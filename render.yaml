@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: paiso-miniapp
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: BOT_USERNAME
+        value: PaisoEarnBot
+      - key: ADMIN_ID
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: WEBAPP_URL
+        sync: false
+      - key: COIN_PER_NPR
+        value: "100"
+      - key: MIN_WITHDRAW_NPR
+        value: "100"
+      - key: REFERRAL_BONUS_COINS
+        value: "500"
+      - key: DAILY_BONUS_COINS
+        value: "100"
+      - key: ADSGRAM_BLOCK_ID
+        sync: false
+      - key: AD_REWARD_COINS
+        value: "50"
+      - key: AD_DAILY_CAP
+        value: "10"

@@ -1,0 +1,21 @@
+{
+  "name": "paiso-miniapp",
+  "version": "1.0.0",
+  "description": "Telegram Mini App - Task Earning App (TypeScript)",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "dev": "npm run build && node --watch server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.1",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}

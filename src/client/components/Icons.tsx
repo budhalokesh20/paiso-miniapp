@@ -1,0 +1,98 @@
+import { h } from '../jsx';
+
+export function SvgSpriteDefs() {
+  return (
+    <svg style="display:none" aria-hidden="true">
+      <defs>
+        <linearGradient id="pCoinGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#FFE066" />
+          <stop offset="50%" stop-color="#F59E0B" />
+          <stop offset="100%" stop-color="#D97706" />
+        </linearGradient>
+        <symbol id="icon-p-coin" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10.5" fill="url(#pCoinGrad)" stroke="#B45309" stroke-width="1" />
+          <circle cx="12" cy="12" r="8" fill="none" stroke="#FEF08A" stroke-width="1" opacity="0.65" />
+          <path
+            d="M9.5 16.5V7.5h3.3c1.9 0 3.1 1 3.1 2.7 0 1.7-1.2 2.8-3.1 2.8h-1.3v3.5H9.5zm2-5.1h1.1c.8 0 1.3-.4 1.3-1.2 0-.7-.5-1.1-1.3-1.1h-1.1v2.3z"
+            fill="#78350F"
+          />
+        </symbol>
+        <symbol id="icon-gift" viewBox="0 0 24 24">
+          <path
+            d="M20 12v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <rect
+            x="2"
+            y="7"
+            width="20"
+            height="5"
+            rx="1"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <line x1="12" y1="22" x2="12" y2="7" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </symbol>
+        <symbol id="icon-clock" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+          <polyline
+            points="12 7 12 12 15.5 14"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </symbol>
+        <symbol id="icon-check-circle" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2" />
+          <polyline
+            points="16.5 9.5 10.8 15 7.5 11.8"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </symbol>
+        <symbol id="icon-blue-tick" viewBox="0 0 24 24">
+          <path
+            d="M12 1.8l2.45 1.85 3.05-.35.95 2.9 2.9.95-.35 3.05L22.85 12l-1.85 2.45.35 3.05-2.9.95-.95 2.9-3.05-.35L12 22.85l-2.45-1.85-3.05.35-.95-2.9-2.9-.95.35-3.05L1.15 12 3 9.55 2.65 6.5l2.9-.95.95-2.9 3.05.35L12 1.8z"
+            fill="#1D9BF0"
+          />
+          <polyline
+            points="16.2 9.2 10.8 14.6 7.8 11.6"
+            fill="none"
+            stroke="#FFFFFF"
+            stroke-width="2.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </symbol>
+      </defs>
+    </svg>
+  );
+}

@@ -1,0 +1,1124 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+/**
+ * Paiso - Telegram Mini App Earning Backend (TypeScript)
+ * - Verifies Telegram initData (HMAC) - no fake accounts
+ * - Tasks: telegram_join (auto-verified via Bot API), social_visit (timer)
+ * - Daily bonus (24h cooldown + 7-day streak)
+ * - Qualified Referral System: Referrer gets +500 coins after referred user completes
+ *   3 Ads + 2 Social Tasks + 2 Days Daily Check-in; plus 10% lifetime task earnings
+ * - Withdrawal requires meeting the qualification condition (3 Ads, 2 Tasks, 2 Daily Check-ins)
+ * - DB: Postgres (Neon) when DATABASE_URL is set, else local JSON file (data/db.json)
+ */
+const express_1 = __importDefault(require("express"));
+const crypto_1 = __importDefault(require("crypto"));
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
+// --- tiny .env loader (no dotenv dep) ---
+try {
+    fs_1.default.readFileSync(path_1.default.join(__dirname, '.env'), 'utf8')
+        .split('\n')
+        .forEach((l) => {
+        const m = l.match(/^\s*([^#=]+)=(.*)$/);
+        if (m)
+            process.env[m[1].trim()] = m[2].trim();
+    });
+}
+catch { }
+const BOT_TOKEN = process.env.BOT_TOKEN || '';
+const ADMIN_ID = String(process.env.ADMIN_ID || '');
+const PORT = +(process.env.PORT || 3000);
+const COIN_PER_NPR = +(process.env.COIN_PER_NPR || 100);
+const MIN_WITHDRAW_COINS = +(process.env.MIN_WITHDRAW_NPR || 100) * COIN_PER_NPR;
+const REFERRAL_BONUS = +(process.env.REFERRAL_BONUS_COINS || 500);
+const DAILY_BONUS = +(process.env.DAILY_BONUS_COINS || 100);
+const ADSGRAM_BLOCK_ID = process.env.ADSGRAM_BLOCK_ID || '';
+const AD_REWARD = +(process.env.AD_REWARD_COINS || 50);
+const AD_DAILY_CAP = +(process.env.AD_DAILY_CAP || 10);
+const AD_COOLDOWN_MS = +(process.env.AD_COOLDOWN_SEC || 45) * 1000;
+const REQ_ADS = 3;
+const REQ_TASKS = 2;
+const REQ_DAILY = 2;
+const DB_FILE = path_1.default.join(__dirname, 'data', 'db.json');
+const SEED_TASKS = JSON.parse(fs_1.default.readFileSync(path_1.default.join(__dirname, 'data', 'tasks.json'), 'utf8'));
+const DEFAULT_SETTINGS = {
+    methods: [
+        {
+            id: 'm_esewa',
+            name: 'eSewa',
+            logo: 'https://cdn-icons-png.flaticon.com/512/10149/10149458.png',
+            placeholder: 'Enter ID / Account Number',
+            country: 'Nepal',
+            enabled: true
+        }
+    ],
+    allowedMethods: ['eSewa'],
+    minWithdrawCoins: MIN_WITHDRAW_COINS,
+    coinPerNpr: COIN_PER_NPR,
+    countries: [
+        {
+            code: 'NP',
+            name: 'Nepal',
+            flag: 'https://flagcdn.com/w40/np.png'
+        }
+    ],
+    allowedCountries: ['Nepal'],
+    requireQualification: true
+};
+// --- Storage: Postgres (Neon) when DATABASE_URL is set, else local JSON file ---
+const DATABASE_URL = process.env.DATABASE_URL || '';
+let sql = null;
+let db = {
+    users: {},
+    withdrawals: [],
+    claims: {},
+    tasks: [...SEED_TASKS],
+    settings: { ...DEFAULT_SETTINGS }
+};
+function normalizeDB(d) {
+    const rawSettings = (d && d.settings) || {};
+    const methods = Array.isArray(rawSettings.methods)
+        ? rawSettings.methods
+        : DEFAULT_SETTINGS.methods;
+    const countries = Array.isArray(rawSettings.countries)
+        ? rawSettings.countries
+        : DEFAULT_SETTINGS.countries;
+    return {
+        users: (d && d.users) || {},
+        withdrawals: (d && d.withdrawals) || [],
+        claims: (d && d.claims) || {},
+        tasks: d && Array.isArray(d.tasks) && d.tasks.length ? d.tasks : [...SEED_TASKS],
+        settings: {
+            ...DEFAULT_SETTINGS,
+            ...rawSettings,
+            methods,
+            allowedMethods: methods.filter((m) => m.enabled !== false).map((m) => m.name),
+            countries,
+            allowedCountries: countries.map((c) => c.name)
+        }
+    };
+}
+function getTasks() {
+    if (!db.tasks || !db.tasks.length) {
+        db.tasks = [...SEED_TASKS];
+    }
+    return db.tasks;
+}
+function getSettings() {
+    if (!db.settings) {
+        db.settings = { ...DEFAULT_SETTINGS };
+    }
+    return db.settings;
+}
+let saveChain = Promise.resolve();
+function persistNow() {
+    if (!sql) {
+        try {
+            fs_1.default.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+        }
+        catch { }
+        return Promise.resolve();
+    }
+    const snapshot = JSON.stringify(db);
+    return sql
+        .query('INSERT INTO paiso_state (id, data) VALUES (1, $1::jsonb) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data', [snapshot])
+        .then(() => undefined)
+        .catch((e) => console.error('DB save failed:', e.message));
+}
+function saveDB() {
+    saveChain = saveChain.then(persistNow);
+    return saveChain;
+}
+async function initDB() {
+    if (DATABASE_URL) {
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            const { neon } = require('@neondatabase/serverless');
+            sql = neon(DATABASE_URL);
+            if (sql) {
+                await sql.query('CREATE TABLE IF NOT EXISTS paiso_state (id INT PRIMARY KEY, data JSONB NOT NULL)');
+                const rows = await sql.query('SELECT data FROM paiso_state WHERE id = 1');
+                if (rows.length)
+                    db = normalizeDB(rows[0].data);
+                else
+                    await persistNow();
+                console.log('🗄️  Postgres DB loaded (Neon) — data permanent chha');
+                return;
+            }
+        }
+        catch (e) {
+            const err = e;
+            console.error('⚠️ Postgres init failed, file DB ma fallback:', err.message);
+            sql = null;
+        }
+    }
+    try {
+        db = normalizeDB(JSON.parse(fs_1.default.readFileSync(DB_FILE, 'utf8')));
+    }
+    catch { }
+    console.log('🗄️  File DB mode (DATABASE_URL chhaina)');
+}
+function verifyInitData(initData) {
+    if (!BOT_TOKEN)
+        return null;
+    const params = new URLSearchParams(initData);
+    const hash = params.get('hash');
+    if (!hash)
+        return null;
+    params.delete('hash');
+    const dataCheck = [...params.entries()]
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([k, v]) => `${k}=${v}`)
+        .join('\n');
+    const secret = crypto_1.default.createHmac('sha256', 'WebAppData').update(BOT_TOKEN).digest();
+    const calc = crypto_1.default.createHmac('sha256', secret).update(dataCheck).digest('hex');
+    if (calc !== hash)
+        return null;
+    try {
+        return JSON.parse(params.get('user') || 'null');
+    }
+    catch {
+        return null;
+    }
+}
+async function tgApi(method, body) {
+    const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {})
+    });
+    return r.json();
+}
+async function isMember(chat, userId) {
+    try {
+        const r = await tgApi('getChatMember', { chat_id: chat, user_id: userId });
+        return Boolean(r.ok && ['member', 'administrator', 'creator'].includes(r.result?.status));
+    }
+    catch {
+        return false;
+    }
+}
+function getTaskClaimState(userId, task) {
+    const claimedAt = db.claims[`${userId}:${task.id}`];
+    if (!claimedAt)
+        return { done: false };
+    const resetHours = +(task.resetHours || 0);
+    if (resetHours > 0) {
+        const unlockAt = claimedAt + resetHours * 3600 * 1000;
+        if (Date.now() >= unlockAt) {
+            return { done: false };
+        }
+        return { done: true, nextAvailableAt: unlockAt };
+    }
+    return { done: true };
+}
+function getQualification(user) {
+    const adsDone = user.totalAdsWatched ?? user.adCount ?? 0;
+    const activeClaimsCount = getTasks().filter((t) => getTaskClaimState(user.id, t).done).length;
+    const tasksDone = Math.max(user.totalTasksCompleted || 0, activeClaimsCount);
+    const dailyDone = user.totalDailyCheckins ?? user.dailyStreak ?? (user.lastDaily ? 1 : 0);
+    const qualified = adsDone >= REQ_ADS && tasksDone >= REQ_TASKS && dailyDone >= REQ_DAILY;
+    return {
+        adsDone,
+        adsReq: REQ_ADS,
+        tasksDone,
+        tasksReq: REQ_TASKS,
+        dailyDone,
+        dailyReq: REQ_DAILY,
+        qualified
+    };
+}
+function checkAndPayReferralBonus(user) {
+    if (!user.referredBy || user.refBonusPaid)
+        return;
+    const referrer = db.users[user.referredBy];
+    if (!referrer)
+        return;
+    const qual = getQualification(user);
+    if (qual.qualified) {
+        user.refBonusPaid = true;
+        user.qualifiedAt = new Date().toISOString();
+        referrer.coins += REFERRAL_BONUS;
+        referrer.totalEarned += REFERRAL_BONUS;
+        saveDB();
+        tgApi('sendMessage', {
+            chat_id: referrer.id,
+            text: `🎉 Timro referral ${user.first_name || user.username || user.id} qualified bhayo (3 Ads, 2 Tasks, 2 Daily Check-in)! +${REFERRAL_BONUS} coins bonus milyo.`
+        }).catch(() => { });
+    }
+}
+function getUser(tgUser, startParam) {
+    const id = String(tgUser.id);
+    if (!db.users[id]) {
+        db.users[id] = {
+            id,
+            first_name: tgUser.first_name || '',
+            username: tgUser.username || '',
+            coins: 0,
+            totalEarned: 0,
+            referrals: 0,
+            lastDaily: '',
+            totalDailyCheckins: 0,
+            totalAdsWatched: 0,
+            referredBy: null,
+            refBonusPaid: false,
+            joinedAt: new Date().toISOString()
+        };
+        const m = /^ref_(\d+)$/.exec(startParam || '');
+        if (m && m[1] !== id && db.users[m[1]]) {
+            db.users[id].referredBy = m[1];
+            db.users[id].refBonusPaid = false;
+            db.users[m[1]].referrals += 1;
+            tgApi('sendMessage', {
+                chat_id: m[1],
+                text: `👋 Naya referral (${tgUser.first_name || 'User'}) join bhayo! Usle 3 Ads, 2 Social Tasks ra 2 Days Daily Check-in pura garepachhi +${REFERRAL_BONUS} coins bonus aauchha.`
+            }).catch(() => { });
+        }
+        saveDB();
+    }
+    return db.users[id];
+}
+function credit(user, amount, reason) {
+    user.coins += amount;
+    user.totalEarned += amount;
+    if (user.referredBy && db.users[user.referredBy] && (reason === 'task' || reason === 'daily')) {
+        const cut = Math.floor(amount * 0.1);
+        if (cut > 0) {
+            db.users[user.referredBy].coins += cut;
+            db.users[user.referredBy].totalEarned += cut;
+        }
+    }
+    saveDB();
+}
+function getReferralHistory(referrerId) {
+    return Object.values(db.users)
+        .filter((u) => u.referredBy === referrerId)
+        .sort((a, b) => (b.joinedAt || '').localeCompare(a.joinedAt || ''))
+        .map((u) => {
+        const q = getQualification(u);
+        return {
+            id: u.id,
+            name: u.first_name || 'User',
+            username: u.username || '',
+            joinedAt: u.joinedAt,
+            qualified: Boolean(u.refBonusPaid || q.qualified),
+            bonusCoins: REFERRAL_BONUS,
+            adsDone: q.adsDone,
+            adsReq: q.adsReq,
+            tasksDone: q.tasksDone,
+            tasksReq: q.tasksReq,
+            dailyDone: q.dailyDone,
+            dailyReq: q.dailyReq
+        };
+    });
+}
+// --- Express ---
+const app = (0, express_1.default)();
+app.use(express_1.default.json({ limit: '5mb' }));
+app.use(express_1.default.static(path_1.default.join(__dirname, 'public')));
+app.get('/admin', (_req, res) => {
+    res.sendFile(path_1.default.join(__dirname, 'public', 'admin.html'));
+});
+let cachedCountries = null;
+app.get('/api/countries', async (_req, res) => {
+    if (cachedCountries && cachedCountries.length) {
+        res.json({ countries: cachedCountries });
+        return;
+    }
+    try {
+        const r = await fetch('https://restcountries.com/v3.1/all?fields=name,cca2,flags');
+        const raw = (await r.json());
+        if (Array.isArray(raw)) {
+            cachedCountries = raw
+                .filter((c) => c.name?.common && c.cca2)
+                .map((c) => ({
+                code: String(c.cca2),
+                name: String(c.name.common),
+                flag: String(c.flags?.png || c.flags?.svg || `https://flagcdn.com/w40/${String(c.cca2).toLowerCase()}.png`)
+            }))
+                .sort((a, b) => a.name.localeCompare(b.name));
+            res.json({ countries: cachedCountries });
+            return;
+        }
+    }
+    catch { }
+    res.json({ countries: getSettings().countries });
+});
+function auth(req, res, next) {
+    const initData = String(req.headers['x-init-data'] || '');
+    const isLocalDev = !initData && (req.hostname === 'localhost' || req.hostname === '127.0.0.1');
+    const tgUser = BOT_TOKEN && !isLocalDev
+        ? verifyInitData(initData)
+        : { id: 999001, first_name: 'Test User', username: 'test' };
+    if (!tgUser) {
+        res.status(401).json({ error: 'Invalid Telegram login' });
+        return;
+    }
+    const startParam = new URLSearchParams(initData).get('start_param') || '';
+    req.user = getUser(tgUser, startParam);
+    next();
+}
+const DAILY_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
+const STREAK_RESET_MS = 48 * 60 * 60 * 1000; // 48 hours
+function getDailyState(user) {
+    const now = Date.now();
+    const lastAt = user.lastDailyAt || 0;
+    let streak = user.dailyStreak || 0;
+    if (lastAt > 0 && now - lastAt >= STREAK_RESET_MS) {
+        streak = 0;
+    }
+    const nextDailyAt = lastAt > 0 ? lastAt + DAILY_COOLDOWN_MS : 0;
+    const canDaily = now >= nextDailyAt;
+    return { canDaily, nextDailyAt, dailyStreak: streak };
+}
+app.get('/api/me', auth, (req, res) => {
+    const user = req.user;
+    const today = new Date().toISOString().slice(0, 10);
+    const dailyState = getDailyState(user);
+    const cfg = getSettings();
+    checkAndPayReferralBonus(user);
+    res.json({
+        user,
+        tasks: getTasks().map((t) => {
+            const st = getTaskClaimState(user.id, t);
+            return { ...t, done: st.done, nextAvailableAt: st.nextAvailableAt };
+        }),
+        coinPerNpr: cfg.coinPerNpr || COIN_PER_NPR,
+        minWithdrawCoins: cfg.minWithdrawCoins || MIN_WITHDRAW_COINS,
+        dailyBonus: DAILY_BONUS,
+        ads: {
+            blockId: ADSGRAM_BLOCK_ID,
+            reward: AD_REWARD,
+            dailyCap: AD_DAILY_CAP,
+            watchedToday: user.adDay === today ? user.adCount || 0 : 0
+        },
+        canDaily: dailyState.canDaily,
+        nextDailyAt: dailyState.nextDailyAt,
+        dailyStreak: dailyState.dailyStreak,
+        qualification: getQualification(user),
+        referralHistory: getReferralHistory(user.id),
+        withdrawSettings: cfg,
+        refLink: `https://t.me/${process.env.BOT_USERNAME || 'YourBot'}?start=ref_${user.id}`
+    });
+});
+app.post('/api/task/claim', auth, async (req, res) => {
+    const user = req.user;
+    const task = getTasks().find((t) => t.id === req.body?.taskId);
+    if (!task) {
+        res.status(404).json({ error: 'Task not found' });
+        return;
+    }
+    const key = `${user.id}:${task.id}`;
+    const claimState = getTaskClaimState(user.id, task);
+    if (claimState.done) {
+        res.json({ ok: false, error: 'Already claimed' });
+        return;
+    }
+    // If task reset cooldown expired, clear old claim before starting new verification
+    if (db.claims[key]) {
+        delete db.claims[key];
+        delete db.claims[`${key}:start`];
+    }
+    if (task.type === 'telegram_join') {
+        if (BOT_TOKEN && !(await isMember(task.target, user.id))) {
+            res.json({ ok: false, error: 'Pahila join gara, ani Verify dabau.' });
+            return;
+        }
+    }
+    if (task.type === 'social_visit') {
+        const started = db.claims[`${key}:start`];
+        const waitSec = task.waitSeconds || 15;
+        if (!started) {
+            db.claims[`${key}:start`] = Date.now();
+            saveDB();
+            res.json({
+                ok: false,
+                started: true,
+                waitSeconds: waitSec,
+                error: `Link kholyo. ${waitSec} sec parkha ani feri Verify dabau.`
+            });
+            return;
+        }
+        if (Date.now() - started < waitSec * 1000) {
+            res.json({ ok: false, error: 'Wait time pugeko chhaina, link ma basera aau.' });
+            return;
+        }
+    }
+    db.claims[key] = Date.now();
+    delete db.claims[`${key}:start`];
+    user.totalTasksCompleted = (user.totalTasksCompleted || 0) + 1;
+    credit(user, task.reward, 'task');
+    checkAndPayReferralBonus(user);
+    res.json({ ok: true, reward: task.reward, coins: user.coins });
+});
+// --- AdsGram rewarded ads ---
+function tryCreditAd(user) {
+    const today = new Date().toISOString().slice(0, 10);
+    if (user.adDay !== today) {
+        user.adDay = today;
+        user.adCount = 0;
+    }
+    if ((user.adCount || 0) >= AD_DAILY_CAP)
+        return false;
+    if (user.lastAdAt && Date.now() - user.lastAdAt < AD_COOLDOWN_MS)
+        return false;
+    user.adCount = (user.adCount || 0) + 1;
+    user.totalAdsWatched = (user.totalAdsWatched || 0) + 1;
+    user.lastAdAt = Date.now();
+    credit(user, AD_REWARD, 'ad');
+    checkAndPayReferralBonus(user);
+    return true;
+}
+app.get('/api/adsgram/reward', (req, res) => {
+    const uid = String(req.query.userid || '');
+    const user = db.users[uid];
+    if (user && ADSGRAM_BLOCK_ID)
+        tryCreditAd(user);
+    res.status(200).send('ok');
+});
+app.post('/api/daily', auth, (req, res) => {
+    const user = req.user;
+    const now = Date.now();
+    const { canDaily, nextDailyAt, dailyStreak } = getDailyState(user);
+    if (!canDaily) {
+        const remSec = Math.max(1, Math.ceil((nextDailyAt - now) / 1000));
+        const hrs = Math.floor(remSec / 3600);
+        const mins = Math.floor((remSec % 3600) / 60);
+        res.json({
+            ok: false,
+            error: `Arko check-in ${hrs}h ${mins}m pachhi milchha!`,
+            nextDailyAt,
+            dailyStreak
+        });
+        return;
+    }
+    const newStreak = (dailyStreak % 7) + 1;
+    const reward = newStreak === 7 ? DAILY_BONUS * 2 : DAILY_BONUS;
+    user.lastDaily = new Date(now).toISOString().slice(0, 10);
+    user.lastDailyAt = now;
+    user.dailyStreak = newStreak;
+    user.totalDailyCheckins = (user.totalDailyCheckins || 0) + 1;
+    credit(user, reward, 'daily');
+    checkAndPayReferralBonus(user);
+    res.json({
+        ok: true,
+        reward,
+        coins: user.coins,
+        dailyStreak: newStreak,
+        nextDailyAt: now + DAILY_COOLDOWN_MS
+    });
+});
+app.post('/api/withdraw', auth, (req, res) => {
+    const user = req.user;
+    const cfg = getSettings();
+    const qual = getQualification(user);
+    if (cfg.requireQualification !== false && !qual.qualified) {
+        res.json({
+            ok: false,
+            error: `Withdraw unlock garna 3 Ads (${qual.adsDone}/${qual.adsReq}), 2 Social Tasks (${qual.tasksDone}/${qual.tasksReq}) ra 2 Days Check-in (${qual.dailyDone}/${qual.dailyReq}) pura garnuhos!`
+        });
+        return;
+    }
+    const { method, account, amountCoins } = req.body || {};
+    const enabledNames = (cfg.methods || []).filter((m) => m.enabled !== false).map((m) => m.name);
+    if (!method || (enabledNames.length > 0 && !enabledNames.includes(String(method)))) {
+        res.json({ ok: false, error: `${method || 'Selected'} withdrawal method is not enabled` });
+        return;
+    }
+    if (!account || String(account).length < 5) {
+        res.json({ ok: false, error: 'Sahi account number/id hal' });
+        return;
+    }
+    const minCoins = cfg.minWithdrawCoins || MIN_WITHDRAW_COINS;
+    const rate = cfg.coinPerNpr || COIN_PER_NPR;
+    const amt = Math.floor(+(amountCoins || 0));
+    if (amt < minCoins) {
+        res.json({
+            ok: false,
+            error: `Minimum withdraw ${minCoins} coins (NPR ${(minCoins / rate).toFixed(0)})`
+        });
+        return;
+    }
+    if (amt > user.coins) {
+        res.json({ ok: false, error: 'Balance pugena' });
+        return;
+    }
+    user.coins -= amt;
+    const w = {
+        id: 'W' + Date.now(),
+        userId: user.id,
+        username: user.username,
+        method,
+        account: String(account),
+        coins: amt,
+        npr: +(amt / rate).toFixed(2),
+        status: 'pending',
+        at: new Date().toISOString()
+    };
+    db.withdrawals.push(w);
+    saveDB();
+    if (ADMIN_ID) {
+        tgApi('sendMessage', {
+            chat_id: ADMIN_ID,
+            text: `💸 Withdraw request ${w.id}\n@${w.username} (${w.userId})\n${w.method}: ${w.account}\n${w.coins} coins = NPR ${w.npr}`
+        }).catch(() => { });
+    }
+    res.json({ ok: true, withdraw: w, coins: user.coins });
+});
+app.get('/api/my-withdrawals', auth, (req, res) => {
+    const user = req.user;
+    res.json({
+        withdrawals: db.withdrawals
+            .filter((w) => w.userId === user.id)
+            .slice(-20)
+            .reverse()
+    });
+});
+// --- Profile Verification (Details + Email OTP -> Blue Tick) ---
+async function sendVerificationEmail(toEmail, fullName, otp) {
+    const resendKey = process.env.RESEND_API_KEY || '';
+    if (resendKey) {
+        try {
+            const r = await fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${resendKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    from: process.env.EMAIL_FROM || 'Paiso Verification <onboarding@resend.dev>',
+                    to: [toEmail],
+                    subject: `${otp} is your Paiso Verification OTP`,
+                    html: `<div style="font-family:sans-serif;max-width:440px;margin:0 auto;padding:24px;border:1px solid #E2E8F0;border-radius:16px">
+            <h2 style="color:#091A3C;margin:0 0 8px">Verify your Paiso Account</h2>
+            <p style="color:#475569;font-size:14px">Hi <b>${fullName}</b>, use the 6-digit OTP below to complete your profile verification and unlock your Blue Tick badge:</p>
+            <div style="background:#EFF6FF;border:1px dashed #2563EB;border-radius:12px;padding:16px;text-align:center;font-size:28px;font-weight:800;letter-spacing:6px;color:#1D4ED8;margin:18px 0">${otp}</div>
+            <p style="color:#64748B;font-size:12px">This code expires in 10 minutes.</p>
+          </div>`
+                })
+            });
+            if (r.ok)
+                return true;
+        }
+        catch { }
+    }
+    return false;
+}
+app.post('/api/verify/send-otp', auth, async (req, res) => {
+    const user = req.user;
+    if (user.verified && user.verification?.verified) {
+        res.json({ ok: false, error: 'Account is already verified!' });
+        return;
+    }
+    const fullName = String(req.body?.fullName || '').trim();
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const dob = String(req.body?.dob || '').trim();
+    const gender = String(req.body?.gender || '').trim();
+    if (fullName.length < 2) {
+        res.json({ ok: false, error: 'Please enter your full name' });
+        return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        res.json({ ok: false, error: 'Please enter a valid email address' });
+        return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
+        res.json({ ok: false, error: 'Please select your Date of Birth' });
+        return;
+    }
+    if (gender !== 'Male' && gender !== 'Female') {
+        res.json({ ok: false, error: 'Please select Male or Female' });
+        return;
+    }
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    user.pendingOtp = {
+        otp,
+        fullName,
+        email,
+        dob,
+        gender,
+        expiresAt: Date.now() + 10 * 60 * 1000
+    };
+    saveDB();
+    const emailSent = await sendVerificationEmail(email, fullName, otp);
+    // Also deliver OTP via Telegram bot chat if BOT_TOKEN is active
+    if (BOT_TOKEN) {
+        tgApi('sendMessage', {
+            chat_id: user.id,
+            text: `📧 Paiso Verification OTP: ${otp}\nName: ${fullName}\nEmail: ${email}\n\nEnter this 6-digit code in the app to get your Blue Tick!`
+        }).catch(() => { });
+    }
+    console.log(`📧 Verification OTP for ${email} (${user.id}): ${otp}`);
+    res.json({
+        ok: true,
+        emailSent,
+        otpPreview: emailSent ? undefined : otp,
+        message: emailSent
+            ? `6-digit OTP sent to ${email}`
+            : `OTP generated for ${email}`
+    });
+});
+app.post('/api/verify/confirm-otp', auth, (req, res) => {
+    const user = req.user;
+    const code = String(req.body?.otp || '').trim();
+    if (!user.pendingOtp) {
+        res.json({ ok: false, error: 'Please request an OTP first' });
+        return;
+    }
+    if (Date.now() > user.pendingOtp.expiresAt) {
+        delete user.pendingOtp;
+        saveDB();
+        res.json({ ok: false, error: 'OTP expired! Please request a new OTP.' });
+        return;
+    }
+    if (code !== user.pendingOtp.otp) {
+        res.json({ ok: false, error: 'Invalid OTP code! Please check and try again.' });
+        return;
+    }
+    const { fullName, email, dob, gender } = user.pendingOtp;
+    user.verified = true;
+    user.first_name = fullName;
+    user.verification = {
+        verified: true,
+        fullName,
+        email,
+        dob,
+        gender,
+        verifiedAt: new Date().toISOString()
+    };
+    delete user.pendingOtp;
+    saveDB();
+    res.json({
+        ok: true,
+        verified: true,
+        verification: user.verification
+    });
+});
+// --- Admin endpoints ---
+function adminOnly(req, res, next) {
+    const key = String(req.headers['x-admin-id'] || '').trim();
+    const isLocal = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
+    if ((ADMIN_ID && key === ADMIN_ID) || (isLocal && (key === 'admin' || key === ADMIN_ID))) {
+        next();
+        return;
+    }
+    res.status(403).json({ error: 'forbidden' });
+}
+app.get('/api/admin/withdrawals', adminOnly, (_req, res) => {
+    res.json({ withdrawals: db.withdrawals.filter((w) => w.status === 'pending') });
+});
+app.get('/api/admin/stats', adminOnly, (_req, res) => {
+    const users = Object.values(db.users);
+    const pendingList = db.withdrawals.filter((w) => w.status === 'pending');
+    const paidList = db.withdrawals.filter((w) => w.status === 'paid');
+    const rejectedList = db.withdrawals.filter((w) => w.status === 'rejected');
+    res.json({
+        totalUsers: users.length,
+        verifiedUsers: users.filter((u) => Boolean(u.verified)).length,
+        qualifiedUsers: users.filter((u) => getQualification(u).qualified).length,
+        totalCoins: users.reduce((s, u) => s + u.coins, 0),
+        totalEarned: users.reduce((s, u) => s + u.totalEarned, 0),
+        pendingWithdrawals: pendingList.length,
+        paidWithdrawals: paidList.length,
+        rejectedWithdrawals: rejectedList.length,
+        pendingNpr: +pendingList.reduce((s, w) => s + w.npr, 0).toFixed(2),
+        paidNpr: +paidList.reduce((s, w) => s + w.npr, 0).toFixed(2),
+        users: users
+            .sort((a, b) => b.coins - a.coins)
+            .map((u) => {
+            const q = getQualification(u);
+            return {
+                id: u.id,
+                name: u.verification?.fullName || u.first_name || 'User',
+                username: u.username || '',
+                coins: u.coins,
+                totalEarned: u.totalEarned,
+                referrals: u.referrals,
+                verified: Boolean(u.verified),
+                email: u.verification?.email || '',
+                gender: u.verification?.gender || '',
+                dob: u.verification?.dob || '',
+                qualified: q.qualified,
+                adsDone: q.adsDone,
+                tasksDone: q.tasksDone,
+                dailyDone: q.dailyDone,
+                joinedAt: u.joinedAt
+            };
+        }),
+        recentWithdrawals: [...db.withdrawals].reverse(),
+        tasks: getTasks().map((t) => {
+            const claimsCount = Object.keys(db.claims).filter((k) => k.endsWith(`:${t.id}`) && !k.endsWith(':start') && getTaskClaimState(k.split(':')[0], t).done).length;
+            return { ...t, claimsCount };
+        }),
+        settings: getSettings()
+    });
+});
+app.post('/api/admin/settings', adminOnly, (req, res) => {
+    const cur = getSettings();
+    const body = req.body || {};
+    const methods = Array.isArray(body.methods)
+        ? body.methods
+            .map((m) => ({
+            id: String(m.id || 'm_' + Date.now() + Math.random().toString(36).slice(2, 6)),
+            name: String(m.name || '').trim(),
+            logo: String(m.logo || '').trim(),
+            placeholder: String(m.placeholder || `Enter ${m.name || 'Account'} ID`).trim(),
+            country: String(m.country || 'All').trim(),
+            enabled: m.enabled !== false
+        }))
+            .filter((m) => Boolean(m.name))
+        : cur.methods;
+    const countries = Array.isArray(body.countries)
+        ? body.countries
+            .map((c) => ({
+            code: String(c.code || '').trim(),
+            name: String(c.name || '').trim(),
+            flag: String(c.flag || '').trim()
+        }))
+            .filter((c) => Boolean(c.name))
+        : cur.countries;
+    const minWithdrawCoins = Math.max(100, Math.floor(+(body.minWithdrawCoins ?? cur.minWithdrawCoins)));
+    const coinPerNpr = Math.max(1, Math.floor(+(body.coinPerNpr ?? cur.coinPerNpr)));
+    const requireQualification = typeof body.requireQualification === 'boolean' ? body.requireQualification : cur.requireQualification;
+    db.settings = {
+        methods,
+        allowedMethods: methods.filter((m) => m.enabled !== false).map((m) => m.name),
+        minWithdrawCoins,
+        coinPerNpr,
+        countries,
+        allowedCountries: countries.map((c) => c.name),
+        requireQualification
+    };
+    saveDB();
+    res.json({ ok: true, settings: db.settings });
+});
+app.post('/api/admin/tasks', adminOnly, (req, res) => {
+    const b = req.body || {};
+    const title = String(b.title || '').trim();
+    const reward = Math.max(1, Math.floor(+(b.reward || 100)));
+    const type = b.type === 'telegram_join' ? 'telegram_join' : 'social_visit';
+    const url = String(b.url || '').trim();
+    const target = String(b.target || url).trim();
+    const waitSeconds = Math.max(5, Math.floor(+(b.waitSeconds || 15)));
+    const resetHours = Math.max(0, Math.floor(+(b.resetHours || 0)));
+    if (!title || !url) {
+        res.status(400).json({ ok: false, error: 'Title and URL are required' });
+        return;
+    }
+    const newTask = {
+        id: 'task_' + Date.now(),
+        title,
+        description: String(b.description || title),
+        icon: type === 'telegram_join' ? 'TG' : 'WEB',
+        reward,
+        type,
+        target,
+        url,
+        waitSeconds,
+        resetHours
+    };
+    getTasks().push(newTask);
+    saveDB();
+    res.json({ ok: true, task: newTask, tasks: getTasks() });
+});
+app.put('/api/admin/tasks/:id', adminOnly, (req, res) => {
+    const list = getTasks();
+    const idx = list.findIndex((t) => t.id === req.params.id);
+    if (idx === -1) {
+        res.status(404).json({ ok: false, error: 'Task not found' });
+        return;
+    }
+    const b = req.body || {};
+    const cur = list[idx];
+    list[idx] = {
+        ...cur,
+        title: String(b.title ?? cur.title).trim(),
+        reward: Math.max(1, Math.floor(+(b.reward ?? cur.reward))),
+        type: b.type === 'telegram_join' || b.type === 'social_visit' ? b.type : cur.type,
+        url: String(b.url ?? cur.url).trim(),
+        target: String(b.target ?? cur.target).trim(),
+        waitSeconds: Math.max(5, Math.floor(+(b.waitSeconds ?? cur.waitSeconds ?? 15))),
+        resetHours: Math.max(0, Math.floor(+(b.resetHours ?? cur.resetHours ?? 0)))
+    };
+    saveDB();
+    res.json({ ok: true, task: list[idx], tasks: list });
+});
+app.post('/api/admin/tasks/reset-all', adminOnly, (_req, res) => {
+    db.claims = {};
+    const nowIso = new Date().toISOString();
+    getTasks().forEach((t) => {
+        t.lastResetAt = nowIso;
+    });
+    saveDB();
+    res.json({ ok: true, tasks: getTasks() });
+});
+app.post('/api/admin/tasks/:id/reset', adminOnly, (req, res) => {
+    const taskId = String(req.params.id);
+    const task = getTasks().find((t) => t.id === taskId);
+    if (!task) {
+        res.status(404).json({ ok: false, error: 'Task not found' });
+        return;
+    }
+    Object.keys(db.claims).forEach((k) => {
+        if (k.endsWith(`:${taskId}`) || k.endsWith(`:${taskId}:start`)) {
+            delete db.claims[k];
+        }
+    });
+    task.lastResetAt = new Date().toISOString();
+    saveDB();
+    res.json({ ok: true, task, tasks: getTasks() });
+});
+app.delete('/api/admin/tasks/:id', adminOnly, (req, res) => {
+    const taskId = String(req.params.id);
+    db.tasks = getTasks().filter((t) => t.id !== taskId);
+    Object.keys(db.claims).forEach((k) => {
+        if (k.endsWith(`:${taskId}`) || k.endsWith(`:${taskId}:start`)) {
+            delete db.claims[k];
+        }
+    });
+    saveDB();
+    res.json({ ok: true, tasks: getTasks() });
+});
+app.post('/api/admin/users', adminOnly, (req, res) => {
+    const b = req.body || {};
+    const id = String(b.id || Date.now()).trim();
+    if (db.users[id]) {
+        res.status(400).json({ ok: false, error: 'User ID already exists' });
+        return;
+    }
+    const name = String(b.name || 'New User').trim();
+    const username = String(b.username || '').trim();
+    const coins = Math.max(0, Math.floor(+(b.coins || 0)));
+    const verified = Boolean(b.verified);
+    const email = String(b.email || '').trim();
+    const newUser = {
+        id,
+        first_name: name,
+        username,
+        coins,
+        totalEarned: coins,
+        referrals: 0,
+        lastDaily: '',
+        referredBy: null,
+        verified,
+        verification: verified
+            ? {
+                verified: true,
+                fullName: name,
+                email: email || 'verified@paiso.app',
+                dob: '2000-01-01',
+                gender: 'Male',
+                verifiedAt: new Date().toISOString()
+            }
+            : undefined,
+        joinedAt: new Date().toISOString()
+    };
+    db.users[id] = newUser;
+    saveDB();
+    res.json({ ok: true, user: newUser });
+});
+app.put('/api/admin/user/:id', adminOnly, (req, res) => {
+    const uid = String(req.params.id);
+    const u = db.users[uid];
+    if (!u) {
+        res.status(404).json({ ok: false, error: 'User not found' });
+        return;
+    }
+    const b = req.body || {};
+    if (b.name !== undefined)
+        u.first_name = String(b.name).trim();
+    if (b.username !== undefined)
+        u.username = String(b.username).trim();
+    if (b.coins !== undefined)
+        u.coins = Math.max(0, Math.floor(+b.coins));
+    if (b.adsDone !== undefined)
+        u.totalAdsWatched = Math.max(0, Math.floor(+b.adsDone));
+    if (b.dailyDone !== undefined)
+        u.totalDailyCheckins = Math.max(0, Math.floor(+b.dailyDone));
+    if (typeof b.verified === 'boolean') {
+        u.verified = b.verified;
+        if (u.verified) {
+            u.verification = {
+                verified: true,
+                fullName: u.first_name,
+                email: String(b.email || u.verification?.email || 'verified@paiso.app'),
+                dob: u.verification?.dob || '2000-01-01',
+                gender: u.verification?.gender || 'Male',
+                verifiedAt: u.verification?.verifiedAt || new Date().toISOString()
+            };
+        }
+        else if (u.verification) {
+            u.verification.verified = false;
+        }
+    }
+    saveDB();
+    res.json({ ok: true, user: u });
+});
+app.post('/api/admin/user/:id/coins', adminOnly, (req, res) => {
+    const uid = String(req.params.id);
+    const u = db.users[uid];
+    if (!u) {
+        res.status(404).json({ ok: false, error: 'User not found' });
+        return;
+    }
+    const delta = Math.floor(+(req.body?.delta || 0));
+    u.coins = Math.max(0, u.coins + delta);
+    if (delta > 0)
+        u.totalEarned += delta;
+    saveDB();
+    res.json({ ok: true, coins: u.coins });
+});
+app.post('/api/admin/user/:id/verify', adminOnly, (req, res) => {
+    const uid = String(req.params.id);
+    const u = db.users[uid];
+    if (!u) {
+        res.status(404).json({ ok: false, error: 'User not found' });
+        return;
+    }
+    u.verified = !u.verified;
+    if (u.verified && !u.verification) {
+        u.verification = {
+            verified: true,
+            fullName: u.first_name || 'Verified User',
+            email: 'verified@paiso.app',
+            dob: '2000-01-01',
+            gender: 'Male',
+            verifiedAt: new Date().toISOString()
+        };
+    }
+    else if (u.verification) {
+        u.verification.verified = u.verified;
+    }
+    saveDB();
+    res.json({ ok: true, verified: u.verified });
+});
+app.delete('/api/admin/user/:id', adminOnly, (req, res) => {
+    const uid = String(req.params.id);
+    delete db.users[uid];
+    saveDB();
+    res.json({ ok: true });
+});
+app.post('/api/admin/withdrawals', adminOnly, (req, res) => {
+    const b = req.body || {};
+    const userId = String(b.userId || '').trim();
+    const username = String(b.username || db.users[userId]?.username || userId).trim();
+    const method = String(b.method || getSettings().methods[0]?.name || 'Custom').trim();
+    const account = String(b.account || '').trim();
+    const coins = Math.max(100, Math.floor(+(b.coins || 10000)));
+    const rate = getSettings().coinPerNpr || COIN_PER_NPR;
+    const status = b.status === 'paid' || b.status === 'rejected' ? b.status : 'pending';
+    if (!userId || !account) {
+        res.status(400).json({ ok: false, error: 'User ID and Account are required' });
+        return;
+    }
+    const w = {
+        id: 'W' + Date.now(),
+        userId,
+        username,
+        method,
+        account,
+        coins,
+        npr: +(coins / rate).toFixed(2),
+        status,
+        at: new Date().toISOString()
+    };
+    db.withdrawals.push(w);
+    saveDB();
+    res.json({ ok: true, withdraw: w });
+});
+app.put('/api/admin/withdraw/:id', adminOnly, (req, res) => {
+    const wid = String(req.params.id);
+    const w = db.withdrawals.find((x) => x.id === wid);
+    if (!w) {
+        res.status(404).json({ ok: false, error: 'Withdrawal not found' });
+        return;
+    }
+    const b = req.body || {};
+    const rate = getSettings().coinPerNpr || COIN_PER_NPR;
+    if (b.method)
+        w.method = String(b.method).trim();
+    if (b.account !== undefined)
+        w.account = String(b.account).trim();
+    if (b.coins !== undefined) {
+        w.coins = Math.max(1, Math.floor(+b.coins));
+        w.npr = +(w.coins / rate).toFixed(2);
+    }
+    if (b.status === 'pending' || b.status === 'paid' || b.status === 'rejected') {
+        w.status = b.status;
+    }
+    saveDB();
+    res.json({ ok: true, withdraw: w });
+});
+app.delete('/api/admin/withdraw/:id', adminOnly, (req, res) => {
+    const wid = String(req.params.id);
+    db.withdrawals = db.withdrawals.filter((x) => x.id !== wid);
+    saveDB();
+    res.json({ ok: true });
+});
+app.post('/api/admin/withdraw/:id', adminOnly, (req, res) => {
+    const w = db.withdrawals.find((x) => x.id === req.params.id);
+    if (!w) {
+        res.status(404).json({ error: 'not found' });
+        return;
+    }
+    w.status = req.body?.action === 'paid' ? 'paid' : 'rejected';
+    if (w.status === 'rejected' && db.users[w.userId]) {
+        db.users[w.userId].coins += w.coins;
+    }
+    saveDB();
+    tgApi('sendMessage', {
+        chat_id: w.userId,
+        text: w.status === 'paid'
+            ? `✅ Withdraw ${w.id} PAID: NPR ${w.npr} -> ${w.method}`
+            : `❌ Withdraw ${w.id} rejected, coins refund bhayo.`
+    }).catch(() => { });
+    res.json({ ok: true, withdraw: w });
+});
+// --- Bot polling (/start with Mini App button) ---
+let offset = 0;
+async function poll() {
+    if (!BOT_TOKEN) {
+        console.log('⚠️  BOT_TOKEN chhaina - bot polling off, API dev mode ma chha.');
+        return;
+    }
+    console.log('🤖 Bot polling start...');
+    while (true) {
+        try {
+            const r = await tgApi('getUpdates', { offset, timeout: 25 });
+            for (const u of r.result || []) {
+                offset = u.update_id + 1;
+                const msg = u.message;
+                if (!msg?.text)
+                    continue;
+                if (msg.text.startsWith('/start')) {
+                    const param = msg.text.split(' ')[1] || '';
+                    getUser(msg.from, param);
+                    await tgApi('sendMessage', {
+                        chat_id: msg.chat.id,
+                        text: `👋 Paiso ma swagat chha ${msg.from.first_name}!\n\n🪙 Tasks gara, coins kamaau\n👥 Refer gara = +${REFERRAL_BONUS} coins\n💸 ${MIN_WITHDRAW_COINS} coins = NPR ${MIN_WITHDRAW_COINS / COIN_PER_NPR} withdraw (eSewa/Khalti)\n\nTala ko button dabayera Paiso app khola 👇`,
+                        reply_markup: {
+                            inline_keyboard: [[{ text: '🚀 Open Paiso App', web_app: { url: process.env.WEBAPP_URL || '' } }]]
+                        }
+                    });
+                }
+                if (msg.text === '/balance') {
+                    const u2 = getUser(msg.from, '');
+                    await tgApi('sendMessage', {
+                        chat_id: msg.chat.id,
+                        text: `🪙 Balance: ${u2.coins} coins (≈ NPR ${(u2.coins / COIN_PER_NPR).toFixed(2)})`
+                    });
+                }
+            }
+        }
+        catch {
+            await new Promise((r) => setTimeout(r, 3000));
+        }
+    }
+}
+initDB().then(() => {
+    app.listen(PORT, () => console.log(`✅ Server: http://localhost:${PORT}`));
+    poll();
+});
