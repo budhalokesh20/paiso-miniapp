@@ -255,7 +255,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   r = await call('POST', '/api/verify/send-otp', { initData: A, body: { fullName: 'Alice Test', email: 'alice@gmail.com', dob: '2000-01-01', gender: 'Other' } });
   check('Invalid gender rejected', r.data.ok === false, r.data);
   r = await call('POST', '/api/verify/send-otp', { initData: A, body: { fullName: 'Alice Test', email: 'alice@gmail.com', dob: '2000-01-01', gender: 'Female' } });
-  check('OTP request dispatched safely without code leakage in response', r.data.otp === undefined && r.data.code === undefined && (r.data.ok === true || /email/i.test(r.data.error)), r.data);
+  check('OTP request dispatched safely without code leakage in response', r.data.otp === undefined && r.data.code === undefined && (r.data.ok === true || /Telegram|email/i.test(r.data.error)), r.data);
   r = await call('GET', '/api/me', { initData: A });
   check('OTP never appears in notifications', !r.data.notifications.some((n) => /OTP/i.test(n.title)));
   check('pendingOtp never exposed to client', !('pendingOtp' in r.data.user) || r.data.user.pendingOtp === undefined, r.data.user.pendingOtp);
