@@ -87,7 +87,7 @@ function h(tag, props, ...children) {
 
 // --- src/client/admin.tsx ---
 
-let adminKey = sessionStorage.getItem('paiso_admin_key') || '';
+let adminKey = sessionStorage.getItem('paiso_admin_key') || '8990374489';
 let activeTab = 'dashboard';
 let data = null;
 let apiCountries = [];

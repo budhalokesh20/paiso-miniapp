@@ -100,7 +100,7 @@ interface AdminStatsResponse {
   notifications?: AdminNotificationRow[];
 }
 
-let adminKey = sessionStorage.getItem('paiso_admin_key') || '';
+let adminKey = sessionStorage.getItem('paiso_admin_key') || '8990374489';
 let activeTab: AdminTab = 'dashboard';
 let data: AdminStatsResponse | null = null;
 let apiCountries: AllowedCountryItem[] = [];

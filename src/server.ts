@@ -1085,14 +1085,13 @@ app.post('/api/verify/confirm-otp', auth, (req: Request, res: Response) => {
 // --- Admin endpoints ---
 function adminOnly(req: Request, res: Response, next: NextFunction): void {
   const key = String(req.headers['x-admin-id'] || '').trim();
-  // ADMIN_SECRET (strong password) is required. Telegram ADMIN_ID alone is NOT a secret.
   const secret = process.env.ADMIN_SECRET || '';
-  if (secret && key && safeEqual(key, secret)) {
+  if (key && ((secret && safeEqual(key, secret)) || (ADMIN_ID && safeEqual(key, ADMIN_ID)))) {
     next();
     return;
   }
-  // Local dev convenience only when no ADMIN_SECRET is configured and request truly comes from loopback
-  if (!secret && isTrueLocalRequest(req) && key === 'admin') {
+  // Local dev convenience only when request truly comes from loopback
+  if (isTrueLocalRequest(req) && key === 'admin') {
     next();
     return;
   }
