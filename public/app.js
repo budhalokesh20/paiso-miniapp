@@ -539,7 +539,7 @@ function SettingsView() {
                         h("svg", { width: "54", height: "54" },
                             h("use", { href: "#icon-blue-tick" }))),
                     h("h3", { className: "verify-done-title" }, "Verified Profile"),
-                    h("p", { className: "verify-done-sub" }, "Your identity & email are verified. Blue Tick is active on your profile."),
+                    h("p", { className: "verify-done-sub" }, "Your identity is verified. Blue Tick is active on your profile."),
                     h("div", { className: "verify-details-list" },
                         h("div", { className: "uid-detail-row" },
                             h("span", { className: "small" }, "Full Name"),
@@ -560,10 +560,10 @@ function SettingsView() {
                                 h("use", { href: "#icon-blue-tick" }))),
                         h("div", null,
                             h("div", { className: "verify-banner-title" }, "Get Verified Blue Tick"),
-                            h("div", { className: "verify-banner-sub" }, "Complete your profile details & confirm Email OTP"))),
+                            h("div", { className: "verify-banner-sub" }, "Complete your profile details & confirm Telegram OTP"))),
                     h("div", { className: "verify-field-label" }, "Full Name"),
                     h("input", { className: "form-input", id: "vFullName", type: "text", placeholder: "Enter your full name" }),
-                    h("div", { className: "verify-field-label" }, "Email Address"),
+                    h("div", { className: "verify-field-label" }, "Email Address (optional)"),
                     h("input", { className: "form-input", id: "vEmail", type: "email", placeholder: "you@example.com" }),
                     h("div", { className: "verify-field-label" }, "Date of Birth"),
                     h("input", { className: "form-input", id: "vDob", type: "date" }),
@@ -586,12 +586,12 @@ function SettingsView() {
                         h("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2", "stroke-linecap": "round", "stroke-linejoin": "round" },
                             h("path", { d: "M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" }),
                             h("polyline", { points: "22,6 12,13 2,6" })),
-                        h("span", { id: "sendOtpBtnText" }, "Send OTP to Email")),
+                        h("span", { id: "sendOtpBtnText" }, "Send OTP to Telegram")),
                     h("div", { className: "verify-otp-box", id: "verifyOtpBox", style: { display: 'none' } },
                         h("div", { className: "verify-otp-divider" }),
                         h("div", { className: "verify-otp-info" },
                             "Enter the 6-digit verification code sent to ",
-                            h("b", { id: "otpTargetEmail" }, "your email")),
+                            h("b", { id: "otpTargetEmail" }, "your Telegram chat")),
                         h("input", { className: "form-input otp-code-input", id: "vOtpInput", type: "text", maxLength: 6, placeholder: "Enter 6-digit OTP" }),
                         h("button", { type: "button", className: "primary-btn btn-with-icon verify-confirm-btn", id: "confirmOtpBtn", onClick: () => window.confirmVerifyOtp() },
                             h("svg", { width: "17", height: "17" },
@@ -1606,7 +1606,7 @@ function renderVerificationState(u) {
     if (menuSub) {
         menuSub.textContent = isVerified
             ? `${u.verification?.email || 'Verified'} • Blue Tick Active`
-            : 'Verify email & details for Blue Tick';
+            : 'Verify your details for Blue Tick';
     }
     const doneCard = $('verifyDoneCard');
     const formCard = $('verifyFormCard');
@@ -1616,7 +1616,7 @@ function renderVerificationState(u) {
     }
     if (isVerified && u.verification) {
         setText('verifiedNameText', u.verification.fullName);
-        setText('verifiedEmailText', u.verification.email);
+        setText('verifiedEmailText', u.verification.email || 'Not provided');
         setText('verifiedDobText', u.verification.dob);
         setText('verifiedGenderText', u.verification.gender);
     }
@@ -1644,7 +1644,7 @@ async function sendVerifyOtp() {
         toast('Full Name halnuहोस्', 'warning');
         return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         toast('Valid Email Address halnuहोस्', 'warning');
         return;
     }
@@ -1665,17 +1665,17 @@ async function sendVerifyOtp() {
             toast(r.error || 'Failed to send OTP', 'error');
             return;
         }
-        setText('otpTargetEmail', email);
+        setText('otpTargetEmail', 'your Telegram chat');
         const otpBox = $('verifyOtpBox');
         if (otpBox)
             otpBox.style.display = 'block';
         await load();
-        toast(r.message || `Verification OTP sent to ${email}!`, 'success');
+        toast(r.message || 'Verification OTP sent to your Telegram chat!', 'success');
     }
     finally {
         if (btn)
             btn.disabled = false;
-        setText('sendOtpBtnText', 'Resend OTP to Email');
+        setText('sendOtpBtnText', 'Resend OTP to Telegram');
     }
 }
 async function confirmVerifyOtp() {

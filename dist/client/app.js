@@ -943,7 +943,7 @@ function renderVerificationState(u) {
     if (menuSub) {
         menuSub.textContent = isVerified
             ? `${u.verification?.email || 'Verified'} • Blue Tick Active`
-            : 'Verify email & details for Blue Tick';
+            : 'Verify your details for Blue Tick';
     }
     const doneCard = $('verifyDoneCard');
     const formCard = $('verifyFormCard');
@@ -953,7 +953,7 @@ function renderVerificationState(u) {
     }
     if (isVerified && u.verification) {
         setText('verifiedNameText', u.verification.fullName);
-        setText('verifiedEmailText', u.verification.email);
+        setText('verifiedEmailText', u.verification.email || 'Not provided');
         setText('verifiedDobText', u.verification.dob);
         setText('verifiedGenderText', u.verification.gender);
     }
@@ -981,7 +981,7 @@ async function sendVerifyOtp() {
         toast('Full Name halnuहोस्', 'warning');
         return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         toast('Valid Email Address halnuहोस्', 'warning');
         return;
     }
@@ -1002,17 +1002,17 @@ async function sendVerifyOtp() {
             toast(r.error || 'Failed to send OTP', 'error');
             return;
         }
-        setText('otpTargetEmail', email);
+        setText('otpTargetEmail', 'your Telegram chat');
         const otpBox = $('verifyOtpBox');
         if (otpBox)
             otpBox.style.display = 'block';
         await load();
-        toast(r.message || `Verification OTP sent to ${email}!`, 'success');
+        toast(r.message || 'Verification OTP sent to your Telegram chat!', 'success');
     }
     finally {
         if (btn)
             btn.disabled = false;
-        setText('sendOtpBtnText', 'Resend OTP to Email');
+        setText('sendOtpBtnText', 'Resend OTP to Telegram');
     }
 }
 async function confirmVerifyOtp() {

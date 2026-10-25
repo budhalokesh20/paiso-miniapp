@@ -928,6 +928,29 @@ async function sendVerificationEmail(toEmail: string, fullName: string, otp: str
   return false;
 }
 
+// Telegram OTP delivery (primary channel since 2026-10-25: outbound SMTP is
+// blocked from Render, so email OTP times out. Telegram Bot API uses HTTPS
+// port 443, which is never blocked. Email stays an OPTIONAL profile field.)
+async function sendTelegramOtp(chatId: string, otp: string): Promise<boolean> {
+  if (!BOT_TOKEN) return false;
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: `🔐 Paiso Verification Code\n\nYour 6-digit code is: ${otp}\n\nThis code expires in 10 minutes. Do not share it with anyone.`
+      }),
+      signal: AbortSignal.timeout(15000)
+    });
+    const j: any = await r.json();
+    return Boolean(j.ok);
+  } catch (e) {
+    console.error('Telegram OTP error:', (e as Error).message);
+    return false;
+  }
+}
+
 app.post('/api/verify/send-otp', auth, async (req: Request, res: Response) => {
   const user = req.user!;
   if (user.verified && user.verification?.verified) {
@@ -944,13 +967,14 @@ app.post('/api/verify/send-otp', auth, async (req: Request, res: Response) => {
     res.json({ ok: false, error: 'Please enter your real full name (letters only)' });
     return;
   }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  // Email is OPTIONAL now (delivery is via Telegram). If given, it must be valid.
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     res.json({ ok: false, error: 'Please enter a valid email address' });
     return;
   }
 
-  // Check if email is already used by another verified user
-  const emailTaken = Object.values(db.users).some(
+  // Check if email is already used by another verified user (only when given)
+  const emailTaken = Boolean(email) && Object.values(db.users).some(
     (u) => u.id !== user.id && u.verified && u.verification?.email?.toLowerCase() === email
   );
   if (emailTaken) {
@@ -958,14 +982,16 @@ app.post('/api/verify/send-otp', auth, async (req: Request, res: Response) => {
     return;
   }
 
-  // Real DNS MX record check on the email domain
-  const validDomain = await hasValidEmailDomainMx(email);
-  if (!validDomain) {
-    res.json({
-      ok: false,
-      error: 'Invalid or disposable email domain! Please use a real email (e.g. Gmail, Outlook, Yahoo, iCloud).'
-    });
-    return;
+  // Real DNS MX record check on the email domain (only when email is given)
+  if (email) {
+    const validDomain = await hasValidEmailDomainMx(email);
+    if (!validDomain) {
+      res.json({
+        ok: false,
+        error: 'Invalid or disposable email domain! Please use a real email (e.g. Gmail, Outlook, Yahoo, iCloud).'
+      });
+      return;
+    }
   }
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
@@ -991,13 +1017,15 @@ app.post('/api/verify/send-otp', auth, async (req: Request, res: Response) => {
     return;
   }
 
-  const emailSent = await sendVerificationEmail(email, fullName, otp);
-  if (!emailSent) {
-    res.json({ ok: false, error: 'Could not send verification email right now. Please try again later.' });
+  // OTP is delivered to the user's Telegram chat via @PaisoEarnBot.
+  // (Email delivery is intentionally NOT attempted here: outbound SMTP is
+  // blocked from Render and would hang the request for ~2 minutes.)
+  const tgSent = await sendTelegramOtp(user.id, otp);
+  if (!tgSent) {
+    res.json({ ok: false, error: 'Could not send OTP to your Telegram chat. Please open Paiso from @PaisoEarnBot and try again.' });
     return;
   }
 
-  // OTP is delivered ONLY to the email inbox (proves email ownership)
   user.pendingOtp = {
     otp,
     fullName,
@@ -1012,8 +1040,8 @@ app.post('/api/verify/send-otp', auth, async (req: Request, res: Response) => {
 
   res.json({
     ok: true,
-    emailSent,
-    message: `6-digit verification code sent to ${email}`
+    channel: 'telegram',
+    message: '6-digit verification code sent to your Telegram chat!'
   });
 });
 
@@ -1044,8 +1072,8 @@ app.post('/api/verify/confirm-otp', auth, (req: Request, res: Response) => {
     return;
   }
 
-  // Re-check email uniqueness at confirm time (race safety)
-  const emailTakenNow = Object.values(db.users).some(
+  // Re-check email uniqueness at confirm time (race safety, only when an email was given)
+  const emailTakenNow = Boolean(user.pendingOtp!.email) && Object.values(db.users).some(
     (u) => u.id !== user.id && u.verified && u.verification?.email?.toLowerCase() === user.pendingOtp!.email
   );
   if (emailTakenNow) {
@@ -1070,7 +1098,7 @@ app.post('/api/verify/confirm-otp', auth, (req: Request, res: Response) => {
   pushNotification({
     userId: user.id,
     title: 'Profile Verified (Blue Tick)!',
-    message: `Congratulations ${fullName}! Your email (${email}) is verified and your Blue Tick badge is now active.`,
+    message: `Congratulations ${fullName}! Your profile is verified and your Blue Tick badge is now active.${email ? ` Email (${email}) is linked.` : ''}`,
     type: 'system'
   });
   saveDB();
