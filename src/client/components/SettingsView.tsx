@@ -1,5 +1,173 @@
 import { h } from '../jsx';
 
+const FAQ_STEPS = [
+  {
+    step: '1',
+    title: 'Daily Check-in & Ads',
+    desc: 'Claim your daily check-in every 24 hours and watch rewarded ads from the Home screen.'
+  },
+  {
+    step: '2',
+    title: 'Complete Tasks',
+    desc: 'Open tasks, join the channel or stay for the required seconds, then tap Verify to receive coins.'
+  },
+  {
+    step: '3',
+    title: 'Unlock Eligibility',
+    desc: 'Complete 3 Ads, 2 Tasks, and 2 Daily Check-ins to unlock withdrawals and referral bonuses.'
+  },
+  {
+    step: '4',
+    title: 'Withdraw Earnings',
+    desc: 'Go to Settings → Withdrawal, select your payment method, enter your account ID, and submit.'
+  }
+];
+
+const FAQ_LIST = [
+  {
+    q: 'How are coins converted to cash?',
+    a: '100 Coins = NPR 1. The default minimum withdrawal is 10,000 Coins (NPR 100).'
+  },
+  {
+    q: 'Why do completed tasks disappear?',
+    a: 'Once a task is verified, it clears from your active list. Daily or resettable tasks appear again automatically when ready.'
+  },
+  {
+    q: 'How does the referral reward work?',
+    a: 'You receive +500 Coins when your invited friend completes 3 Ads, 2 Tasks, and 2 Check-ins, plus 10% of their task earnings.'
+  },
+  {
+    q: 'How long do withdrawals take?',
+    a: 'Withdrawals are reviewed within 24–48 hours. If rejected due to invalid details, your coins are refunded automatically.'
+  }
+];
+
+const TERMS_SECTIONS = [
+  {
+    title: '1. One Account Per User',
+    body: 'Each user may only use one Telegram account. Multiple accounts, bots, or self-referrals are not allowed.'
+  },
+  {
+    title: '2. Task & Channel Rules',
+    body: 'Rewards require genuine task completion. Leaving joined channels immediately after claiming may result in coin deduction.'
+  },
+  {
+    title: '3. Referral Qualification',
+    body: 'Referral bonuses apply only to active users who complete the required ads, tasks, and check-ins.'
+  },
+  {
+    title: '4. Withdrawals & Account Accuracy',
+    body: 'Payouts are processed via active methods for allowed countries. Please verify your wallet/account ID before submitting.'
+  },
+  {
+    title: '5. Verification & Privacy',
+    body: 'Details provided for profile verification are used only for account security and verification badge status.'
+  },
+  {
+    title: '6. Fair Use Policy',
+    body: 'Accounts abusing system bugs or automated tools may have withdrawals declined or access restricted.'
+  }
+];
+
+function WithdrawSection() {
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
+      {/* 1. Simple Balance & Min Withdraw Row */}
+      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div>
+          <span className="text-[11px] font-semibold text-slate-400 block">Balance</span>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <svg width="18" height="18" className="shrink-0">
+              <use href="#icon-p-coin" />
+            </svg>
+            <span className="text-lg font-extrabold text-slate-900" id="wCoins">
+              0
+            </span>
+            <span className="text-xs font-bold text-slate-500">
+              (NPR <span id="npr">0.00</span>)
+            </span>
+          </div>
+        </div>
+
+        <div className="text-right">
+          <span className="text-[11px] font-semibold text-slate-400 block">Minimum</span>
+          <b className="text-xs font-extrabold text-slate-800">
+            <span id="minW">10,000</span> Coins
+          </b>
+        </div>
+      </div>
+
+      {/* 2. Payment Method */}
+      <div>
+        <div className="text-xs font-bold text-slate-700 mb-2">Method</div>
+        <div className="grid grid-cols-2 gap-2" id="wMethodsGrid" />
+        <input type="hidden" id="wMethod" value="" />
+      </div>
+
+      {/* 3. Account ID */}
+      <div>
+        <div className="text-xs font-bold text-slate-700 mb-1" id="wAccountLabel">
+          Account ID
+        </div>
+        <input
+          className="w-full px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600"
+          id="wAccount"
+          placeholder="Enter Account / Wallet ID"
+        />
+      </div>
+
+      {/* 4. Amount */}
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs font-bold text-slate-700">Amount (Coins)</span>
+          <button
+            type="button"
+            className="text-[11px] font-extrabold text-blue-600"
+            onClick={() => window.setWithdrawAmount('MAX')}
+          >
+            MAX
+          </button>
+        </div>
+
+        <input
+          className="w-full px-3 py-2 text-xs font-extrabold bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600"
+          id="wAmount"
+          type="number"
+          placeholder="Enter coins amount"
+          onInput={() => window.updateWithdrawPreview()}
+        />
+
+        <div className="flex items-center justify-between text-xs pt-2">
+          <span className="text-slate-400 font-medium">Receive</span>
+          <b className="text-slate-900 font-extrabold" id="wReceivePreview">
+            NPR 0.00
+          </b>
+        </div>
+      </div>
+
+      {/* 5. Submit Button */}
+      <button
+        type="button"
+        className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-lg transition"
+        onClick={() => window.withdraw()}
+      >
+        Withdraw
+      </button>
+
+      {/* Hidden state placeholders */}
+      <div className="hidden">
+        <span id="coins">0</span>
+        <span id="total">0</span>
+        <span id="wAllowedCountriesBar" />
+        <span id="wqStatusBadge" />
+        <span id="wqAds" />
+        <span id="wqTasks" />
+        <span id="wqDaily" />
+      </div>
+    </div>
+  );
+}
+
 function SubpageTopBar(props: { title: string }) {
   return (
     <div className="native-subpage-bar">
@@ -238,6 +406,34 @@ export function SettingsView() {
             </div>
             <span className="settings-chevron">›</span>
           </button>
+
+          {/* 6. Terms & Conditions */}
+          <button type="button" className="settings-row" onClick={() => window.openSettingPage('sub-terms')}>
+            <div className="settings-item-left">
+              <div className="settings-icon-box icon-blue">
+                <svg
+                  width="19"
+                  height="19"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                </svg>
+              </div>
+              <div>
+                <div className="settings-item-title">Terms &amp; Conditions</div>
+                <div className="settings-item-sub">Terms of use &amp; withdrawal rules</div>
+              </div>
+            </div>
+            <span className="settings-chevron">›</span>
+          </button>
         </div>
       </div>
 
@@ -383,11 +579,7 @@ export function SettingsView() {
             <div className="verify-otp-box" id="verifyOtpBox" style={{ display: 'none' }}>
               <div className="verify-otp-divider" />
               <div className="verify-otp-info">
-                Enter the 6-digit OTP sent to <b id="otpTargetEmail">your email</b>
-              </div>
-              <div className="otp-preview-banner" id="otpPreviewBanner" style={{ display: 'none' }}>
-                <span>Inbox OTP Code:</span>
-                <b id="otpPreviewCode">------</b>
+                Enter the 6-digit verification code sent to <b id="otpTargetEmail">your email</b>
               </div>
               <input
                 className="form-input otp-code-input"
@@ -415,160 +607,23 @@ export function SettingsView() {
       {/* Slide-in Fullscreen Sub-Page 2: Transaction History */}
       <div id="sub-history" className="settings-subpage">
         <SubpageTopBar title="Transaction History" />
-        <div className="screen-content">
-          <div className="card" id="wHistory" />
+        <div className="screen-content pb-6">
+          <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100" id="wHistory" />
         </div>
       </div>
 
-      {/* Slide-in Fullscreen Sub-Page 3: Withdrawal */}
+      {/* Slide-in Fullscreen Sub-Page 3: Simple Withdrawal + Transaction History */}
       <div id="sub-withdraw" className="settings-subpage">
         <SubpageTopBar title="Withdrawal" />
-        <div className="screen-content">
-          {/* 1. Premium Wallet Balance Hero Card */}
-          <div className="withdraw-hero-card">
-            <div className="withdraw-hero-glow" />
-            <div className="withdraw-hero-top">
-              <span className="withdraw-hero-label">AVAILABLE BALANCE</span>
-              <span className="withdraw-rate-pill">100 Coins = NPR 1</span>
-            </div>
-            <div className="withdraw-hero-balance-row">
-              <svg width="28" height="28">
-                <use href="#icon-p-coin" />
-              </svg>
-              <span className="withdraw-hero-coins" id="wCoins">
-                0
-              </span>
-              <span className="withdraw-hero-npr-pill">
-                ≈ NPR <span id="npr">0.00</span>
-              </span>
-            </div>
-            <div className="withdraw-hero-stats">
-              <div className="withdraw-stat-item">
-                <span className="withdraw-stat-lbl">Minimum Withdraw</span>
-                <b className="withdraw-stat-val">
-                  <span id="minW">10,000</span> Coins
-                </b>
-              </div>
-              <div className="withdraw-stat-divider" />
-              <div className="withdraw-stat-item">
-                <span className="withdraw-stat-lbl">Total Earned</span>
-                <b className="withdraw-stat-val">
-                  <span id="total">0</span> Coins
-                </b>
-              </div>
-            </div>
-          </div>
+        <div className="screen-content space-y-4 pb-6">
+          <WithdrawSection />
 
-          {/* 2. Qualification Status Card */}
-          <div className="withdraw-qual-card" id="withdrawQualCard">
-            <div className="withdraw-qual-head">
-              <div className="withdraw-qual-title">
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.3"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                </svg>
-                <span>Withdrawal Eligibility</span>
-              </div>
-              <span className="wq-badge locked" id="wqStatusBadge">
-                In Progress
-              </span>
-            </div>
-            <div className="withdraw-qual-pills">
-              <div className="wq-pill" id="wqPillAds">
-                <span>Ads</span>
-                <b id="wqAds">0/3</b>
-              </div>
-              <div className="wq-pill" id="wqPillTasks">
-                <span>Tasks</span>
-                <b id="wqTasks">0/2</b>
-              </div>
-              <div className="wq-pill" id="wqPillDaily">
-                <span>Check-in</span>
-                <b id="wqDaily">0/2</b>
-              </div>
-            </div>
-          </div>
-
-          {/* 3. Allowed Countries & Dynamic Custom Payout Methods */}
-          <div className="withdraw-countries-bar" id="wAllowedCountriesBar" />
-          <div className="withdraw-section-label">SELECT PAYOUT METHOD</div>
-          <div className="method-pills" id="wMethodsGrid" />
-
-          <input type="hidden" id="wMethod" value="" />
-
-          {/* 4. Payout Account & Amount Card */}
-          <div className="card withdraw-form-card">
-            <div className="verify-field-label" id="wAccountLabel" style={{ marginTop: '0' }}>
-              Account / Wallet ID
-            </div>
-            <input className="form-input" id="wAccount" placeholder="Enter Account / Wallet ID" />
-
-            <div className="withdraw-amount-head">
-              <span className="verify-field-label" style={{ margin: '0' }}>
-                Withdraw Amount (Coins)
-              </span>
-              <div className="withdraw-quick-chips">
-                <button type="button" className="w-chip" onClick={() => window.setWithdrawAmount(10000)}>
-                  10K
-                </button>
-                <button type="button" className="w-chip" onClick={() => window.setWithdrawAmount(25000)}>
-                  25K
-                </button>
-                <button type="button" className="w-chip" onClick={() => window.setWithdrawAmount(50000)}>
-                  50K
-                </button>
-                <button type="button" className="w-chip w-chip-max" onClick={() => window.setWithdrawAmount('MAX')}>
-                  MAX
-                </button>
-              </div>
-            </div>
-
-            <input
-              className="form-input withdraw-amount-input"
-              id="wAmount"
-              type="number"
-              placeholder="Minimum 10,000 coins"
-              onInput={() => window.updateWithdrawPreview()}
+          <div>
+            <div className="text-xs font-extrabold text-slate-700 mb-2 px-0.5">Transaction History</div>
+            <div
+              className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100"
+              id="wWithdrawHistory"
             />
-
-            <div className="withdraw-preview-strip">
-              <div className="withdraw-preview-left">
-                <span className="withdraw-preview-lbl">Estimated Payout</span>
-                <span className="withdraw-preview-sub">Processed within 24–48 hrs</span>
-              </div>
-              <div className="withdraw-preview-val" id="wReceivePreview">
-                NPR 0.00
-              </div>
-            </div>
-
-            <button className="primary-btn btn-with-icon withdraw-submit-btn" onClick={() => window.withdraw()}>
-              <svg
-                width="17"
-                height="17"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.3"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <line x1="22" y1="2" x2="11" y2="13" />
-                <polygon points="22 2 15 22 11 13 2 9 22 2" />
-              </svg>
-              <span>Request Withdraw</span>
-            </button>
-          </div>
-
-          <div style={{ display: 'none' }}>
-            <span id="coins">0</span>
           </div>
         </div>
       </div>
@@ -605,31 +660,48 @@ export function SettingsView() {
       {/* Slide-in Fullscreen Sub-Page 5: FAQ */}
       <div id="sub-faq" className="settings-subpage">
         <SubpageTopBar title="FAQ" />
-        <div className="screen-content">
-          <div className="card">
-            <div className="faq-item">
-              <div className="faq-q">1. How do I earn coins?</div>
-              <div className="faq-a">
-                Complete daily check-ins every 24 hours, watch rewarded ads, join Telegram channels, and invite friends.
+        <div className="screen-content space-y-3 pb-6">
+          {/* Modular Step-by-Step Section */}
+          <div className="bg-white border border-slate-200 rounded-xl p-4">
+            <div className="text-xs font-extrabold text-slate-900 mb-3">How It Works</div>
+            <div className="space-y-3">
+              {FAQ_STEPS.map((item) => (
+                <div className="flex items-start gap-2.5">
+                  <span className="w-5 h-5 rounded-md bg-slate-100 text-slate-700 font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">
+                    {item.step}
+                  </span>
+                  <div>
+                    <div className="text-xs font-bold text-slate-900">{item.title}</div>
+                    <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Modular Questions List */}
+          <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
+            {FAQ_LIST.map((item) => (
+              <div className="p-3.5">
+                <div className="text-xs font-bold text-slate-900">{item.q}</div>
+                <p className="text-[11px] text-slate-500 leading-relaxed mt-1">{item.a}</p>
               </div>
-            </div>
-            <div className="faq-item">
-              <div className="faq-q">2. What is the minimum withdrawal?</div>
-              <div className="faq-a">
-                Minimum withdrawal is 10,000 coins (NPR 100) via eSewa, Khalti, Binance USDT, or PayPal.
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Slide-in Fullscreen Sub-Page 6: Terms & Conditions */}
+      <div id="sub-terms" className="settings-subpage">
+        <SubpageTopBar title="Terms & Conditions" />
+        <div className="screen-content pb-6">
+          <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
+            {TERMS_SECTIONS.map((sec) => (
+              <div className="p-3.5">
+                <div className="text-xs font-bold text-slate-900">{sec.title}</div>
+                <p className="text-[11px] text-slate-500 leading-relaxed mt-1">{sec.body}</p>
               </div>
-            </div>
-            <div className="faq-item">
-              <div className="faq-q">3. How long does withdrawal take?</div>
-              <div className="faq-a">Withdrawals are reviewed and processed by admin within 24 to 48 hours.</div>
-            </div>
-            <div className="faq-item" style={{ marginBottom: '0', borderBottom: '0', paddingBottom: '0' }}>
-              <div className="faq-q">4. How does referral bonus work?</div>
-              <div className="faq-a">
-                You earn +500 coins per qualified referral plus a 10% lifetime bonus on their task and daily check-in
-                earnings.
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </div>

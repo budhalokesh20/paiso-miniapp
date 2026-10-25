@@ -29,7 +29,11 @@ export function HomeView() {
             </div>
           </div>
           <div className="header-actions">
-            <button className="bell-btn" onClick={() => window.showTab('wallet')} aria-label="Notifications">
+            <button
+              className="bell-btn relative"
+              onClick={() => window.openNotificationsModal()}
+              aria-label="Notifications"
+            >
               <svg
                 viewBox="0 0 24 24"
                 fill="none"
@@ -41,7 +45,13 @@ export function HomeView() {
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                 <path d="M13.73 21a2 2 0 0 1-3.46 0" />
               </svg>
-              <span className="bell-dot" />
+              <span
+                id="notifUnreadBadge"
+                style="display:none"
+                className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-extrabold flex items-center justify-center border-2 border-white shadow-sm"
+              >
+                0
+              </span>
             </button>
           </div>
         </header>
@@ -173,10 +183,7 @@ export function HomeView() {
               <img src="/assets/icon-ads.png" alt="Watch Ads" className="explore-icon" />
             </div>
             <div className="explore-info">
-              <div className="explore-title-row">
-                <span className="explore-title">Watch Ads</span>
-                <span className="explore-arrow">›</span>
-              </div>
+              <div className="explore-title">Watch Ads</div>
               <div className="explore-sub" id="adCardSub">
                 Earn coins
               </div>
@@ -192,82 +199,22 @@ export function HomeView() {
               <img src="/assets/icon-tasks.png" alt="Complete Tasks" className="explore-icon" />
             </div>
             <div className="explore-info">
-              <div className="explore-title-row">
-                <span className="explore-title">Complete Tasks</span>
-                <span className="explore-arrow">›</span>
-              </div>
+              <div className="explore-title">Complete Tasks</div>
               <div className="explore-sub">Easy &amp; Fast</div>
             </div>
           </div>
 
           <div
             className="explore-card card-games"
-            data-title="play games more fun coins"
-            onClick={() => window.showTab('tasks', 'social_visit')}
+            data-title="play and earn games more fun coins"
+            onClick={() => window.showTab('tasks', 'play_game')}
           >
             <div className="explore-icon-wrap">
-              <img src="/assets/icon-games.png" alt="Play Games" className="explore-icon" />
+              <img src="/assets/icon-games.png" alt="Play & Earn" className="explore-icon" />
             </div>
             <div className="explore-info">
-              <div className="explore-title-row">
-                <span className="explore-title">Play Games</span>
-                <span className="explore-arrow">›</span>
-              </div>
-              <div className="explore-sub">More Fun, More Coins</div>
-            </div>
-          </div>
-
-          <div
-            className="explore-card card-channels"
-            data-title="join channels telegram get rewards"
-            onClick={() => window.showTab('tasks', 'telegram_join')}
-          >
-            <div className="explore-icon-wrap">
-              <img src="/assets/icon-channels.png" alt="Join Channels" className="explore-icon" />
-            </div>
-            <div className="explore-info">
-              <div className="explore-title-row">
-                <span className="explore-title">Join Channels</span>
-                <span className="explore-arrow">›</span>
-              </div>
-              <div className="explore-sub">Get rewards</div>
-            </div>
-          </div>
-
-          <div
-            className="explore-card card-friends"
-            data-title="invite friends refer earn together"
-            onClick={() => window.showTab('refer')}
-          >
-            <div className="explore-icon-wrap">
-              <img src="/assets/icon-friends.png" alt="Invite Friends" className="explore-icon" />
-            </div>
-            <div className="explore-info">
-              <div className="explore-title-row">
-                <span className="explore-title">Invite Friends</span>
-                <span className="explore-arrow">›</span>
-              </div>
-              <div className="explore-sub">Earn Together</div>
-            </div>
-          </div>
-
-          <div
-            className="explore-card card-freefire"
-            data-title="free fire indonesia play earn rewards diamonds"
-            onClick={() => {
-              window.showTab('wallet');
-              window.openSettingPage('sub-withdraw');
-            }}
-          >
-            <div className="explore-icon-wrap">
-              <img src="/assets/icon-freefire.png" alt="Free Fire Indonesia" className="explore-icon" />
-            </div>
-            <div className="explore-info">
-              <div className="explore-title-row">
-                <span className="explore-title">Free Fire Indonesia</span>
-                <span className="explore-arrow">›</span>
-              </div>
-              <div className="explore-sub">Play &amp; Earn rewards</div>
+              <div className="explore-title">Play &amp; Earn</div>
+              <div className="explore-sub">More Fun, Coins</div>
             </div>
           </div>
         </div>

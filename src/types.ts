@@ -16,6 +16,8 @@ export interface PendingOtp {
   dob: string;
   gender: UserGender;
   expiresAt: number;
+  attempts?: number;
+  sentAt?: number;
 }
 
 export interface User {
@@ -68,7 +70,7 @@ export interface ReferralHistoryItem {
   dailyReq: number;
 }
 
-export type TaskType = 'telegram_join' | 'social_visit';
+export type TaskType = 'telegram_join' | 'social_visit' | 'app_task' | 'play_game';
 
 export interface Task {
   id: string;
@@ -127,12 +129,26 @@ export interface WithdrawSettings {
   requireQualification: boolean;
 }
 
+export type NotificationType = 'task' | 'reward' | 'withdraw' | 'referral' | 'admin' | 'system';
+
+export interface AppNotification {
+  id: string;
+  userId: string; // 'all' for broadcast or specific user.id
+  title: string;
+  message: string;
+  type: NotificationType;
+  coins?: number;
+  createdAt: string;
+  readBy?: string[]; // userIds for broadcast, or [userId]
+}
+
 export interface DatabaseSchema {
   users: Record<string, User>;
   withdrawals: Withdrawal[];
   claims: Record<string, number>;
   tasks?: Task[];
   settings?: WithdrawSettings;
+  notifications?: AppNotification[];
 }
 
 export interface AdsInfo {
@@ -155,6 +171,8 @@ export interface MeResponse {
   qualification: QualificationStatus;
   referralHistory: ReferralHistoryItem[];
   withdrawSettings: WithdrawSettings;
+  notifications: Array<AppNotification & { read: boolean }>;
+  unreadCount: number;
   refLink: string;
   error?: string;
 }

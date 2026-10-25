@@ -1,14 +1,35 @@
-import { h, Fragment } from './jsx';
+import { h } from './jsx';
 import { SvgSpriteDefs } from './components/Icons';
 import { HomeView } from './components/HomeView';
 import { TasksView } from './components/TasksView';
 import { FriendsView } from './components/FriendsView';
 import { SettingsView } from './components/SettingsView';
 import { BottomNav } from './components/BottomNav';
+function NotificationModal() {
+    return (h("div", { id: "notifModal", className: "fixed inset-0 z-[9999] bg-slate-900/50 backdrop-blur-[2px] hidden items-end sm:items-center justify-center p-0 sm:p-4", onClick: (e) => {
+            if (e.target.id === 'notifModal')
+                closeNotificationsModal();
+        } },
+        h("div", { className: "w-full max-w-[440px] max-h-[82vh] bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-100" },
+            h("div", { className: "px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70" },
+                h("div", { className: "flex items-center gap-2.5" },
+                    h("div", { className: "w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs" },
+                        h("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2", "stroke-linecap": "round", "stroke-linejoin": "round" },
+                            h("path", { d: "M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" }),
+                            h("path", { d: "M13.73 21a2 2 0 0 1-3.46 0" }))),
+                    h("div", null,
+                        h("h3", { className: "text-sm font-extrabold text-slate-900 leading-tight" }, "Notifications"),
+                        h("p", { className: "text-[11px] text-slate-500 font-medium", id: "notifSubHeader" }, "Activity & Admin updates"))),
+                h("div", { className: "flex items-center gap-1.5" },
+                    h("button", { type: "button", onClick: () => clearAllNotifications(), className: "px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px] font-bold transition" }, "Clear All"),
+                    h("button", { type: "button", onClick: () => closeNotificationsModal(), className: "w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold text-xs flex items-center justify-center transition" }, "\u2715"))),
+            h("div", { id: "notifList", className: "flex-1 overflow-y-auto p-4 space-y-2.5 bg-[#F8FAFC]" }))));
+}
 function PaisoApp() {
     return (h("div", { className: "app-shell" },
         h(SvgSpriteDefs, null),
         h("div", { className: "toast", id: "toast" }),
+        h(NotificationModal, null),
         h("main", { className: "app-viewport" },
             h(HomeView, null),
             h(TasksView, null),
@@ -25,6 +46,7 @@ let currentTaskFilter = 'all';
 let AdController = null;
 let toastTimer;
 let dailyCountdownTimer;
+let lastTopNotifId = null;
 const activeTimers = {};
 const COIN_SVG = `<svg width="14" height="14" style="vertical-align:-2px"><use href="#icon-p-coin"/></svg>`;
 const DUMMY_AVATARS = [
@@ -48,17 +70,32 @@ function randomizeAvatar() {
     renderDummyAvatar(currentAvatarIndex);
 }
 function TaskSvgIcon({ task }) {
+    if (task.type === 'app_task') {
+        return (h("svg", { width: "21", height: "21", viewBox: "0 0 24 24", fill: "none", stroke: "#4F46E5", "stroke-width": "2.1", "stroke-linecap": "round", "stroke-linejoin": "round" },
+            h("rect", { x: "3", y: "3", width: "7", height: "7", rx: "1.5" }),
+            h("rect", { x: "14", y: "3", width: "7", height: "7", rx: "1.5" }),
+            h("rect", { x: "14", y: "14", width: "7", height: "7", rx: "1.5" }),
+            h("rect", { x: "3", y: "14", width: "7", height: "7", rx: "1.5" })));
+    }
+    if (task.type === 'play_game') {
+        return (h("svg", { width: "22", height: "22", viewBox: "0 0 24 24", fill: "none", stroke: "#7C3AED", "stroke-width": "2.1", "stroke-linecap": "round", "stroke-linejoin": "round" },
+            h("line", { x1: "6", y1: "12", x2: "10", y2: "12" }),
+            h("line", { x1: "8", y1: "10", x2: "8", y2: "14" }),
+            h("line", { x1: "15", y1: "13", x2: "15.01", y2: "13" }),
+            h("line", { x1: "18", y1: "11", x2: "18.01", y2: "11" }),
+            h("rect", { x: "2", y: "6", width: "20", height: "12", rx: "4" })));
+    }
     if (task.type === 'telegram_join') {
-        return (h("svg", { width: "22", height: "22", viewBox: "0 0 24 24", fill: "none", stroke: "#0284C7", "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round" },
+        return (h("svg", { width: "21", height: "21", viewBox: "0 0 24 24", fill: "none", stroke: "#0284C7", "stroke-width": "2.1", "stroke-linecap": "round", "stroke-linejoin": "round" },
             h("line", { x1: "22", y1: "2", x2: "11", y2: "13" }),
             h("polygon", { points: "22 2 15 22 11 13 2 9 22 2" })));
     }
     if (task.url.includes('youtube.com') || task.url.includes('youtu.be')) {
-        return (h("svg", { width: "22", height: "22", viewBox: "0 0 24 24", fill: "none", stroke: "#DC2626", "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round" },
+        return (h("svg", { width: "21", height: "21", viewBox: "0 0 24 24", fill: "none", stroke: "#DC2626", "stroke-width": "2.1", "stroke-linecap": "round", "stroke-linejoin": "round" },
             h("rect", { x: "2", y: "4", width: "20", height: "16", rx: "4" }),
             h("polygon", { points: "10 9 15 12 10 15 10 9", fill: "#DC2626" })));
     }
-    return (h("svg", { width: "22", height: "22", viewBox: "0 0 24 24", fill: "none", stroke: "#2563EB", "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round" },
+    return (h("svg", { width: "21", height: "21", viewBox: "0 0 24 24", fill: "none", stroke: "#2563EB", "stroke-width": "2.1", "stroke-linecap": "round", "stroke-linejoin": "round" },
         h("circle", { cx: "12", cy: "12", r: "10" }),
         h("line", { x1: "2", y1: "12", x2: "22", y2: "12" }),
         h("path", { d: "M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" })));
@@ -175,8 +212,11 @@ function selectMethod(method) {
     const select = $('wMethod');
     if (select)
         select.value = method;
-    document.querySelectorAll('.method-pill').forEach((btn) => {
-        btn.classList.toggle('active', btn.dataset.method === method);
+    document.querySelectorAll('#wMethodsGrid button').forEach((btn) => {
+        const isAct = btn.dataset.method === method;
+        btn.className = `flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition ${isAct
+            ? 'bg-blue-50/70 border-blue-600 text-slate-900'
+            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'}`;
     });
     const acc = $('wAccount');
     const lbl = $('wAccountLabel');
@@ -193,11 +233,11 @@ function renderWithdrawMethodsAndCountries() {
     const countries = state?.withdrawSettings?.countries || [];
     if (cBar) {
         if (countries.length) {
-            cBar.replaceChildren(h("div", { className: "withdraw-countries-inner" },
-                h("span", { className: "wc-label" }, "Allowed Countries:"),
-                h("div", { className: "wc-flags" }, countries.map((c) => (h("span", { className: "wc-pill" },
-                    c.flag ? h("img", { src: c.flag, alt: c.name, className: "wc-flag-img" }) : null,
-                    h("span", null, c.name)))))));
+            cBar.replaceChildren(h("div", { className: "flex flex-wrap items-center gap-1.5 pb-2 border-b border-slate-100" },
+                h("span", { className: "text-[11px] font-bold text-slate-400 mr-1" }, "Regions:"),
+                countries.map((c) => (h("span", { className: "inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-bold" },
+                    c.flag ? h("img", { src: c.flag, alt: c.name, className: "w-3.5 h-2.5 object-cover rounded-xs" }) : null,
+                    h("span", null, c.name))))));
         }
         else {
             cBar.replaceChildren();
@@ -206,21 +246,18 @@ function renderWithdrawMethodsAndCountries() {
     if (!grid)
         return;
     if (!methods.length) {
-        grid.replaceChildren(h("div", { className: "small", style: "grid-column:1/-1;text-align:center;padding:12px" }, "No payout methods enabled by Admin"));
+        grid.replaceChildren(h("div", { className: "col-span-full text-center text-xs text-slate-400 py-3" }, "No payout methods enabled"));
         return;
     }
     const currentVal = $('wMethod')?.value || '';
     const selectedName = methods.some((m) => m.name === currentVal) ? currentVal : methods[0].name;
     grid.replaceChildren(...methods.map((m) => {
         const isAct = m.name === selectedName;
-        return (h("button", { type: "button", className: `method-pill ${isAct ? 'active' : ''}`, "data-method": m.name, onClick: () => selectMethod(m.name) },
-            m.logo ? (h("img", { src: m.logo, alt: m.name, className: "method-custom-logo" })) : (h("div", { className: "method-brand-icon brand-paypal" }, m.name.slice(0, 1).toUpperCase())),
-            h("div", { className: "method-meta" },
-                h("span", { className: "method-name" }, m.name),
-                h("span", { className: "method-sub" }, m.country && m.country !== 'All' ? m.country : 'Instant Payout')),
-            h("span", { className: "method-check" },
-                h("svg", { width: "15", height: "15" },
-                    h("use", { href: "#icon-check-circle" })))));
+        return (h("button", { type: "button", "data-method": m.name, onClick: () => selectMethod(m.name), className: `flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition ${isAct
+                ? 'bg-blue-50/70 border-blue-600 text-slate-900'
+                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'}` },
+            m.logo ? (h("img", { src: m.logo, alt: m.name, className: "w-6 h-6 rounded object-contain shrink-0" })) : (h("div", { className: "w-6 h-6 rounded bg-blue-600 text-white flex items-center justify-center font-extrabold text-xs shrink-0" }, m.name.slice(0, 1).toUpperCase())),
+            h("span", { className: "text-xs font-bold truncate" }, m.name)));
     }));
     selectMethod(selectedName);
 }
@@ -405,54 +442,244 @@ function renderReferralsAndQualification() {
         }
     }
 }
-function getTaskPlatformClass(task) {
+function getTaskIconBoxClass(task) {
+    if (task.type === 'app_task')
+        return 'bg-indigo-50 border-indigo-200/80 text-indigo-600';
+    if (task.type === 'play_game')
+        return 'bg-violet-50 border-violet-200/80 text-violet-600';
     if (task.type === 'telegram_join')
-        return 'platform-telegram';
+        return 'bg-sky-50 border-sky-200/80 text-sky-600';
     if (task.url.includes('youtube.com') || task.url.includes('youtu.be'))
-        return 'platform-youtube';
-    return 'platform-web';
+        return 'bg-red-50 border-red-200/80 text-red-600';
+    return 'bg-blue-50 border-blue-200/80 text-blue-600';
 }
 function renderTasks() {
     const listEl = $('taskList');
     if (!listEl || !state)
         return;
     const allTasks = state.tasks || [];
-    const filtered = allTasks.filter((t) => {
-        if (currentTaskFilter === 'done')
-            return Boolean(t.done);
+    const availableTasks = allTasks.filter((t) => !t.done);
+    const completedCount = allTasks.filter((t) => Boolean(t.done)).length;
+    const totalAvailableReward = availableTasks.reduce((sum, t) => sum + (t.reward || 0), 0);
+    const availAppCount = availableTasks.filter((t) => t.type === 'app_task').length;
+    const availGameCount = availableTasks.filter((t) => t.type === 'play_game').length;
+    setText('tasksAvailableBadge', `${availableTasks.length} Left`);
+    setText('tasksTotalRewardText', `+${totalAvailableReward.toLocaleString()}`);
+    setText('tasksDoneCountText', `${completedCount}/${allTasks.length}`);
+    setText('appTaskCountText', availAppCount > 0 ? `${availAppCount} Available` : 'Try apps & earn');
+    setText('playGameCountText', availGameCount > 0 ? `${availGameCount} Available` : 'Play & win coins');
+    const appQuickCard = $('quickCardAppTask');
+    const gameQuickCard = $('quickCardPlayGame');
+    if (appQuickCard) {
+        appQuickCard.className = `flex items-center gap-3 p-3 rounded-2xl border text-left transition active:scale-[0.98] ${currentTaskFilter === 'app_task'
+            ? 'bg-indigo-100/80 border-indigo-500 ring-2 ring-indigo-500/20'
+            : 'bg-gradient-to-br from-indigo-50/90 to-blue-50/60 border-indigo-200/80'}`;
+    }
+    if (gameQuickCard) {
+        gameQuickCard.className = `flex items-center gap-3 p-3 rounded-2xl border text-left transition active:scale-[0.98] ${currentTaskFilter === 'play_game'
+            ? 'bg-violet-100/80 border-violet-500 ring-2 ring-violet-500/20'
+            : 'bg-gradient-to-br from-violet-50/90 to-purple-50/60 border-violet-200/80'}`;
+    }
+    const filtered = availableTasks.filter((t) => {
         if (currentTaskFilter === 'telegram_join')
             return t.type === 'telegram_join';
         if (currentTaskFilter === 'social_visit')
             return t.type === 'social_visit';
+        if (currentTaskFilter === 'app_task')
+            return t.type === 'app_task';
+        if (currentTaskFilter === 'play_game')
+            return t.type === 'play_game';
         return true;
     });
     if (!filtered.length) {
-        listEl.replaceChildren(h("div", { className: "empty-state" },
-            h("div", { className: "empty-title" }, "No tasks here")));
+        listEl.replaceChildren(h("div", { className: "bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-2xs my-2" },
+            h("div", { className: "w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto mb-3" },
+                h("svg", { width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.4" },
+                    h("polyline", { points: "20 6 9 17 4 12" }))),
+            h("div", { className: "text-sm font-extrabold text-slate-900" }, "All Tasks Completed!"),
+            h("div", { className: "text-xs text-slate-500 mt-1 leading-relaxed" }, "You have completed all available tasks in this category. New or repeatable tasks will appear here when ready!")));
         return;
     }
     listEl.replaceChildren(...filtered.map((t) => {
         const waitRemaining = activeTimers[t.id] || 0;
-        const platClass = getTaskPlatformClass(t);
+        const iconBoxClass = getTaskIconBoxClass(t);
         const resetHours = +(t.resetHours || 0);
-        const repeatLabel = resetHours === 24 ? 'Daily' : resetHours > 0 ? `Every ${resetHours}h` : '';
-        return (h("div", { className: `task-card ${t.done ? 'task-done' : ''}` },
-            h("div", { className: `task-icon-box ${platClass}` },
-                h(TaskSvgIcon, { task: t })),
-            h("div", { className: "task-info" },
-                h("div", { className: "task-name" }, t.title),
-                h("div", { className: "task-reward-row" },
-                    h("svg", { width: "14", height: "14", style: "vertical-align:-2px" },
+        const repeatLabel = resetHours === 24 ? 'Daily' : resetHours > 0 ? `${resetHours}h` : '';
+        const categoryLabel = t.type === 'app_task'
+            ? 'App Task'
+            : t.type === 'play_game'
+                ? 'Play Game'
+                : t.type === 'telegram_join'
+                    ? 'Telegram'
+                    : 'Social';
+        const timerHint = t.type === 'telegram_join'
+            ? 'Join to verify'
+            : t.type === 'play_game'
+                ? `Play ${t.waitSeconds || 30}s`
+                : `${t.waitSeconds || 15}s visit`;
+        const openBtnLabel = t.type === 'play_game'
+            ? 'Play'
+            : t.type === 'app_task'
+                ? 'Open App'
+                : t.type === 'telegram_join'
+                    ? 'Join'
+                    : 'Open';
+        return (h("div", { className: "bg-white border border-slate-200/90 hover:border-blue-300 rounded-2xl p-3.5 shadow-2xs flex items-center justify-between gap-3 transition" },
+            h("div", { className: "flex items-center gap-3 min-w-0" },
+                h("div", { className: `w-11 h-11 rounded-xl border flex items-center justify-center shrink-0 ${iconBoxClass}` },
+                    h(TaskSvgIcon, { task: t })),
+                h("div", { className: "min-w-0" },
+                    h("div", { className: "text-[13px] font-extrabold text-slate-900 truncate" }, t.title),
+                    h("div", { className: "flex flex-wrap items-center gap-1.5 mt-1" },
+                        h("span", { className: "inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200/80 text-amber-800 text-[11px] font-extrabold" },
+                            h("svg", { width: "12", height: "12" },
+                                h("use", { href: "#icon-p-coin" })),
+                            h("span", null,
+                                "+",
+                                t.reward)),
+                        h("span", { className: "px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold" }, categoryLabel),
+                        h("span", { className: "text-[10px] font-semibold text-slate-400" },
+                            "\u2022 ",
+                            timerHint),
+                        repeatLabel ? (h("span", { className: "px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-extrabold uppercase" }, repeatLabel)) : null))),
+            h("div", { className: "flex items-center gap-1.5 shrink-0" },
+                h("button", { type: "button", className: "px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-extrabold transition", onClick: () => doTask(t.id, t.url) }, openBtnLabel),
+                h("button", { type: "button", id: `verify-${t.id}`, disabled: waitRemaining > 0, onClick: () => claimTask(t.id), className: `px-3.5 py-2 rounded-xl text-xs font-extrabold text-white transition ${waitRemaining > 0
+                        ? 'bg-slate-400 cursor-not-allowed'
+                        : 'bg-blue-600 hover:bg-blue-700 shadow-xs'}` }, waitRemaining > 0 ? `${waitRemaining}s` : 'Verify'))));
+    }));
+}
+function formatTimeAgo(iso) {
+    const diffSec = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+    if (diffSec < 45)
+        return 'Just now';
+    if (diffSec < 3600)
+        return `${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400)
+        return `${Math.floor(diffSec / 3600)}h ago`;
+    return `${Math.floor(diffSec / 86400)}d ago`;
+}
+function NotifTypeIcon({ type }) {
+    if (type === 'task') {
+        return (h("div", { className: "w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0" },
+            h("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.3" },
+                h("polyline", { points: "20 6 9 17 4 12" }))));
+    }
+    if (type === 'reward') {
+        return (h("div", { className: "w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0" },
+            h("svg", { width: "18", height: "18" },
+                h("use", { href: "#icon-gift" }))));
+    }
+    if (type === 'withdraw') {
+        return (h("div", { className: "w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0" },
+            h("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2" },
+                h("rect", { x: "2", y: "5", width: "20", height: "14", rx: "2" }),
+                h("line", { x1: "2", y1: "10", x2: "22", y2: "10" }))));
+    }
+    if (type === 'admin') {
+        return (h("div", { className: "w-9 h-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0" },
+            h("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2" },
+                h("path", { d: "M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" }),
+                h("path", { d: "M13.73 21a2 2 0 0 1-3.46 0" }))));
+    }
+    return (h("div", { className: "w-9 h-9 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center shrink-0" },
+        h("svg", { width: "18", height: "18" },
+            h("use", { href: "#icon-blue-tick" }))));
+}
+function renderNotifications() {
+    const list = state?.notifications || [];
+    const unread = state?.unreadCount || 0;
+    const badge = $('notifUnreadBadge');
+    if (badge) {
+        if (unread > 0) {
+            badge.style.display = 'flex';
+            badge.textContent = unread > 9 ? '9+' : String(unread);
+        }
+        else {
+            badge.style.display = 'none';
+        }
+    }
+    const subHeader = $('notifSubHeader');
+    if (subHeader) {
+        subHeader.textContent = unread > 0 ? `${unread} unread notification${unread > 1 ? 's' : ''}` : 'All caught up';
+    }
+    if (list.length > 0) {
+        const newest = list[0];
+        if (lastTopNotifId !== null && newest.id !== lastTopNotifId && !newest.read) {
+            toast(`${newest.title}: ${newest.message}`, 'success');
+        }
+        lastTopNotifId = newest.id;
+    }
+    else if (lastTopNotifId === null) {
+        lastTopNotifId = '';
+    }
+    const listEl = $('notifList');
+    if (!listEl)
+        return;
+    if (!list.length) {
+        listEl.replaceChildren(h("div", { className: "py-12 text-center" },
+            h("div", { className: "text-sm font-extrabold text-slate-700 mb-1" }, "No notifications yet"),
+            h("div", { className: "text-xs text-slate-400" }, "Task verifications, rewards, and Admin messages will appear here.")));
+        return;
+    }
+    listEl.replaceChildren(...list.map((n) => (h("div", { className: `p-3.5 rounded-2xl border transition flex items-start gap-3 ${n.read ? 'bg-white border-slate-100' : 'bg-blue-50/60 border-blue-200 shadow-2xs'}` },
+        h(NotifTypeIcon, { type: n.type }),
+        h("div", { className: "flex-1 min-w-0" },
+            h("div", { className: "flex items-center justify-between gap-2" },
+                h("span", { className: "text-xs font-extrabold text-slate-900 truncate" }, n.title),
+                h("span", { className: "text-[10px] font-semibold text-slate-400 shrink-0" }, formatTimeAgo(n.createdAt))),
+            h("p", { className: "text-[11px] text-slate-600 font-medium mt-0.5 leading-relaxed" }, n.message),
+            h("div", { className: "flex items-center gap-2 mt-1.5" },
+                n.coins ? (h("span", { className: "inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-extrabold" },
+                    h("svg", { width: "11", height: "11" },
                         h("use", { href: "#icon-p-coin" })),
-                    ' ',
                     h("span", null,
                         "+",
-                        t.reward),
-                    repeatLabel ? (h("span", { className: "ml-2 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold" }, repeatLabel)) : null)),
-            h("div", { className: "task-actions" }, t.done ? (h("button", { className: "btn-done", disabled: true }, repeatLabel ? `Done (${repeatLabel})` : 'Done')) : (h(Fragment, null,
-                h("button", { className: "btn-open", onClick: () => doTask(t.id, t.url) }, "Open"),
-                h("button", { className: "btn-verify", id: `verify-${t.id}`, disabled: waitRemaining > 0, onClick: () => claimTask(t.id) }, waitRemaining > 0 ? `${waitRemaining}s` : 'Verify'))))));
-    }));
+                        n.coins,
+                        " Coins"))) : null,
+                n.type === 'admin' ? (h("span", { className: "px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 text-[10px] font-bold" }, "Admin Broadcast")) : null)),
+        !n.read ? h("span", { className: "w-2 h-2 rounded-full bg-blue-600 shrink-0 mt-1.5" }) : null))));
+}
+function openNotificationsModal() {
+    tg?.HapticFeedback?.impactOccurred?.('light');
+    const modal = $('notifModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+    if ((state?.unreadCount || 0) > 0) {
+        markAllNotificationsRead();
+    }
+}
+function closeNotificationsModal() {
+    const modal = $('notifModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+}
+async function markAllNotificationsRead() {
+    try {
+        const r = await api('/api/notifications/read', { method: 'POST', body: '{}' });
+        if (state && r.notifications) {
+            state.notifications = r.notifications;
+            state.unreadCount = r.unreadCount;
+            renderNotifications();
+        }
+    }
+    catch { }
+}
+async function clearAllNotifications() {
+    try {
+        const r = await api('/api/notifications', { method: 'DELETE' });
+        if (state && r.notifications) {
+            state.notifications = r.notifications;
+            state.unreadCount = r.unreadCount;
+            renderNotifications();
+        }
+        toast('Notifications cleared', 'success');
+    }
+    catch { }
 }
 function startTaskCountdown(taskId, seconds) {
     if (activeTimers[taskId])
@@ -526,33 +753,74 @@ async function load() {
     renderReferralsAndQualification();
     renderWithdrawMethodsAndCountries();
     renderTasks();
+    renderNotifications();
     try {
         const hData = await api('/api/my-withdrawals');
+        const withdrawals = hData.withdrawals || [];
+        const coinNotifs = (state.notifications || []).filter((n) => (n.coins || 0) > 0 && n.type !== 'withdraw');
+        const renderWithdrawNodes = () => {
+            if (!withdrawals.length) {
+                return [
+                    h("div", { className: "p-4 text-center text-xs text-slate-400" }, "No withdrawal transactions yet.")
+                ];
+            }
+            return withdrawals.map((w) => (h("div", { className: "p-3.5 flex items-center justify-between gap-3" },
+                h("div", null,
+                    h("div", { className: "text-xs font-bold text-slate-900" },
+                        w.method,
+                        " ",
+                        h("span", { className: "text-slate-400 font-medium" },
+                            "\u2022 ",
+                            w.account)),
+                    h("div", { className: "text-[11px] text-slate-400 mt-0.5" },
+                        w.id,
+                        " \u2022 ",
+                        new Date(w.at).toLocaleDateString())),
+                h("div", { className: "text-right shrink-0" },
+                    h("div", { className: "text-xs font-extrabold text-slate-900 flex items-center justify-end gap-1" },
+                        h("span", null,
+                            "-",
+                            w.coins.toLocaleString()),
+                        h("svg", { width: "13", height: "13", className: "inline-block" },
+                            h("use", { href: "#icon-p-coin" }))),
+                    h("span", { className: `status-badge status-${w.status}` }, w.status.toUpperCase())))));
+        };
+        const renderFullTxNodes = () => {
+            const items = [...renderWithdrawNodes()];
+            if (!withdrawals.length && coinNotifs.length) {
+                items.length = 0;
+            }
+            coinNotifs.forEach((n) => {
+                items.push(h("div", { className: "p-3.5 flex items-center justify-between gap-3" },
+                    h("div", { className: "min-w-0" },
+                        h("div", { className: "text-xs font-bold text-slate-900 truncate" }, n.title),
+                        h("div", { className: "text-[11px] text-slate-400 mt-0.5" },
+                            new Date(n.createdAt).toLocaleDateString(),
+                            " \u2022 ",
+                            n.type.toUpperCase())),
+                    h("div", { className: "text-right shrink-0" },
+                        h("div", { className: "text-xs font-extrabold text-emerald-600 flex items-center justify-end gap-1" },
+                            h("span", null,
+                                "+",
+                                (n.coins || 0).toLocaleString()),
+                            h("svg", { width: "13", height: "13", className: "inline-block" },
+                                h("use", { href: "#icon-p-coin" }))),
+                        h("span", { className: "status-badge status-paid" }, "CREDITED"))));
+            });
+            if (!items.length) {
+                return [
+                    h("div", { className: "p-4 text-center text-xs text-slate-400" }, "No transactions yet.")
+                ];
+            }
+            return items;
+        };
         const wHist = $('wHistory');
         if (wHist) {
-            const list = hData.withdrawals || [];
-            if (list.length) {
-                wHist.replaceChildren(...list.map((w) => (h("div", { className: "withdraw-item", style: "border-bottom:1px solid #F1F5F9;padding:10px 0" },
-                    h("div", null,
-                        h("div", { className: "withdraw-title" },
-                            w.method,
-                            " \u2022 ",
-                            h("span", { className: "small" }, w.account)),
-                        h("div", { className: "small" },
-                            w.id,
-                            " \u2022 ",
-                            new Date(w.at).toLocaleDateString())),
-                    h("div", { style: "text-align:right" },
-                        h("div", { className: "withdraw-amount" },
-                            w.coins.toLocaleString(),
-                            ' ',
-                            h("svg", { width: "14", height: "14", style: "vertical-align:-2px" },
-                                h("use", { href: "#icon-p-coin" }))),
-                        h("span", { className: `status-badge status-${w.status}` }, w.status.toUpperCase()))))));
-            }
-            else {
-                wHist.replaceChildren(h("div", { className: "small", style: "padding:10px 0" }, "No transactions yet."));
-            }
+            wHist.replaceChildren(...renderFullTxNodes());
+        }
+        const wPageHist = $('wWithdrawHistory');
+        if (wPageHist) {
+            wPageHist.replaceChildren(...renderWithdrawNodes());
         }
     }
     catch { }
@@ -738,17 +1006,8 @@ async function sendVerifyOtp() {
         const otpBox = $('verifyOtpBox');
         if (otpBox)
             otpBox.style.display = 'block';
-        const previewBanner = $('otpPreviewBanner');
-        if (previewBanner) {
-            if (r.otpPreview) {
-                previewBanner.style.display = 'flex';
-                setText('otpPreviewCode', r.otpPreview);
-            }
-            else {
-                previewBanner.style.display = 'none';
-            }
-        }
-        toast(`OTP sent to ${email}! Check & confirm below`, 'success');
+        await load();
+        toast(r.message || `Verification OTP sent to ${email}!`, 'success');
     }
     finally {
         if (btn)
@@ -828,6 +1087,10 @@ window.claimDaily = claimDaily;
 window.copyRef = copyRef;
 window.shareRef = shareRef;
 window.withdraw = withdraw;
+window.openNotificationsModal = openNotificationsModal;
+window.closeNotificationsModal = closeNotificationsModal;
+window.markAllNotificationsRead = markAllNotificationsRead;
+window.clearAllNotifications = clearAllNotifications;
 document.addEventListener('DOMContentLoaded', () => {
     const root = document.getElementById('root');
     if (root) {
@@ -836,4 +1099,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     renderDummyAvatar();
     load();
+    window.setInterval(() => {
+        load();
+    }, 8000);
 });

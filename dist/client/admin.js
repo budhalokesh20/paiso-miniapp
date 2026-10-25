@@ -1,5 +1,5 @@
 import { h } from './jsx';
-let adminKey = sessionStorage.getItem('paiso_admin_key') || '8990374489';
+let adminKey = sessionStorage.getItem('paiso_admin_key') || '';
 let activeTab = 'dashboard';
 let data = null;
 let apiCountries = [];
@@ -212,6 +212,7 @@ function UsersTabView(props) {
                     h("td", { className: "py-3 px-3 font-extrabold text-slate-900" }, u.coins.toLocaleString()),
                     h("td", { className: "py-3 px-3 font-semibold text-slate-700" }, u.referrals),
                     h("td", { className: "py-3 px-3 text-right space-x-1.5 whitespace-nowrap" },
+                        h("button", { type: "button", onClick: () => openAdminNotifModal(u.id), className: "px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded text-[11px]" }, "Notify"),
                         h("button", { type: "button", onClick: () => openUserForm(u.id), className: "px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded text-[11px]" }, "Edit"),
                         h("button", { type: "button", onClick: () => deleteUser(u.id), className: "px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded text-[11px]" }, "Delete")))))) : (h("tr", null,
                     h("td", { colSpan: "6", className: "py-8 text-center text-slate-400" }, "No users found"))))))));
@@ -426,6 +427,8 @@ function TasksTabView(props) {
     const editTask = editingTaskId ? s.tasks.find((t) => t.id === editingTaskId) : null;
     const tgTasksCount = s.tasks.filter((t) => t.type === 'telegram_join').length;
     const socialTasksCount = s.tasks.filter((t) => t.type === 'social_visit').length;
+    const appTasksCount = s.tasks.filter((t) => t.type === 'app_task').length;
+    const gameTasksCount = s.tasks.filter((t) => t.type === 'play_game').length;
     const repeatableCount = s.tasks.filter((t) => (t.resetHours || 0) > 0).length;
     const totalActiveClaims = s.tasks.reduce((sum, t) => sum + (t.claimsCount || 0), 0);
     return (h("div", { className: "space-y-4" },
@@ -439,11 +442,17 @@ function TasksTabView(props) {
                 h("div", { className: "h-8 w-px bg-slate-200 hidden sm:block" }),
                 h("div", null,
                     h("div", { className: "text-[11px] font-bold uppercase text-slate-400" }, "Categories"),
-                    h("div", { className: "flex items-center gap-2 mt-1 text-xs font-bold" },
-                        h("span", { className: "px-2.5 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200" },
+                    h("div", { className: "flex flex-wrap items-center gap-1.5 mt-1 text-xs font-bold" },
+                        h("span", { className: "px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200" },
+                            "App Task: ",
+                            appTasksCount),
+                        h("span", { className: "px-2 py-0.5 rounded-md bg-violet-50 text-violet-700 border border-violet-200" },
+                            "Play Game: ",
+                            gameTasksCount),
+                        h("span", { className: "px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200" },
                             "Telegram: ",
                             tgTasksCount),
-                        h("span", { className: "px-2.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200" },
+                        h("span", { className: "px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200" },
                             "Social/Web: ",
                             socialTasksCount))),
                 h("div", { className: "h-8 w-px bg-slate-200 hidden sm:block" }),
@@ -479,7 +488,9 @@ function TasksTabView(props) {
                     h("div", { className: "grid grid-cols-2 gap-2.5" },
                         h("div", null,
                             h("label", { className: "block text-[11px] text-slate-600 font-bold mb-1" }, "Task Type"),
-                            h("select", { id: "newTaskType", value: editTask?.type || 'social_visit', className: "w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold focus:outline-none focus:border-[#16A34A]" },
+                            h("select", { id: "newTaskType", value: editTask?.type || 'app_task', className: "w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold focus:outline-none focus:border-[#16A34A]" },
+                                h("option", { value: "app_task" }, "App Task"),
+                                h("option", { value: "play_game" }, "Play Game"),
                                 h("option", { value: "social_visit" }, "Social / Web Visit"),
                                 h("option", { value: "telegram_join" }, "Telegram Join"))),
                         h("div", null,
@@ -524,13 +535,29 @@ function TasksTabView(props) {
                                 h("th", { className: "py-2.5 px-3 text-right" }, "Actions"))),
                         h("tbody", { className: "divide-y divide-slate-100" }, s.tasks.length ? (s.tasks.map((t) => {
                             const isTg = t.type === 'telegram_join';
+                            const isApp = t.type === 'app_task';
+                            const isGame = t.type === 'play_game';
                             const isRepeatable = (t.resetHours || 0) > 0;
+                            const typeBadgeClass = isApp
+                                ? 'bg-indigo-50 text-indigo-700'
+                                : isGame
+                                    ? 'bg-violet-50 text-violet-700'
+                                    : isTg
+                                        ? 'bg-sky-50 text-sky-700'
+                                        : 'bg-blue-50 text-blue-700';
+                            const typeBadgeText = isApp
+                                ? `App Task (${t.waitSeconds || 20}s)`
+                                : isGame
+                                    ? `Play Game (${t.waitSeconds || 30}s)`
+                                    : isTg
+                                        ? 'Telegram'
+                                        : `Social (${t.waitSeconds || 15}s)`;
                             return (h("tr", { className: "hover:bg-slate-50/80" },
                                 h("td", { className: "py-3 px-3" },
                                     h("div", { className: "font-extrabold text-slate-900" }, t.title),
                                     h("a", { href: t.url, target: "_blank", className: "text-[11px] text-blue-600 hover:underline truncate block max-w-[240px]" }, t.url)),
                                 h("td", { className: "py-3 px-3 whitespace-nowrap" },
-                                    h("span", { className: `px-2 py-0.5 rounded text-[11px] font-bold ${isTg ? 'bg-sky-50 text-sky-700' : 'bg-indigo-50 text-indigo-700'}` }, isTg ? 'Telegram' : `Social (${t.waitSeconds || 15}s)`)),
+                                    h("span", { className: `px-2 py-0.5 rounded text-[11px] font-bold ${typeBadgeClass}` }, typeBadgeText)),
                                 h("td", { className: "py-3 px-3 whitespace-nowrap" },
                                     h("span", { className: `px-2 py-0.5 rounded text-[11px] font-bold ${isRepeatable
                                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
@@ -643,6 +670,11 @@ function AdminApp() {
                     h("div", { className: "w-8 h-8 rounded-lg bg-[#16A34A] flex items-center justify-center text-white font-extrabold text-sm" }, "P"),
                     h("span", { className: "text-base font-extrabold tracking-tight text-slate-900" }, "Paiso Admin")),
                 h("div", { className: "flex items-center gap-2.5" },
+                    h("button", { type: "button", onClick: () => openAdminNotifModal('all'), className: "px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-md flex items-center gap-1.5 transition" },
+                        h("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2", "stroke-linecap": "round", "stroke-linejoin": "round" },
+                            h("path", { d: "M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" }),
+                            h("path", { d: "M13.73 21a2 2 0 0 1-3.46 0" })),
+                        h("span", null, "Send Notification")),
                     h("button", { type: "button", onClick: () => refreshAdmin(), className: "px-3.5 py-1.5 bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-bold rounded-md transition" }, "Refresh"),
                     h("button", { type: "button", onClick: () => adminLogout(), className: "px-3 py-1.5 border border-slate-200 hover:bg-slate-100 text-slate-600 text-xs font-semibold rounded-md transition" }, "Logout"))),
             h("div", { className: "w-full px-6 flex items-center gap-8 overflow-x-auto border-t border-slate-100" },
@@ -659,7 +691,36 @@ function AdminApp() {
                 h("button", { type: "button", onClick: () => adminLogin(), className: "w-full bg-[#16A34A] hover:bg-[#15803D] text-white font-bold text-xs uppercase py-2.5 rounded-lg transition" }, "Login"),
                 h("div", { id: "adminLoginErr", className: "text-xs text-red-600 font-semibold mt-2" }))),
         h("main", { id: "adminMainWorkspace", className: "flex-1 w-full overflow-y-auto px-6 py-5" },
-            h("div", { id: "adminTabView", className: "w-full h-full" }))));
+            h("div", { id: "adminTabView", className: "w-full h-full" })),
+        h("div", { id: "adminNotifModal", className: "fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-[2px] hidden items-center justify-center p-4", onClick: (e) => {
+                if (e.target.id === 'adminNotifModal')
+                    closeAdminNotifModal();
+            } },
+            h("div", { className: "w-full max-w-2xl bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[85vh]" },
+                h("div", { className: "px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50" },
+                    h("div", null,
+                        h("h3", { className: "text-sm font-extrabold text-slate-900" }, "Send Notification & Activity Log"),
+                        h("p", { className: "text-xs text-slate-500" }, "Broadcast a message (with optional bonus coins) to all users or a specific user.")),
+                    h("button", { type: "button", onClick: () => closeAdminNotifModal(), className: "px-2.5 py-1 rounded-lg bg-slate-200/70 hover:bg-slate-300 text-slate-700 text-xs font-bold" }, "\u2715 Close")),
+                h("div", { className: "p-5 overflow-y-auto space-y-5 text-xs" },
+                    h("div", { className: "bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3" },
+                        h("div", { className: "grid grid-cols-1 sm:grid-cols-2 gap-3" },
+                            h("div", null,
+                                h("label", { className: "block text-[11px] font-bold text-slate-600 mb-1" }, "Recipient (Target User ID or 'all')"),
+                                h("input", { id: "adminNotifTarget", type: "text", defaultValue: "all", placeholder: "all (for everyone) or User ID e.g. 999001", className: "w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-bold focus:outline-none focus:border-[#16A34A]" })),
+                            h("div", null,
+                                h("label", { className: "block text-[11px] font-bold text-slate-600 mb-1" }, "Optional Gift Coins (0 for none)"),
+                                h("input", { id: "adminNotifCoins", type: "number", defaultValue: "0", placeholder: "0", className: "w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-extrabold text-[#16A34A] focus:outline-none focus:border-[#16A34A]" }))),
+                        h("div", null,
+                            h("label", { className: "block text-[11px] font-bold text-slate-600 mb-1" }, "Notification Title"),
+                            h("input", { id: "adminNotifTitle", type: "text", placeholder: "e.g. New High-Reward Task Added! or Special Bonus", className: "w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-bold focus:outline-none focus:border-[#16A34A]" })),
+                        h("div", null,
+                            h("label", { className: "block text-[11px] font-bold text-slate-600 mb-1" }, "Notification Message"),
+                            h("textarea", { id: "adminNotifMessage", rows: 2, placeholder: "Write the notification message that users will see in their app...", className: "w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-medium focus:outline-none focus:border-[#16A34A]" })),
+                        h("button", { type: "button", onClick: () => sendAdminNotification(), className: "w-full py-2.5 bg-[#16A34A] hover:bg-[#15803D] text-white font-extrabold rounded-lg transition" }, "Send Notification Now")),
+                    h("div", null,
+                        h("div", { className: "text-xs font-extrabold uppercase text-slate-700 mb-2" }, "Recent Notifications & Activity Log"),
+                        h("div", { id: "adminNotifHistoryList", className: "space-y-2 max-h-60 overflow-y-auto pr-1" })))))));
 }
 function renderActiveTab() {
     const container = document.getElementById('adminTabView');
@@ -1042,6 +1103,78 @@ function setTxFilter(status) {
 function filterTxSearch(q) {
     txSearchQuery = q;
     renderActiveTab();
+}
+function renderAdminNotifHistory() {
+    const listEl = document.getElementById('adminNotifHistoryList');
+    if (!listEl)
+        return;
+    const list = data?.notifications || [];
+    if (!list.length) {
+        listEl.replaceChildren(h("div", { className: "py-6 text-center text-xs text-slate-400 bg-slate-50 rounded-xl border border-slate-200" }, "No notifications in history yet"));
+        return;
+    }
+    listEl.replaceChildren(...list.map((n) => (h("div", { className: "flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200" },
+        h("div", { className: "min-w-0" },
+            h("div", { className: "flex items-center gap-2" },
+                h("span", { className: "text-xs font-extrabold text-slate-900 truncate" }, n.title),
+                h("span", { className: "px-2 py-0.5 rounded bg-white border border-slate-200 text-[10px] font-bold text-slate-600" }, n.userId === 'all' ? 'All Users' : `User #${n.userId}`),
+                h("span", { className: "px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase" }, n.type),
+                n.coins ? (h("span", { className: "text-[10px] font-extrabold text-[#16A34A]" },
+                    "+",
+                    n.coins,
+                    " Coins")) : null),
+            h("div", { className: "text-[11px] text-slate-600 mt-0.5 truncate" }, n.message)),
+        h("button", { type: "button", onClick: () => deleteAdminNotif(n.id), className: "px-2.5 py-1 rounded bg-red-50 hover:bg-red-100 text-red-600 text-[11px] font-bold shrink-0" }, "Delete")))));
+}
+function openAdminNotifModal(targetUserId = 'all') {
+    const modal = document.getElementById('adminNotifModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+    const targetInput = document.getElementById('adminNotifTarget');
+    if (targetInput)
+        targetInput.value = targetUserId;
+    renderAdminNotifHistory();
+}
+function closeAdminNotifModal() {
+    const modal = document.getElementById('adminNotifModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+}
+async function sendAdminNotification() {
+    const userId = document.getElementById('adminNotifTarget')?.value.trim() || 'all';
+    const title = document.getElementById('adminNotifTitle')?.value.trim() || '';
+    const message = document.getElementById('adminNotifMessage')?.value.trim() || '';
+    const coins = Math.max(0, Math.floor(+(document.getElementById('adminNotifCoins')?.value || 0)));
+    if (!title || !message) {
+        notify('Please enter both Title and Message', true);
+        return;
+    }
+    await adminApi('/api/admin/notifications', {
+        method: 'POST',
+        body: JSON.stringify({ userId, title, message, coins })
+    });
+    const titleEl = document.getElementById('adminNotifTitle');
+    const msgEl = document.getElementById('adminNotifMessage');
+    const coinsEl = document.getElementById('adminNotifCoins');
+    if (titleEl)
+        titleEl.value = '';
+    if (msgEl)
+        msgEl.value = '';
+    if (coinsEl)
+        coinsEl.value = '0';
+    notify(userId === 'all' ? 'Notification broadcasted to all users!' : `Notification sent to #${userId}!`);
+    await refreshAdmin();
+    renderAdminNotifHistory();
+}
+async function deleteAdminNotif(id) {
+    await adminApi(`/api/admin/notifications/${id}`, { method: 'DELETE' });
+    notify('Notification removed');
+    await refreshAdmin();
+    renderAdminNotifHistory();
 }
 document.addEventListener('DOMContentLoaded', () => {
     const root = document.getElementById('admin-root');

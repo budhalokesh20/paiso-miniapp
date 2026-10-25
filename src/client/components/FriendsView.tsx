@@ -4,9 +4,9 @@ export function FriendsView() {
   return (
     <section id="tab-refer" className="app-screen">
       <div className="native-topbar">
-        <h2 className="page-title">
+        <h2 className="page-title flex items-center gap-2">
           <svg
-            className="title-icon"
+            className="title-icon w-5 h-5 shrink-0"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -24,12 +24,12 @@ export function FriendsView() {
       </div>
 
       <div className="screen-content">
-        <div className="refer-hero">
-          <img src="/assets/icon-friends.png" alt="Invite Friends" />
-          <div>
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+        <div className="refer-hero flex items-center gap-3.5">
+          <img src="/assets/icon-friends.png" alt="Invite Friends" className="w-14 h-14 object-contain shrink-0" />
+          <div className="min-w-0">
+            <h3 className="flex items-center gap-1.5 flex-wrap">
               <span>Earn +500</span>
-              <svg width="18" height="18">
+              <svg width="18" height="18" className="inline-block shrink-0">
                 <use href="#icon-p-coin" />
               </svg>
               <span>/ Friend</span>

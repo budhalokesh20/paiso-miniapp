@@ -137,11 +137,11 @@ function HomeView() {
                             h("span", { className: "dot" }, "\u2022"),
                             " Real Rewards"))),
                 h("div", { className: "header-actions" },
-                    h("button", { className: "bell-btn", onClick: () => window.showTab('wallet'), "aria-label": "Notifications" },
+                    h("button", { className: "bell-btn relative", onClick: () => window.openNotificationsModal(), "aria-label": "Notifications" },
                         h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round" },
                             h("path", { d: "M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" }),
                             h("path", { d: "M13.73 21a2 2 0 0 1-3.46 0" })),
-                        h("span", { className: "bell-dot" })))),
+                        h("span", { id: "notifUnreadBadge", style: "display:none", className: "absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-extrabold flex items-center justify-center border-2 border-white shadow-sm" }, "0")))),
             h("div", { className: "hero-banner" },
                 h("div", { className: "hero-content" },
                     h("div", { className: "hero-tag" }, "EARN \u2022 PLAY \u2022 REDEEM"),
@@ -207,53 +207,20 @@ function HomeView() {
                     h("div", { className: "explore-icon-wrap" },
                         h("img", { src: "/assets/icon-ads.png", alt: "Watch Ads", className: "explore-icon" })),
                     h("div", { className: "explore-info" },
-                        h("div", { className: "explore-title-row" },
-                            h("span", { className: "explore-title" }, "Watch Ads"),
-                            h("span", { className: "explore-arrow" }, "\u203A")),
+                        h("div", { className: "explore-title" }, "Watch Ads"),
                         h("div", { className: "explore-sub", id: "adCardSub" }, "Earn coins"))),
                 h("div", { className: "explore-card card-tasks", "data-title": "complete tasks easy fast", onClick: () => window.showTab('tasks', 'all') },
                     h("div", { className: "explore-icon-wrap" },
                         h("img", { src: "/assets/icon-tasks.png", alt: "Complete Tasks", className: "explore-icon" })),
                     h("div", { className: "explore-info" },
-                        h("div", { className: "explore-title-row" },
-                            h("span", { className: "explore-title" }, "Complete Tasks"),
-                            h("span", { className: "explore-arrow" }, "\u203A")),
+                        h("div", { className: "explore-title" }, "Complete Tasks"),
                         h("div", { className: "explore-sub" }, "Easy & Fast"))),
-                h("div", { className: "explore-card card-games", "data-title": "play games more fun coins", onClick: () => window.showTab('tasks', 'social_visit') },
+                h("div", { className: "explore-card card-games", "data-title": "play and earn games more fun coins", onClick: () => window.showTab('tasks', 'play_game') },
                     h("div", { className: "explore-icon-wrap" },
-                        h("img", { src: "/assets/icon-games.png", alt: "Play Games", className: "explore-icon" })),
+                        h("img", { src: "/assets/icon-games.png", alt: "Play & Earn", className: "explore-icon" })),
                     h("div", { className: "explore-info" },
-                        h("div", { className: "explore-title-row" },
-                            h("span", { className: "explore-title" }, "Play Games"),
-                            h("span", { className: "explore-arrow" }, "\u203A")),
-                        h("div", { className: "explore-sub" }, "More Fun, More Coins"))),
-                h("div", { className: "explore-card card-channels", "data-title": "join channels telegram get rewards", onClick: () => window.showTab('tasks', 'telegram_join') },
-                    h("div", { className: "explore-icon-wrap" },
-                        h("img", { src: "/assets/icon-channels.png", alt: "Join Channels", className: "explore-icon" })),
-                    h("div", { className: "explore-info" },
-                        h("div", { className: "explore-title-row" },
-                            h("span", { className: "explore-title" }, "Join Channels"),
-                            h("span", { className: "explore-arrow" }, "\u203A")),
-                        h("div", { className: "explore-sub" }, "Get rewards"))),
-                h("div", { className: "explore-card card-friends", "data-title": "invite friends refer earn together", onClick: () => window.showTab('refer') },
-                    h("div", { className: "explore-icon-wrap" },
-                        h("img", { src: "/assets/icon-friends.png", alt: "Invite Friends", className: "explore-icon" })),
-                    h("div", { className: "explore-info" },
-                        h("div", { className: "explore-title-row" },
-                            h("span", { className: "explore-title" }, "Invite Friends"),
-                            h("span", { className: "explore-arrow" }, "\u203A")),
-                        h("div", { className: "explore-sub" }, "Earn Together"))),
-                h("div", { className: "explore-card card-freefire", "data-title": "free fire indonesia play earn rewards diamonds", onClick: () => {
-                        window.showTab('wallet');
-                        window.openSettingPage('sub-withdraw');
-                    } },
-                    h("div", { className: "explore-icon-wrap" },
-                        h("img", { src: "/assets/icon-freefire.png", alt: "Free Fire Indonesia", className: "explore-icon" })),
-                    h("div", { className: "explore-info" },
-                        h("div", { className: "explore-title-row" },
-                            h("span", { className: "explore-title" }, "Free Fire Indonesia"),
-                            h("span", { className: "explore-arrow" }, "\u203A")),
-                        h("div", { className: "explore-sub" }, "Play & Earn rewards")))),
+                        h("div", { className: "explore-title" }, "Play & Earn"),
+                        h("div", { className: "explore-sub" }, "More Fun, Coins")))),
             h("div", { style: { display: 'none' } },
                 h("span", { id: "adReward" }),
                 h("span", { id: "adCount" }, "0"),
@@ -265,38 +232,39 @@ function HomeView() {
 function TasksView() {
     return (h("section", { id: "tab-tasks", className: "app-screen" },
         h("div", { className: "native-topbar" },
-            h("h2", { className: "page-title" }, "Tasks"),
+            h("h2", { className: "page-title" }, "Earn Tasks"),
             h("div", { className: "coin-pill" },
                 h("svg", { width: "16", height: "16" },
                     h("use", { href: "#icon-p-coin" })),
                 h("span", { id: "headerCoins" }, "0"))),
-        h("div", { className: "screen-content" },
-            h("div", { className: "filter-bar" },
-                h("button", { className: "filter-chip active", "data-filter": "all", onClick: () => window.setTaskFilter('all') }, "All"),
+        h("div", { className: "screen-content space-y-3.5" },
+            h("div", { className: "flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar" },
+                h("button", { className: "filter-chip active", "data-filter": "all", onClick: () => window.setTaskFilter('all') }, "All Tasks"),
+                h("button", { className: "filter-chip", "data-filter": "app_task", onClick: () => window.setTaskFilter('app_task') }, "App Task"),
+                h("button", { className: "filter-chip", "data-filter": "play_game", onClick: () => window.setTaskFilter('play_game') }, "Play Game"),
                 h("button", { className: "filter-chip", "data-filter": "telegram_join", onClick: () => window.setTaskFilter('telegram_join') }, "Telegram"),
-                h("button", { className: "filter-chip", "data-filter": "social_visit", onClick: () => window.setTaskFilter('social_visit') }, "Social"),
-                h("button", { className: "filter-chip", "data-filter": "done", onClick: () => window.setTaskFilter('done') }, "Completed")),
-            h("div", { id: "taskList", className: "tasks-list-wrap" }))));
+                h("button", { className: "filter-chip", "data-filter": "social_visit", onClick: () => window.setTaskFilter('social_visit') }, "Social & Web")),
+            h("div", { id: "taskList", className: "space-y-2.5 pb-4" }))));
 }
 
 // --- src/client/components/FriendsView.tsx ---
 function FriendsView() {
     return (h("section", { id: "tab-refer", className: "app-screen" },
         h("div", { className: "native-topbar" },
-            h("h2", { className: "page-title" },
-                h("svg", { className: "title-icon", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2", "stroke-linecap": "round", "stroke-linejoin": "round" },
+            h("h2", { className: "page-title flex items-center gap-2" },
+                h("svg", { className: "title-icon w-5 h-5 shrink-0", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2", "stroke-linecap": "round", "stroke-linejoin": "round" },
                     h("path", { d: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" }),
                     h("circle", { cx: "9", cy: "7", r: "4" }),
                     h("path", { d: "M23 21v-2a4 4 0 0 0-3-3.87" }),
                     h("path", { d: "M16 3.13a4 4 0 0 1 0 7.75" })),
                 h("span", null, "Invite Friends"))),
         h("div", { className: "screen-content" },
-            h("div", { className: "refer-hero" },
-                h("img", { src: "/assets/icon-friends.png", alt: "Invite Friends" }),
-                h("div", null,
-                    h("h3", { style: { display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' } },
+            h("div", { className: "refer-hero flex items-center gap-3.5" },
+                h("img", { src: "/assets/icon-friends.png", alt: "Invite Friends", className: "w-14 h-14 object-contain shrink-0" }),
+                h("div", { className: "min-w-0" },
+                    h("h3", { className: "flex items-center gap-1.5 flex-wrap" },
                         h("span", null, "Earn +500"),
-                        h("svg", { width: "18", height: "18" },
+                        h("svg", { width: "18", height: "18", className: "inline-block shrink-0" },
                             h("use", { href: "#icon-p-coin" })),
                         h("span", null, "/ Friend")),
                     h("p", null,
@@ -329,6 +297,115 @@ function FriendsView() {
 
 // --- src/client/components/SettingsView.tsx ---
 
+const FAQ_STEPS = [
+    {
+        step: '1',
+        title: 'Daily Check-in & Ads',
+        desc: 'Claim your daily check-in every 24 hours and watch rewarded ads from the Home screen.'
+    },
+    {
+        step: '2',
+        title: 'Complete Tasks',
+        desc: 'Open tasks, join the channel or stay for the required seconds, then tap Verify to receive coins.'
+    },
+    {
+        step: '3',
+        title: 'Unlock Eligibility',
+        desc: 'Complete 3 Ads, 2 Tasks, and 2 Daily Check-ins to unlock withdrawals and referral bonuses.'
+    },
+    {
+        step: '4',
+        title: 'Withdraw Earnings',
+        desc: 'Go to Settings → Withdrawal, select your payment method, enter your account ID, and submit.'
+    }
+];
+const FAQ_LIST = [
+    {
+        q: 'How are coins converted to cash?',
+        a: '100 Coins = NPR 1. The default minimum withdrawal is 10,000 Coins (NPR 100).'
+    },
+    {
+        q: 'Why do completed tasks disappear?',
+        a: 'Once a task is verified, it clears from your active list. Daily or resettable tasks appear again automatically when ready.'
+    },
+    {
+        q: 'How does the referral reward work?',
+        a: 'You receive +500 Coins when your invited friend completes 3 Ads, 2 Tasks, and 2 Check-ins, plus 10% of their task earnings.'
+    },
+    {
+        q: 'How long do withdrawals take?',
+        a: 'Withdrawals are reviewed within 24–48 hours. If rejected due to invalid details, your coins are refunded automatically.'
+    }
+];
+const TERMS_SECTIONS = [
+    {
+        title: '1. One Account Per User',
+        body: 'Each user may only use one Telegram account. Multiple accounts, bots, or self-referrals are not allowed.'
+    },
+    {
+        title: '2. Task & Channel Rules',
+        body: 'Rewards require genuine task completion. Leaving joined channels immediately after claiming may result in coin deduction.'
+    },
+    {
+        title: '3. Referral Qualification',
+        body: 'Referral bonuses apply only to active users who complete the required ads, tasks, and check-ins.'
+    },
+    {
+        title: '4. Withdrawals & Account Accuracy',
+        body: 'Payouts are processed via active methods for allowed countries. Please verify your wallet/account ID before submitting.'
+    },
+    {
+        title: '5. Verification & Privacy',
+        body: 'Details provided for profile verification are used only for account security and verification badge status.'
+    },
+    {
+        title: '6. Fair Use Policy',
+        body: 'Accounts abusing system bugs or automated tools may have withdrawals declined or access restricted.'
+    }
+];
+function WithdrawSection() {
+    return (h("div", { className: "bg-white border border-slate-200 rounded-xl p-4 space-y-4" },
+        h("div", { className: "flex items-center justify-between pb-3 border-b border-slate-100" },
+            h("div", null,
+                h("span", { className: "text-[11px] font-semibold text-slate-400 block" }, "Balance"),
+                h("div", { className: "flex items-center gap-1.5 mt-0.5" },
+                    h("svg", { width: "18", height: "18", className: "shrink-0" },
+                        h("use", { href: "#icon-p-coin" })),
+                    h("span", { className: "text-lg font-extrabold text-slate-900", id: "wCoins" }, "0"),
+                    h("span", { className: "text-xs font-bold text-slate-500" },
+                        "(NPR ",
+                        h("span", { id: "npr" }, "0.00"),
+                        ")"))),
+            h("div", { className: "text-right" },
+                h("span", { className: "text-[11px] font-semibold text-slate-400 block" }, "Minimum"),
+                h("b", { className: "text-xs font-extrabold text-slate-800" },
+                    h("span", { id: "minW" }, "10,000"),
+                    " Coins"))),
+        h("div", null,
+            h("div", { className: "text-xs font-bold text-slate-700 mb-2" }, "Method"),
+            h("div", { className: "grid grid-cols-2 gap-2", id: "wMethodsGrid" }),
+            h("input", { type: "hidden", id: "wMethod", value: "" })),
+        h("div", null,
+            h("div", { className: "text-xs font-bold text-slate-700 mb-1", id: "wAccountLabel" }, "Account ID"),
+            h("input", { className: "w-full px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600", id: "wAccount", placeholder: "Enter Account / Wallet ID" })),
+        h("div", null,
+            h("div", { className: "flex items-center justify-between mb-1" },
+                h("span", { className: "text-xs font-bold text-slate-700" }, "Amount (Coins)"),
+                h("button", { type: "button", className: "text-[11px] font-extrabold text-blue-600", onClick: () => window.setWithdrawAmount('MAX') }, "MAX")),
+            h("input", { className: "w-full px-3 py-2 text-xs font-extrabold bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-600", id: "wAmount", type: "number", placeholder: "Enter coins amount", onInput: () => window.updateWithdrawPreview() }),
+            h("div", { className: "flex items-center justify-between text-xs pt-2" },
+                h("span", { className: "text-slate-400 font-medium" }, "Receive"),
+                h("b", { className: "text-slate-900 font-extrabold", id: "wReceivePreview" }, "NPR 0.00"))),
+        h("button", { type: "button", className: "w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-lg transition", onClick: () => window.withdraw() }, "Withdraw"),
+        h("div", { className: "hidden" },
+            h("span", { id: "coins" }, "0"),
+            h("span", { id: "total" }, "0"),
+            h("span", { id: "wAllowedCountriesBar" }),
+            h("span", { id: "wqStatusBadge" }),
+            h("span", { id: "wqAds" }),
+            h("span", { id: "wqTasks" }),
+            h("span", { id: "wqDaily" }))));
+}
 function SubpageTopBar(props) {
     return (h("div", { className: "native-subpage-bar" },
         h("button", { type: "button", className: "native-back-btn", onClick: () => window.closeSettingPage() },
@@ -426,6 +503,18 @@ function SettingsView() {
                         h("div", null,
                             h("div", { className: "settings-item-title" }, "FAQ"),
                             h("div", { className: "settings-item-sub" }, "Frequently asked questions"))),
+                    h("span", { className: "settings-chevron" }, "\u203A")),
+                h("button", { type: "button", className: "settings-row", onClick: () => window.openSettingPage('sub-terms') },
+                    h("div", { className: "settings-item-left" },
+                        h("div", { className: "settings-icon-box icon-blue" },
+                            h("svg", { width: "19", height: "19", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2", "stroke-linecap": "round", "stroke-linejoin": "round" },
+                                h("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
+                                h("polyline", { points: "14 2 14 8 20 8" }),
+                                h("line", { x1: "16", y1: "13", x2: "8", y2: "13" }),
+                                h("line", { x1: "16", y1: "17", x2: "8", y2: "17" }))),
+                        h("div", null,
+                            h("div", { className: "settings-item-title" }, "Terms & Conditions"),
+                            h("div", { className: "settings-item-sub" }, "Terms of use & withdrawal rules"))),
                     h("span", { className: "settings-chevron" }, "\u203A")))),
         h("div", { id: "sub-userid", className: "settings-subpage" },
             h(SubpageTopBar, { title: "User ID" }),
@@ -501,11 +590,8 @@ function SettingsView() {
                     h("div", { className: "verify-otp-box", id: "verifyOtpBox", style: { display: 'none' } },
                         h("div", { className: "verify-otp-divider" }),
                         h("div", { className: "verify-otp-info" },
-                            "Enter the 6-digit OTP sent to ",
+                            "Enter the 6-digit verification code sent to ",
                             h("b", { id: "otpTargetEmail" }, "your email")),
-                        h("div", { className: "otp-preview-banner", id: "otpPreviewBanner", style: { display: 'none' } },
-                            h("span", null, "Inbox OTP Code:"),
-                            h("b", { id: "otpPreviewCode" }, "------")),
                         h("input", { className: "form-input otp-code-input", id: "vOtpInput", type: "text", maxLength: 6, placeholder: "Enter 6-digit OTP" }),
                         h("button", { type: "button", className: "primary-btn btn-with-icon verify-confirm-btn", id: "confirmOtpBtn", onClick: () => window.confirmVerifyOtp() },
                             h("svg", { width: "17", height: "17" },
@@ -513,79 +599,15 @@ function SettingsView() {
                             h("span", null, "Confirm OTP & Verify")))))),
         h("div", { id: "sub-history", className: "settings-subpage" },
             h(SubpageTopBar, { title: "Transaction History" }),
-            h("div", { className: "screen-content" },
-                h("div", { className: "card", id: "wHistory" }))),
+            h("div", { className: "screen-content pb-6" },
+                h("div", { className: "bg-white border border-slate-200 rounded-xl divide-y divide-slate-100", id: "wHistory" }))),
         h("div", { id: "sub-withdraw", className: "settings-subpage" },
             h(SubpageTopBar, { title: "Withdrawal" }),
-            h("div", { className: "screen-content" },
-                h("div", { className: "withdraw-hero-card" },
-                    h("div", { className: "withdraw-hero-glow" }),
-                    h("div", { className: "withdraw-hero-top" },
-                        h("span", { className: "withdraw-hero-label" }, "AVAILABLE BALANCE"),
-                        h("span", { className: "withdraw-rate-pill" }, "100 Coins = NPR 1")),
-                    h("div", { className: "withdraw-hero-balance-row" },
-                        h("svg", { width: "28", height: "28" },
-                            h("use", { href: "#icon-p-coin" })),
-                        h("span", { className: "withdraw-hero-coins", id: "wCoins" }, "0"),
-                        h("span", { className: "withdraw-hero-npr-pill" },
-                            "\u2248 NPR ",
-                            h("span", { id: "npr" }, "0.00"))),
-                    h("div", { className: "withdraw-hero-stats" },
-                        h("div", { className: "withdraw-stat-item" },
-                            h("span", { className: "withdraw-stat-lbl" }, "Minimum Withdraw"),
-                            h("b", { className: "withdraw-stat-val" },
-                                h("span", { id: "minW" }, "10,000"),
-                                " Coins")),
-                        h("div", { className: "withdraw-stat-divider" }),
-                        h("div", { className: "withdraw-stat-item" },
-                            h("span", { className: "withdraw-stat-lbl" }, "Total Earned"),
-                            h("b", { className: "withdraw-stat-val" },
-                                h("span", { id: "total" }, "0"),
-                                " Coins")))),
-                h("div", { className: "withdraw-qual-card", id: "withdrawQualCard" },
-                    h("div", { className: "withdraw-qual-head" },
-                        h("div", { className: "withdraw-qual-title" },
-                            h("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.3", "stroke-linecap": "round", "stroke-linejoin": "round" },
-                                h("path", { d: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" })),
-                            h("span", null, "Withdrawal Eligibility")),
-                        h("span", { className: "wq-badge locked", id: "wqStatusBadge" }, "In Progress")),
-                    h("div", { className: "withdraw-qual-pills" },
-                        h("div", { className: "wq-pill", id: "wqPillAds" },
-                            h("span", null, "Ads"),
-                            h("b", { id: "wqAds" }, "0/3")),
-                        h("div", { className: "wq-pill", id: "wqPillTasks" },
-                            h("span", null, "Tasks"),
-                            h("b", { id: "wqTasks" }, "0/2")),
-                        h("div", { className: "wq-pill", id: "wqPillDaily" },
-                            h("span", null, "Check-in"),
-                            h("b", { id: "wqDaily" }, "0/2")))),
-                h("div", { className: "withdraw-countries-bar", id: "wAllowedCountriesBar" }),
-                h("div", { className: "withdraw-section-label" }, "SELECT PAYOUT METHOD"),
-                h("div", { className: "method-pills", id: "wMethodsGrid" }),
-                h("input", { type: "hidden", id: "wMethod", value: "" }),
-                h("div", { className: "card withdraw-form-card" },
-                    h("div", { className: "verify-field-label", id: "wAccountLabel", style: { marginTop: '0' } }, "Account / Wallet ID"),
-                    h("input", { className: "form-input", id: "wAccount", placeholder: "Enter Account / Wallet ID" }),
-                    h("div", { className: "withdraw-amount-head" },
-                        h("span", { className: "verify-field-label", style: { margin: '0' } }, "Withdraw Amount (Coins)"),
-                        h("div", { className: "withdraw-quick-chips" },
-                            h("button", { type: "button", className: "w-chip", onClick: () => window.setWithdrawAmount(10000) }, "10K"),
-                            h("button", { type: "button", className: "w-chip", onClick: () => window.setWithdrawAmount(25000) }, "25K"),
-                            h("button", { type: "button", className: "w-chip", onClick: () => window.setWithdrawAmount(50000) }, "50K"),
-                            h("button", { type: "button", className: "w-chip w-chip-max", onClick: () => window.setWithdrawAmount('MAX') }, "MAX"))),
-                    h("input", { className: "form-input withdraw-amount-input", id: "wAmount", type: "number", placeholder: "Minimum 10,000 coins", onInput: () => window.updateWithdrawPreview() }),
-                    h("div", { className: "withdraw-preview-strip" },
-                        h("div", { className: "withdraw-preview-left" },
-                            h("span", { className: "withdraw-preview-lbl" }, "Estimated Payout"),
-                            h("span", { className: "withdraw-preview-sub" }, "Processed within 24\u201348 hrs")),
-                        h("div", { className: "withdraw-preview-val", id: "wReceivePreview" }, "NPR 0.00")),
-                    h("button", { className: "primary-btn btn-with-icon withdraw-submit-btn", onClick: () => window.withdraw() },
-                        h("svg", { width: "17", height: "17", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.3", "stroke-linecap": "round", "stroke-linejoin": "round" },
-                            h("line", { x1: "22", y1: "2", x2: "11", y2: "13" }),
-                            h("polygon", { points: "22 2 15 22 11 13 2 9 22 2" })),
-                        h("span", null, "Request Withdraw"))),
-                h("div", { style: { display: 'none' } },
-                    h("span", { id: "coins" }, "0")))),
+            h("div", { className: "screen-content space-y-4 pb-6" },
+                h(WithdrawSection, null),
+                h("div", null,
+                    h("div", { className: "text-xs font-extrabold text-slate-700 mb-2 px-0.5" }, "Transaction History"),
+                    h("div", { className: "bg-white border border-slate-200 rounded-xl divide-y divide-slate-100", id: "wWithdrawHistory" })))),
         h("div", { id: "sub-support", className: "settings-subpage" },
             h(SubpageTopBar, { title: "Support" }),
             h("div", { className: "screen-content" },
@@ -598,20 +620,23 @@ function SettingsView() {
                         h("span", null, "Contact Telegram Support"))))),
         h("div", { id: "sub-faq", className: "settings-subpage" },
             h(SubpageTopBar, { title: "FAQ" }),
-            h("div", { className: "screen-content" },
-                h("div", { className: "card" },
-                    h("div", { className: "faq-item" },
-                        h("div", { className: "faq-q" }, "1. How do I earn coins?"),
-                        h("div", { className: "faq-a" }, "Complete daily check-ins every 24 hours, watch rewarded ads, join Telegram channels, and invite friends.")),
-                    h("div", { className: "faq-item" },
-                        h("div", { className: "faq-q" }, "2. What is the minimum withdrawal?"),
-                        h("div", { className: "faq-a" }, "Minimum withdrawal is 10,000 coins (NPR 100) via eSewa, Khalti, Binance USDT, or PayPal.")),
-                    h("div", { className: "faq-item" },
-                        h("div", { className: "faq-q" }, "3. How long does withdrawal take?"),
-                        h("div", { className: "faq-a" }, "Withdrawals are reviewed and processed by admin within 24 to 48 hours.")),
-                    h("div", { className: "faq-item", style: { marginBottom: '0', borderBottom: '0', paddingBottom: '0' } },
-                        h("div", { className: "faq-q" }, "4. How does referral bonus work?"),
-                        h("div", { className: "faq-a" }, "You earn +500 coins per qualified referral plus a 10% lifetime bonus on their task and daily check-in earnings.")))))));
+            h("div", { className: "screen-content space-y-3 pb-6" },
+                h("div", { className: "bg-white border border-slate-200 rounded-xl p-4" },
+                    h("div", { className: "text-xs font-extrabold text-slate-900 mb-3" }, "How It Works"),
+                    h("div", { className: "space-y-3" }, FAQ_STEPS.map((item) => (h("div", { className: "flex items-start gap-2.5" },
+                        h("span", { className: "w-5 h-5 rounded-md bg-slate-100 text-slate-700 font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5" }, item.step),
+                        h("div", null,
+                            h("div", { className: "text-xs font-bold text-slate-900" }, item.title),
+                            h("p", { className: "text-[11px] text-slate-500 leading-relaxed mt-0.5" }, item.desc))))))),
+                h("div", { className: "bg-white border border-slate-200 rounded-xl divide-y divide-slate-100" }, FAQ_LIST.map((item) => (h("div", { className: "p-3.5" },
+                    h("div", { className: "text-xs font-bold text-slate-900" }, item.q),
+                    h("p", { className: "text-[11px] text-slate-500 leading-relaxed mt-1" }, item.a))))))),
+        h("div", { id: "sub-terms", className: "settings-subpage" },
+            h(SubpageTopBar, { title: "Terms & Conditions" }),
+            h("div", { className: "screen-content pb-6" },
+                h("div", { className: "bg-white border border-slate-200 rounded-xl divide-y divide-slate-100" }, TERMS_SECTIONS.map((sec) => (h("div", { className: "p-3.5" },
+                    h("div", { className: "text-xs font-bold text-slate-900" }, sec.title),
+                    h("p", { className: "text-[11px] text-slate-500 leading-relaxed mt-1" }, sec.body)))))))));
 }
 
 // --- src/client/components/BottomNav.tsx ---
@@ -643,10 +668,31 @@ function BottomNav() {
 
 
 
+function NotificationModal() {
+    return (h("div", { id: "notifModal", className: "fixed inset-0 z-[9999] bg-slate-900/50 backdrop-blur-[2px] hidden items-end sm:items-center justify-center p-0 sm:p-4", onClick: (e) => {
+            if (e.target.id === 'notifModal')
+                closeNotificationsModal();
+        } },
+        h("div", { className: "w-full max-w-[440px] max-h-[82vh] bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-100" },
+            h("div", { className: "px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70" },
+                h("div", { className: "flex items-center gap-2.5" },
+                    h("div", { className: "w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs" },
+                        h("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2", "stroke-linecap": "round", "stroke-linejoin": "round" },
+                            h("path", { d: "M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" }),
+                            h("path", { d: "M13.73 21a2 2 0 0 1-3.46 0" }))),
+                    h("div", null,
+                        h("h3", { className: "text-sm font-extrabold text-slate-900 leading-tight" }, "Notifications"),
+                        h("p", { className: "text-[11px] text-slate-500 font-medium", id: "notifSubHeader" }, "Activity & Admin updates"))),
+                h("div", { className: "flex items-center gap-1.5" },
+                    h("button", { type: "button", onClick: () => clearAllNotifications(), className: "px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px] font-bold transition" }, "Clear All"),
+                    h("button", { type: "button", onClick: () => closeNotificationsModal(), className: "w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold text-xs flex items-center justify-center transition" }, "\u2715"))),
+            h("div", { id: "notifList", className: "flex-1 overflow-y-auto p-4 space-y-2.5 bg-[#F8FAFC]" }))));
+}
 function PaisoApp() {
     return (h("div", { className: "app-shell" },
         h(SvgSpriteDefs, null),
         h("div", { className: "toast", id: "toast" }),
+        h(NotificationModal, null),
         h("main", { className: "app-viewport" },
             h(HomeView, null),
             h(TasksView, null),
@@ -663,6 +709,7 @@ let currentTaskFilter = 'all';
 let AdController = null;
 let toastTimer;
 let dailyCountdownTimer;
+let lastTopNotifId = null;
 const activeTimers = {};
 const COIN_SVG = `<svg width="14" height="14" style="vertical-align:-2px"><use href="#icon-p-coin"/></svg>`;
 const DUMMY_AVATARS = [
@@ -686,17 +733,32 @@ function randomizeAvatar() {
     renderDummyAvatar(currentAvatarIndex);
 }
 function TaskSvgIcon({ task }) {
+    if (task.type === 'app_task') {
+        return (h("svg", { width: "21", height: "21", viewBox: "0 0 24 24", fill: "none", stroke: "#4F46E5", "stroke-width": "2.1", "stroke-linecap": "round", "stroke-linejoin": "round" },
+            h("rect", { x: "3", y: "3", width: "7", height: "7", rx: "1.5" }),
+            h("rect", { x: "14", y: "3", width: "7", height: "7", rx: "1.5" }),
+            h("rect", { x: "14", y: "14", width: "7", height: "7", rx: "1.5" }),
+            h("rect", { x: "3", y: "14", width: "7", height: "7", rx: "1.5" })));
+    }
+    if (task.type === 'play_game') {
+        return (h("svg", { width: "22", height: "22", viewBox: "0 0 24 24", fill: "none", stroke: "#7C3AED", "stroke-width": "2.1", "stroke-linecap": "round", "stroke-linejoin": "round" },
+            h("line", { x1: "6", y1: "12", x2: "10", y2: "12" }),
+            h("line", { x1: "8", y1: "10", x2: "8", y2: "14" }),
+            h("line", { x1: "15", y1: "13", x2: "15.01", y2: "13" }),
+            h("line", { x1: "18", y1: "11", x2: "18.01", y2: "11" }),
+            h("rect", { x: "2", y: "6", width: "20", height: "12", rx: "4" })));
+    }
     if (task.type === 'telegram_join') {
-        return (h("svg", { width: "22", height: "22", viewBox: "0 0 24 24", fill: "none", stroke: "#0284C7", "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round" },
+        return (h("svg", { width: "21", height: "21", viewBox: "0 0 24 24", fill: "none", stroke: "#0284C7", "stroke-width": "2.1", "stroke-linecap": "round", "stroke-linejoin": "round" },
             h("line", { x1: "22", y1: "2", x2: "11", y2: "13" }),
             h("polygon", { points: "22 2 15 22 11 13 2 9 22 2" })));
     }
     if (task.url.includes('youtube.com') || task.url.includes('youtu.be')) {
-        return (h("svg", { width: "22", height: "22", viewBox: "0 0 24 24", fill: "none", stroke: "#DC2626", "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round" },
+        return (h("svg", { width: "21", height: "21", viewBox: "0 0 24 24", fill: "none", stroke: "#DC2626", "stroke-width": "2.1", "stroke-linecap": "round", "stroke-linejoin": "round" },
             h("rect", { x: "2", y: "4", width: "20", height: "16", rx: "4" }),
             h("polygon", { points: "10 9 15 12 10 15 10 9", fill: "#DC2626" })));
     }
-    return (h("svg", { width: "22", height: "22", viewBox: "0 0 24 24", fill: "none", stroke: "#2563EB", "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round" },
+    return (h("svg", { width: "21", height: "21", viewBox: "0 0 24 24", fill: "none", stroke: "#2563EB", "stroke-width": "2.1", "stroke-linecap": "round", "stroke-linejoin": "round" },
         h("circle", { cx: "12", cy: "12", r: "10" }),
         h("line", { x1: "2", y1: "12", x2: "22", y2: "12" }),
         h("path", { d: "M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" })));
@@ -813,8 +875,11 @@ function selectMethod(method) {
     const select = $('wMethod');
     if (select)
         select.value = method;
-    document.querySelectorAll('.method-pill').forEach((btn) => {
-        btn.classList.toggle('active', btn.dataset.method === method);
+    document.querySelectorAll('#wMethodsGrid button').forEach((btn) => {
+        const isAct = btn.dataset.method === method;
+        btn.className = `flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition ${isAct
+            ? 'bg-blue-50/70 border-blue-600 text-slate-900'
+            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'}`;
     });
     const acc = $('wAccount');
     const lbl = $('wAccountLabel');
@@ -831,11 +896,11 @@ function renderWithdrawMethodsAndCountries() {
     const countries = state?.withdrawSettings?.countries || [];
     if (cBar) {
         if (countries.length) {
-            cBar.replaceChildren(h("div", { className: "withdraw-countries-inner" },
-                h("span", { className: "wc-label" }, "Allowed Countries:"),
-                h("div", { className: "wc-flags" }, countries.map((c) => (h("span", { className: "wc-pill" },
-                    c.flag ? h("img", { src: c.flag, alt: c.name, className: "wc-flag-img" }) : null,
-                    h("span", null, c.name)))))));
+            cBar.replaceChildren(h("div", { className: "flex flex-wrap items-center gap-1.5 pb-2 border-b border-slate-100" },
+                h("span", { className: "text-[11px] font-bold text-slate-400 mr-1" }, "Regions:"),
+                countries.map((c) => (h("span", { className: "inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-bold" },
+                    c.flag ? h("img", { src: c.flag, alt: c.name, className: "w-3.5 h-2.5 object-cover rounded-xs" }) : null,
+                    h("span", null, c.name))))));
         }
         else {
             cBar.replaceChildren();
@@ -844,21 +909,18 @@ function renderWithdrawMethodsAndCountries() {
     if (!grid)
         return;
     if (!methods.length) {
-        grid.replaceChildren(h("div", { className: "small", style: "grid-column:1/-1;text-align:center;padding:12px" }, "No payout methods enabled by Admin"));
+        grid.replaceChildren(h("div", { className: "col-span-full text-center text-xs text-slate-400 py-3" }, "No payout methods enabled"));
         return;
     }
     const currentVal = $('wMethod')?.value || '';
     const selectedName = methods.some((m) => m.name === currentVal) ? currentVal : methods[0].name;
     grid.replaceChildren(...methods.map((m) => {
         const isAct = m.name === selectedName;
-        return (h("button", { type: "button", className: `method-pill ${isAct ? 'active' : ''}`, "data-method": m.name, onClick: () => selectMethod(m.name) },
-            m.logo ? (h("img", { src: m.logo, alt: m.name, className: "method-custom-logo" })) : (h("div", { className: "method-brand-icon brand-paypal" }, m.name.slice(0, 1).toUpperCase())),
-            h("div", { className: "method-meta" },
-                h("span", { className: "method-name" }, m.name),
-                h("span", { className: "method-sub" }, m.country && m.country !== 'All' ? m.country : 'Instant Payout')),
-            h("span", { className: "method-check" },
-                h("svg", { width: "15", height: "15" },
-                    h("use", { href: "#icon-check-circle" })))));
+        return (h("button", { type: "button", "data-method": m.name, onClick: () => selectMethod(m.name), className: `flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition ${isAct
+                ? 'bg-blue-50/70 border-blue-600 text-slate-900'
+                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'}` },
+            m.logo ? (h("img", { src: m.logo, alt: m.name, className: "w-6 h-6 rounded object-contain shrink-0" })) : (h("div", { className: "w-6 h-6 rounded bg-blue-600 text-white flex items-center justify-center font-extrabold text-xs shrink-0" }, m.name.slice(0, 1).toUpperCase())),
+            h("span", { className: "text-xs font-bold truncate" }, m.name)));
     }));
     selectMethod(selectedName);
 }
@@ -1043,54 +1105,244 @@ function renderReferralsAndQualification() {
         }
     }
 }
-function getTaskPlatformClass(task) {
+function getTaskIconBoxClass(task) {
+    if (task.type === 'app_task')
+        return 'bg-indigo-50 border-indigo-200/80 text-indigo-600';
+    if (task.type === 'play_game')
+        return 'bg-violet-50 border-violet-200/80 text-violet-600';
     if (task.type === 'telegram_join')
-        return 'platform-telegram';
+        return 'bg-sky-50 border-sky-200/80 text-sky-600';
     if (task.url.includes('youtube.com') || task.url.includes('youtu.be'))
-        return 'platform-youtube';
-    return 'platform-web';
+        return 'bg-red-50 border-red-200/80 text-red-600';
+    return 'bg-blue-50 border-blue-200/80 text-blue-600';
 }
 function renderTasks() {
     const listEl = $('taskList');
     if (!listEl || !state)
         return;
     const allTasks = state.tasks || [];
-    const filtered = allTasks.filter((t) => {
-        if (currentTaskFilter === 'done')
-            return Boolean(t.done);
+    const availableTasks = allTasks.filter((t) => !t.done);
+    const completedCount = allTasks.filter((t) => Boolean(t.done)).length;
+    const totalAvailableReward = availableTasks.reduce((sum, t) => sum + (t.reward || 0), 0);
+    const availAppCount = availableTasks.filter((t) => t.type === 'app_task').length;
+    const availGameCount = availableTasks.filter((t) => t.type === 'play_game').length;
+    setText('tasksAvailableBadge', `${availableTasks.length} Left`);
+    setText('tasksTotalRewardText', `+${totalAvailableReward.toLocaleString()}`);
+    setText('tasksDoneCountText', `${completedCount}/${allTasks.length}`);
+    setText('appTaskCountText', availAppCount > 0 ? `${availAppCount} Available` : 'Try apps & earn');
+    setText('playGameCountText', availGameCount > 0 ? `${availGameCount} Available` : 'Play & win coins');
+    const appQuickCard = $('quickCardAppTask');
+    const gameQuickCard = $('quickCardPlayGame');
+    if (appQuickCard) {
+        appQuickCard.className = `flex items-center gap-3 p-3 rounded-2xl border text-left transition active:scale-[0.98] ${currentTaskFilter === 'app_task'
+            ? 'bg-indigo-100/80 border-indigo-500 ring-2 ring-indigo-500/20'
+            : 'bg-gradient-to-br from-indigo-50/90 to-blue-50/60 border-indigo-200/80'}`;
+    }
+    if (gameQuickCard) {
+        gameQuickCard.className = `flex items-center gap-3 p-3 rounded-2xl border text-left transition active:scale-[0.98] ${currentTaskFilter === 'play_game'
+            ? 'bg-violet-100/80 border-violet-500 ring-2 ring-violet-500/20'
+            : 'bg-gradient-to-br from-violet-50/90 to-purple-50/60 border-violet-200/80'}`;
+    }
+    const filtered = availableTasks.filter((t) => {
         if (currentTaskFilter === 'telegram_join')
             return t.type === 'telegram_join';
         if (currentTaskFilter === 'social_visit')
             return t.type === 'social_visit';
+        if (currentTaskFilter === 'app_task')
+            return t.type === 'app_task';
+        if (currentTaskFilter === 'play_game')
+            return t.type === 'play_game';
         return true;
     });
     if (!filtered.length) {
-        listEl.replaceChildren(h("div", { className: "empty-state" },
-            h("div", { className: "empty-title" }, "No tasks here")));
+        listEl.replaceChildren(h("div", { className: "bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-2xs my-2" },
+            h("div", { className: "w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto mb-3" },
+                h("svg", { width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.4" },
+                    h("polyline", { points: "20 6 9 17 4 12" }))),
+            h("div", { className: "text-sm font-extrabold text-slate-900" }, "All Tasks Completed!"),
+            h("div", { className: "text-xs text-slate-500 mt-1 leading-relaxed" }, "You have completed all available tasks in this category. New or repeatable tasks will appear here when ready!")));
         return;
     }
     listEl.replaceChildren(...filtered.map((t) => {
         const waitRemaining = activeTimers[t.id] || 0;
-        const platClass = getTaskPlatformClass(t);
+        const iconBoxClass = getTaskIconBoxClass(t);
         const resetHours = +(t.resetHours || 0);
-        const repeatLabel = resetHours === 24 ? 'Daily' : resetHours > 0 ? `Every ${resetHours}h` : '';
-        return (h("div", { className: `task-card ${t.done ? 'task-done' : ''}` },
-            h("div", { className: `task-icon-box ${platClass}` },
-                h(TaskSvgIcon, { task: t })),
-            h("div", { className: "task-info" },
-                h("div", { className: "task-name" }, t.title),
-                h("div", { className: "task-reward-row" },
-                    h("svg", { width: "14", height: "14", style: "vertical-align:-2px" },
+        const repeatLabel = resetHours === 24 ? 'Daily' : resetHours > 0 ? `${resetHours}h` : '';
+        const categoryLabel = t.type === 'app_task'
+            ? 'App Task'
+            : t.type === 'play_game'
+                ? 'Play Game'
+                : t.type === 'telegram_join'
+                    ? 'Telegram'
+                    : 'Social';
+        const timerHint = t.type === 'telegram_join'
+            ? 'Join to verify'
+            : t.type === 'play_game'
+                ? `Play ${t.waitSeconds || 30}s`
+                : `${t.waitSeconds || 15}s visit`;
+        const openBtnLabel = t.type === 'play_game'
+            ? 'Play'
+            : t.type === 'app_task'
+                ? 'Open App'
+                : t.type === 'telegram_join'
+                    ? 'Join'
+                    : 'Open';
+        return (h("div", { className: "bg-white border border-slate-200/90 hover:border-blue-300 rounded-2xl p-3.5 shadow-2xs flex items-center justify-between gap-3 transition" },
+            h("div", { className: "flex items-center gap-3 min-w-0" },
+                h("div", { className: `w-11 h-11 rounded-xl border flex items-center justify-center shrink-0 ${iconBoxClass}` },
+                    h(TaskSvgIcon, { task: t })),
+                h("div", { className: "min-w-0" },
+                    h("div", { className: "text-[13px] font-extrabold text-slate-900 truncate" }, t.title),
+                    h("div", { className: "flex flex-wrap items-center gap-1.5 mt-1" },
+                        h("span", { className: "inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200/80 text-amber-800 text-[11px] font-extrabold" },
+                            h("svg", { width: "12", height: "12" },
+                                h("use", { href: "#icon-p-coin" })),
+                            h("span", null,
+                                "+",
+                                t.reward)),
+                        h("span", { className: "px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold" }, categoryLabel),
+                        h("span", { className: "text-[10px] font-semibold text-slate-400" },
+                            "\u2022 ",
+                            timerHint),
+                        repeatLabel ? (h("span", { className: "px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-extrabold uppercase" }, repeatLabel)) : null))),
+            h("div", { className: "flex items-center gap-1.5 shrink-0" },
+                h("button", { type: "button", className: "px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-extrabold transition", onClick: () => doTask(t.id, t.url) }, openBtnLabel),
+                h("button", { type: "button", id: `verify-${t.id}`, disabled: waitRemaining > 0, onClick: () => claimTask(t.id), className: `px-3.5 py-2 rounded-xl text-xs font-extrabold text-white transition ${waitRemaining > 0
+                        ? 'bg-slate-400 cursor-not-allowed'
+                        : 'bg-blue-600 hover:bg-blue-700 shadow-xs'}` }, waitRemaining > 0 ? `${waitRemaining}s` : 'Verify'))));
+    }));
+}
+function formatTimeAgo(iso) {
+    const diffSec = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+    if (diffSec < 45)
+        return 'Just now';
+    if (diffSec < 3600)
+        return `${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400)
+        return `${Math.floor(diffSec / 3600)}h ago`;
+    return `${Math.floor(diffSec / 86400)}d ago`;
+}
+function NotifTypeIcon({ type }) {
+    if (type === 'task') {
+        return (h("div", { className: "w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0" },
+            h("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.3" },
+                h("polyline", { points: "20 6 9 17 4 12" }))));
+    }
+    if (type === 'reward') {
+        return (h("div", { className: "w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0" },
+            h("svg", { width: "18", height: "18" },
+                h("use", { href: "#icon-gift" }))));
+    }
+    if (type === 'withdraw') {
+        return (h("div", { className: "w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0" },
+            h("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2" },
+                h("rect", { x: "2", y: "5", width: "20", height: "14", rx: "2" }),
+                h("line", { x1: "2", y1: "10", x2: "22", y2: "10" }))));
+    }
+    if (type === 'admin') {
+        return (h("div", { className: "w-9 h-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0" },
+            h("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2" },
+                h("path", { d: "M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" }),
+                h("path", { d: "M13.73 21a2 2 0 0 1-3.46 0" }))));
+    }
+    return (h("div", { className: "w-9 h-9 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center shrink-0" },
+        h("svg", { width: "18", height: "18" },
+            h("use", { href: "#icon-blue-tick" }))));
+}
+function renderNotifications() {
+    const list = state?.notifications || [];
+    const unread = state?.unreadCount || 0;
+    const badge = $('notifUnreadBadge');
+    if (badge) {
+        if (unread > 0) {
+            badge.style.display = 'flex';
+            badge.textContent = unread > 9 ? '9+' : String(unread);
+        }
+        else {
+            badge.style.display = 'none';
+        }
+    }
+    const subHeader = $('notifSubHeader');
+    if (subHeader) {
+        subHeader.textContent = unread > 0 ? `${unread} unread notification${unread > 1 ? 's' : ''}` : 'All caught up';
+    }
+    if (list.length > 0) {
+        const newest = list[0];
+        if (lastTopNotifId !== null && newest.id !== lastTopNotifId && !newest.read) {
+            toast(`${newest.title}: ${newest.message}`, 'success');
+        }
+        lastTopNotifId = newest.id;
+    }
+    else if (lastTopNotifId === null) {
+        lastTopNotifId = '';
+    }
+    const listEl = $('notifList');
+    if (!listEl)
+        return;
+    if (!list.length) {
+        listEl.replaceChildren(h("div", { className: "py-12 text-center" },
+            h("div", { className: "text-sm font-extrabold text-slate-700 mb-1" }, "No notifications yet"),
+            h("div", { className: "text-xs text-slate-400" }, "Task verifications, rewards, and Admin messages will appear here.")));
+        return;
+    }
+    listEl.replaceChildren(...list.map((n) => (h("div", { className: `p-3.5 rounded-2xl border transition flex items-start gap-3 ${n.read ? 'bg-white border-slate-100' : 'bg-blue-50/60 border-blue-200 shadow-2xs'}` },
+        h(NotifTypeIcon, { type: n.type }),
+        h("div", { className: "flex-1 min-w-0" },
+            h("div", { className: "flex items-center justify-between gap-2" },
+                h("span", { className: "text-xs font-extrabold text-slate-900 truncate" }, n.title),
+                h("span", { className: "text-[10px] font-semibold text-slate-400 shrink-0" }, formatTimeAgo(n.createdAt))),
+            h("p", { className: "text-[11px] text-slate-600 font-medium mt-0.5 leading-relaxed" }, n.message),
+            h("div", { className: "flex items-center gap-2 mt-1.5" },
+                n.coins ? (h("span", { className: "inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-extrabold" },
+                    h("svg", { width: "11", height: "11" },
                         h("use", { href: "#icon-p-coin" })),
-                    ' ',
                     h("span", null,
                         "+",
-                        t.reward),
-                    repeatLabel ? (h("span", { className: "ml-2 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold" }, repeatLabel)) : null)),
-            h("div", { className: "task-actions" }, t.done ? (h("button", { className: "btn-done", disabled: true }, repeatLabel ? `Done (${repeatLabel})` : 'Done')) : (h(Fragment, null,
-                h("button", { className: "btn-open", onClick: () => doTask(t.id, t.url) }, "Open"),
-                h("button", { className: "btn-verify", id: `verify-${t.id}`, disabled: waitRemaining > 0, onClick: () => claimTask(t.id) }, waitRemaining > 0 ? `${waitRemaining}s` : 'Verify'))))));
-    }));
+                        n.coins,
+                        " Coins"))) : null,
+                n.type === 'admin' ? (h("span", { className: "px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 text-[10px] font-bold" }, "Admin Broadcast")) : null)),
+        !n.read ? h("span", { className: "w-2 h-2 rounded-full bg-blue-600 shrink-0 mt-1.5" }) : null))));
+}
+function openNotificationsModal() {
+    tg?.HapticFeedback?.impactOccurred?.('light');
+    const modal = $('notifModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+    if ((state?.unreadCount || 0) > 0) {
+        markAllNotificationsRead();
+    }
+}
+function closeNotificationsModal() {
+    const modal = $('notifModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+}
+async function markAllNotificationsRead() {
+    try {
+        const r = await api('/api/notifications/read', { method: 'POST', body: '{}' });
+        if (state && r.notifications) {
+            state.notifications = r.notifications;
+            state.unreadCount = r.unreadCount;
+            renderNotifications();
+        }
+    }
+    catch { }
+}
+async function clearAllNotifications() {
+    try {
+        const r = await api('/api/notifications', { method: 'DELETE' });
+        if (state && r.notifications) {
+            state.notifications = r.notifications;
+            state.unreadCount = r.unreadCount;
+            renderNotifications();
+        }
+        toast('Notifications cleared', 'success');
+    }
+    catch { }
 }
 function startTaskCountdown(taskId, seconds) {
     if (activeTimers[taskId])
@@ -1164,33 +1416,74 @@ async function load() {
     renderReferralsAndQualification();
     renderWithdrawMethodsAndCountries();
     renderTasks();
+    renderNotifications();
     try {
         const hData = await api('/api/my-withdrawals');
+        const withdrawals = hData.withdrawals || [];
+        const coinNotifs = (state.notifications || []).filter((n) => (n.coins || 0) > 0 && n.type !== 'withdraw');
+        const renderWithdrawNodes = () => {
+            if (!withdrawals.length) {
+                return [
+                    h("div", { className: "p-4 text-center text-xs text-slate-400" }, "No withdrawal transactions yet.")
+                ];
+            }
+            return withdrawals.map((w) => (h("div", { className: "p-3.5 flex items-center justify-between gap-3" },
+                h("div", null,
+                    h("div", { className: "text-xs font-bold text-slate-900" },
+                        w.method,
+                        " ",
+                        h("span", { className: "text-slate-400 font-medium" },
+                            "\u2022 ",
+                            w.account)),
+                    h("div", { className: "text-[11px] text-slate-400 mt-0.5" },
+                        w.id,
+                        " \u2022 ",
+                        new Date(w.at).toLocaleDateString())),
+                h("div", { className: "text-right shrink-0" },
+                    h("div", { className: "text-xs font-extrabold text-slate-900 flex items-center justify-end gap-1" },
+                        h("span", null,
+                            "-",
+                            w.coins.toLocaleString()),
+                        h("svg", { width: "13", height: "13", className: "inline-block" },
+                            h("use", { href: "#icon-p-coin" }))),
+                    h("span", { className: `status-badge status-${w.status}` }, w.status.toUpperCase())))));
+        };
+        const renderFullTxNodes = () => {
+            const items = [...renderWithdrawNodes()];
+            if (!withdrawals.length && coinNotifs.length) {
+                items.length = 0;
+            }
+            coinNotifs.forEach((n) => {
+                items.push(h("div", { className: "p-3.5 flex items-center justify-between gap-3" },
+                    h("div", { className: "min-w-0" },
+                        h("div", { className: "text-xs font-bold text-slate-900 truncate" }, n.title),
+                        h("div", { className: "text-[11px] text-slate-400 mt-0.5" },
+                            new Date(n.createdAt).toLocaleDateString(),
+                            " \u2022 ",
+                            n.type.toUpperCase())),
+                    h("div", { className: "text-right shrink-0" },
+                        h("div", { className: "text-xs font-extrabold text-emerald-600 flex items-center justify-end gap-1" },
+                            h("span", null,
+                                "+",
+                                (n.coins || 0).toLocaleString()),
+                            h("svg", { width: "13", height: "13", className: "inline-block" },
+                                h("use", { href: "#icon-p-coin" }))),
+                        h("span", { className: "status-badge status-paid" }, "CREDITED"))));
+            });
+            if (!items.length) {
+                return [
+                    h("div", { className: "p-4 text-center text-xs text-slate-400" }, "No transactions yet.")
+                ];
+            }
+            return items;
+        };
         const wHist = $('wHistory');
         if (wHist) {
-            const list = hData.withdrawals || [];
-            if (list.length) {
-                wHist.replaceChildren(...list.map((w) => (h("div", { className: "withdraw-item", style: "border-bottom:1px solid #F1F5F9;padding:10px 0" },
-                    h("div", null,
-                        h("div", { className: "withdraw-title" },
-                            w.method,
-                            " \u2022 ",
-                            h("span", { className: "small" }, w.account)),
-                        h("div", { className: "small" },
-                            w.id,
-                            " \u2022 ",
-                            new Date(w.at).toLocaleDateString())),
-                    h("div", { style: "text-align:right" },
-                        h("div", { className: "withdraw-amount" },
-                            w.coins.toLocaleString(),
-                            ' ',
-                            h("svg", { width: "14", height: "14", style: "vertical-align:-2px" },
-                                h("use", { href: "#icon-p-coin" }))),
-                        h("span", { className: `status-badge status-${w.status}` }, w.status.toUpperCase()))))));
-            }
-            else {
-                wHist.replaceChildren(h("div", { className: "small", style: "padding:10px 0" }, "No transactions yet."));
-            }
+            wHist.replaceChildren(...renderFullTxNodes());
+        }
+        const wPageHist = $('wWithdrawHistory');
+        if (wPageHist) {
+            wPageHist.replaceChildren(...renderWithdrawNodes());
         }
     }
     catch { }
@@ -1376,17 +1669,8 @@ async function sendVerifyOtp() {
         const otpBox = $('verifyOtpBox');
         if (otpBox)
             otpBox.style.display = 'block';
-        const previewBanner = $('otpPreviewBanner');
-        if (previewBanner) {
-            if (r.otpPreview) {
-                previewBanner.style.display = 'flex';
-                setText('otpPreviewCode', r.otpPreview);
-            }
-            else {
-                previewBanner.style.display = 'none';
-            }
-        }
-        toast(`OTP sent to ${email}! Check & confirm below`, 'success');
+        await load();
+        toast(r.message || `Verification OTP sent to ${email}!`, 'success');
     }
     finally {
         if (btn)
@@ -1466,6 +1750,10 @@ window.claimDaily = claimDaily;
 window.copyRef = copyRef;
 window.shareRef = shareRef;
 window.withdraw = withdraw;
+window.openNotificationsModal = openNotificationsModal;
+window.closeNotificationsModal = closeNotificationsModal;
+window.markAllNotificationsRead = markAllNotificationsRead;
+window.clearAllNotifications = clearAllNotifications;
 document.addEventListener('DOMContentLoaded', () => {
     const root = document.getElementById('root');
     if (root) {
@@ -1474,6 +1762,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     renderDummyAvatar();
     load();
+    window.setInterval(() => {
+        load();
+    }, 8000);
 });
 
 })();

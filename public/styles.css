@@ -684,17 +684,19 @@ input, select, textarea {
 .explore-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(8px, 2.5vw, 10px);
+  gap: clamp(9px, 2.6vw, 12px);
 }
 .explore-card {
-  border-radius: var(--radius-lg);
-  padding: clamp(10px, 3vw, 13px) clamp(8px, 2.4vw, 10px) clamp(10px, 2.8vw, 12px);
+  border-radius: 18px;
+  padding: 14px 8px 12px;
   display: flex;
   flex-direction: column;
+  align-items: center;
   justify-content: space-between;
-  min-height: clamp(114px, 32vw, 128px);
+  text-align: center;
+  min-height: clamp(118px, 32vw, 130px);
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
   position: relative;
   overflow: hidden;
 }
@@ -702,73 +704,53 @@ input, select, textarea {
   transform: scale(0.96);
 }
 .explore-card.card-ads {
-  background: #FBF2F9;
-  border: 1px solid #F5DFEF;
+  background: linear-gradient(180deg, #FDF4FA 0%, #F9E6F4 100%);
+  border: 1px solid #F2D0E8;
+  box-shadow: 0 4px 12px rgba(219, 39, 119, 0.06);
 }
 .explore-card.card-tasks {
-  background: #EAFAF7;
-  border: 1px solid #D3F3EC;
+  background: linear-gradient(180deg, #EEFCF9 0%, #DFEFEA 100%);
+  border: 1px solid #C6EDE3;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.06);
 }
 .explore-card.card-games {
-  background: #F1EFFE;
-  border: 1px solid #E2DDFC;
-}
-.explore-card.card-channels {
-  background: #E9F5FE;
-  border: 1px solid #D4EAFC;
-}
-.explore-card.card-friends {
-  background: #F5ECFD;
-  border: 1px solid #E9D8FA;
-}
-.explore-card.card-freefire {
-  background: #FDF3E2;
-  border: 1px solid #F8E3BE;
+  background: linear-gradient(180deg, #F3F1FE 0%, #E7E2FD 100%);
+  border: 1px solid #D7CFFC;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.06);
 }
 .explore-icon-wrap {
-  height: clamp(50px, 14.5vw, 60px);
+  height: clamp(52px, 14.5vw, 60px);
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  margin-bottom: 6px;
+  justify-content: center;
+  margin-bottom: 8px;
 }
 .explore-icon {
-  height: clamp(48px, 14vw, 56px);
+  height: clamp(48px, 13.8vw, 56px);
   width: auto;
   max-width: 100%;
   object-fit: contain;
   display: block;
+  filter: drop-shadow(0 4px 6px rgba(15, 23, 42, 0.08));
 }
 .explore-info {
   width: 100%;
 }
-.explore-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 2px;
-}
 .explore-title {
-  font-size: clamp(10.5px, 3vw, 11.8px);
+  font-size: clamp(11.2px, 3.2vw, 12.6px);
   font-weight: 800;
   color: var(--text-navy);
   line-height: 1.2;
+  letter-spacing: -0.01em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.explore-arrow {
-  color: #64748B;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1;
-  flex-shrink: 0;
-}
 .explore-sub {
-  font-size: clamp(9.2px, 2.6vw, 10.2px);
-  font-weight: 500;
-  color: #687B9C;
-  margin-top: 2px;
+  font-size: clamp(9.6px, 2.7vw, 10.6px);
+  font-weight: 600;
+  color: #5B6E92;
+  margin-top: 3px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

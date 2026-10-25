@@ -7,7 +7,7 @@ import { SettingsView } from './components/SettingsView';
 import { BottomNav } from './components/BottomNav';
 
 export type TabName = 'home' | 'tasks' | 'refer' | 'wallet';
-export type TaskFilter = 'all' | 'telegram_join' | 'social_visit' | 'done';
+export type TaskFilter = 'all' | 'telegram_join' | 'social_visit' | 'app_task' | 'play_game' | 'done';
 export type ClientWithdrawMethod = string;
 export type ClientGender = 'Male' | 'Female';
 
@@ -55,7 +55,7 @@ interface ClientTask {
   description: string;
   icon: string;
   reward: number;
-  type: 'telegram_join' | 'social_visit';
+  type: 'telegram_join' | 'social_visit' | 'app_task' | 'play_game';
   target: string;
   url: string;
   waitSeconds?: number;
@@ -96,6 +96,17 @@ interface ClientRefHistoryItem {
   dailyReq: number;
 }
 
+interface ClientNotification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: 'task' | 'reward' | 'withdraw' | 'referral' | 'admin' | 'system';
+  coins?: number;
+  createdAt: string;
+  read: boolean;
+}
+
 interface ClientMeResponse {
   user: ClientUser;
   tasks: ClientTask[];
@@ -112,6 +123,8 @@ interface ClientMeResponse {
     methods: ClientCustomWithdrawMethod[];
     countries: ClientAllowedCountry[];
   };
+  notifications?: ClientNotification[];
+  unreadCount?: number;
   refLink: string;
   error?: string;
 }
@@ -199,7 +212,70 @@ declare global {
     copyRef: () => void;
     shareRef: () => void;
     withdraw: () => Promise<void>;
+    openNotificationsModal: () => void;
+    closeNotificationsModal: () => void;
+    markAllNotificationsRead: () => Promise<void>;
+    clearAllNotifications: () => Promise<void>;
   }
+}
+
+function NotificationModal() {
+  return (
+    <div
+      id="notifModal"
+      className="fixed inset-0 z-[9999] bg-slate-900/50 backdrop-blur-[2px] hidden items-end sm:items-center justify-center p-0 sm:p-4"
+      onClick={(e: Event) => {
+        if ((e.target as HTMLElement).id === 'notifModal') closeNotificationsModal();
+      }}
+    >
+      <div className="w-full max-w-[440px] max-h-[82vh] bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-100">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900 leading-tight">Notifications</h3>
+              <p className="text-[11px] text-slate-500 font-medium" id="notifSubHeader">
+                Activity &amp; Admin updates
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => clearAllNotifications()}
+              className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px] font-bold transition"
+            >
+              Clear All
+            </button>
+            <button
+              type="button"
+              onClick={() => closeNotificationsModal()}
+              className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold text-xs flex items-center justify-center transition"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        <div id="notifList" className="flex-1 overflow-y-auto p-4 space-y-2.5 bg-[#F8FAFC]" />
+      </div>
+    </div>
+  );
 }
 
 function PaisoApp() {
@@ -207,6 +283,7 @@ function PaisoApp() {
     <div className="app-shell">
       <SvgSpriteDefs />
       <div className="toast" id="toast" />
+      <NotificationModal />
       <main className="app-viewport">
         <HomeView />
         <TasksView />
@@ -228,6 +305,7 @@ let currentTaskFilter: TaskFilter = 'all';
 let AdController: AdsgramController | null = null;
 let toastTimer: number | undefined;
 let dailyCountdownTimer: number | undefined;
+let lastTopNotifId: string | null = null;
 const activeTimers: Record<string, number> = {};
 
 const COIN_SVG = `<svg width="14" height="14" style="vertical-align:-2px"><use href="#icon-p-coin"/></svg>`;
@@ -263,9 +341,30 @@ function randomizeAvatar(): void {
 }
 
 function TaskSvgIcon({ task }: { task: ClientTask }) {
+  if (task.type === 'app_task') {
+    return (
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1.5" />
+        <rect x="14" y="3" width="7" height="7" rx="1.5" />
+        <rect x="14" y="14" width="7" height="7" rx="1.5" />
+        <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      </svg>
+    );
+  }
+  if (task.type === 'play_game') {
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="6" y1="12" x2="10" y2="12" />
+        <line x1="8" y1="10" x2="8" y2="14" />
+        <line x1="15" y1="13" x2="15.01" y2="13" />
+        <line x1="18" y1="11" x2="18.01" y2="11" />
+        <rect x="2" y="6" width="20" height="12" rx="4" />
+      </svg>
+    );
+  }
   if (task.type === 'telegram_join') {
     return (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0284C7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#0284C7" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
         <line x1="22" y1="2" x2="11" y2="13"></line>
         <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
       </svg>
@@ -273,14 +372,14 @@ function TaskSvgIcon({ task }: { task: ClientTask }) {
   }
   if (task.url.includes('youtube.com') || task.url.includes('youtu.be')) {
     return (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
         <rect x="2" y="4" width="20" height="16" rx="4"></rect>
         <polygon points="10 9 15 12 10 15 10 9" fill="#DC2626"></polygon>
       </svg>
     );
   }
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="12" cy="12" r="10"></circle>
       <line x1="2" y1="12" x2="22" y2="12"></line>
       <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
@@ -407,8 +506,13 @@ function selectMethod(method: ClientWithdrawMethod): void {
   tg?.HapticFeedback?.impactOccurred?.('light');
   const select = $<HTMLInputElement>('wMethod');
   if (select) select.value = method;
-  document.querySelectorAll<HTMLButtonElement>('.method-pill').forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.method === method);
+  document.querySelectorAll<HTMLButtonElement>('#wMethodsGrid button').forEach((btn) => {
+    const isAct = btn.dataset.method === method;
+    btn.className = `flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition ${
+      isAct
+        ? 'bg-blue-50/70 border-blue-600 text-slate-900'
+        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+    }`;
   });
   const acc = $<HTMLInputElement>('wAccount');
   const lbl = $('wAccountLabel');
@@ -426,16 +530,14 @@ function renderWithdrawMethodsAndCountries(): void {
   if (cBar) {
     if (countries.length) {
       cBar.replaceChildren(
-        <div className="withdraw-countries-inner">
-          <span className="wc-label">Allowed Countries:</span>
-          <div className="wc-flags">
-            {countries.map((c) => (
-              <span className="wc-pill">
-                {c.flag ? <img src={c.flag} alt={c.name} className="wc-flag-img" /> : null}
-                <span>{c.name}</span>
-              </span>
-            ))}
-          </div>
+        <div className="flex flex-wrap items-center gap-1.5 pb-2 border-b border-slate-100">
+          <span className="text-[11px] font-bold text-slate-400 mr-1">Regions:</span>
+          {countries.map((c) => (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-bold">
+              {c.flag ? <img src={c.flag} alt={c.name} className="w-3.5 h-2.5 object-cover rounded-xs" /> : null}
+              <span>{c.name}</span>
+            </span>
+          ))}
         </div>
       );
     } else {
@@ -446,8 +548,8 @@ function renderWithdrawMethodsAndCountries(): void {
   if (!grid) return;
   if (!methods.length) {
     grid.replaceChildren(
-      <div className="small" style="grid-column:1/-1;text-align:center;padding:12px">
-        No payout methods enabled by Admin
+      <div className="col-span-full text-center text-xs text-slate-400 py-3">
+        No payout methods enabled
       </div>
     );
     return;
@@ -462,24 +564,22 @@ function renderWithdrawMethodsAndCountries(): void {
       return (
         <button
           type="button"
-          className={`method-pill ${isAct ? 'active' : ''}`}
           data-method={m.name}
           onClick={() => selectMethod(m.name)}
+          className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition ${
+            isAct
+              ? 'bg-blue-50/70 border-blue-600 text-slate-900'
+              : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+          }`}
         >
           {m.logo ? (
-            <img src={m.logo} alt={m.name} className="method-custom-logo" />
+            <img src={m.logo} alt={m.name} className="w-6 h-6 rounded object-contain shrink-0" />
           ) : (
-            <div className="method-brand-icon brand-paypal">{m.name.slice(0, 1).toUpperCase()}</div>
+            <div className="w-6 h-6 rounded bg-blue-600 text-white flex items-center justify-center font-extrabold text-xs shrink-0">
+              {m.name.slice(0, 1).toUpperCase()}
+            </div>
           )}
-          <div className="method-meta">
-            <span className="method-name">{m.name}</span>
-            <span className="method-sub">{m.country && m.country !== 'All' ? m.country : 'Instant Payout'}</span>
-          </div>
-          <span className="method-check">
-            <svg width="15" height="15">
-              <use href="#icon-check-circle" />
-            </svg>
-          </span>
+          <span className="text-xs font-bold truncate">{m.name}</span>
         </button>
       );
     })
@@ -681,10 +781,12 @@ function renderReferralsAndQualification(): void {
   }
 }
 
-function getTaskPlatformClass(task: ClientTask): string {
-  if (task.type === 'telegram_join') return 'platform-telegram';
-  if (task.url.includes('youtube.com') || task.url.includes('youtu.be')) return 'platform-youtube';
-  return 'platform-web';
+function getTaskIconBoxClass(task: ClientTask): string {
+  if (task.type === 'app_task') return 'bg-indigo-50 border-indigo-200/80 text-indigo-600';
+  if (task.type === 'play_game') return 'bg-violet-50 border-violet-200/80 text-violet-600';
+  if (task.type === 'telegram_join') return 'bg-sky-50 border-sky-200/80 text-sky-600';
+  if (task.url.includes('youtube.com') || task.url.includes('youtu.be')) return 'bg-red-50 border-red-200/80 text-red-600';
+  return 'bg-blue-50 border-blue-200/80 text-blue-600';
 }
 
 function renderTasks(): void {
@@ -692,17 +794,57 @@ function renderTasks(): void {
   if (!listEl || !state) return;
 
   const allTasks = state.tasks || [];
-  const filtered = allTasks.filter((t) => {
-    if (currentTaskFilter === 'done') return Boolean(t.done);
+  const availableTasks = allTasks.filter((t) => !t.done);
+  const completedCount = allTasks.filter((t) => Boolean(t.done)).length;
+  const totalAvailableReward = availableTasks.reduce((sum, t) => sum + (t.reward || 0), 0);
+
+  const availAppCount = availableTasks.filter((t) => t.type === 'app_task').length;
+  const availGameCount = availableTasks.filter((t) => t.type === 'play_game').length;
+
+  setText('tasksAvailableBadge', `${availableTasks.length} Left`);
+  setText('tasksTotalRewardText', `+${totalAvailableReward.toLocaleString()}`);
+  setText('tasksDoneCountText', `${completedCount}/${allTasks.length}`);
+  setText('appTaskCountText', availAppCount > 0 ? `${availAppCount} Available` : 'Try apps & earn');
+  setText('playGameCountText', availGameCount > 0 ? `${availGameCount} Available` : 'Play & win coins');
+
+  const appQuickCard = $('quickCardAppTask');
+  const gameQuickCard = $('quickCardPlayGame');
+  if (appQuickCard) {
+    appQuickCard.className = `flex items-center gap-3 p-3 rounded-2xl border text-left transition active:scale-[0.98] ${
+      currentTaskFilter === 'app_task'
+        ? 'bg-indigo-100/80 border-indigo-500 ring-2 ring-indigo-500/20'
+        : 'bg-gradient-to-br from-indigo-50/90 to-blue-50/60 border-indigo-200/80'
+    }`;
+  }
+  if (gameQuickCard) {
+    gameQuickCard.className = `flex items-center gap-3 p-3 rounded-2xl border text-left transition active:scale-[0.98] ${
+      currentTaskFilter === 'play_game'
+        ? 'bg-violet-100/80 border-violet-500 ring-2 ring-violet-500/20'
+        : 'bg-gradient-to-br from-violet-50/90 to-purple-50/60 border-violet-200/80'
+    }`;
+  }
+
+  // Completed tasks automatically disappear from the screen (!t.done)
+  const filtered = availableTasks.filter((t) => {
     if (currentTaskFilter === 'telegram_join') return t.type === 'telegram_join';
     if (currentTaskFilter === 'social_visit') return t.type === 'social_visit';
+    if (currentTaskFilter === 'app_task') return t.type === 'app_task';
+    if (currentTaskFilter === 'play_game') return t.type === 'play_game';
     return true;
   });
 
   if (!filtered.length) {
     listEl.replaceChildren(
-      <div className="empty-state">
-        <div className="empty-title">No tasks here</div>
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-2xs my-2">
+        <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto mb-3">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </div>
+        <div className="text-sm font-extrabold text-slate-900">All Tasks Completed!</div>
+        <div className="text-xs text-slate-500 mt-1 leading-relaxed">
+          You have completed all available tasks in this category. New or repeatable tasks will appear here when ready!
+        </div>
       </div>
     );
     return;
@@ -711,49 +853,86 @@ function renderTasks(): void {
   listEl.replaceChildren(
     ...filtered.map((t) => {
       const waitRemaining = activeTimers[t.id] || 0;
-      const platClass = getTaskPlatformClass(t);
+      const iconBoxClass = getTaskIconBoxClass(t);
       const resetHours = +(t.resetHours || 0);
       const repeatLabel =
-        resetHours === 24 ? 'Daily' : resetHours > 0 ? `Every ${resetHours}h` : '';
+        resetHours === 24 ? 'Daily' : resetHours > 0 ? `${resetHours}h` : '';
+
+      const categoryLabel =
+        t.type === 'app_task'
+          ? 'App Task'
+          : t.type === 'play_game'
+          ? 'Play Game'
+          : t.type === 'telegram_join'
+          ? 'Telegram'
+          : 'Social';
+
+      const timerHint =
+        t.type === 'telegram_join'
+          ? 'Join to verify'
+          : t.type === 'play_game'
+          ? `Play ${t.waitSeconds || 30}s`
+          : `${t.waitSeconds || 15}s visit`;
+
+      const openBtnLabel =
+        t.type === 'play_game'
+          ? 'Play'
+          : t.type === 'app_task'
+          ? 'Open App'
+          : t.type === 'telegram_join'
+          ? 'Join'
+          : 'Open';
+
       return (
-        <div className={`task-card ${t.done ? 'task-done' : ''}`}>
-          <div className={`task-icon-box ${platClass}`}>
-            <TaskSvgIcon task={t} />
-          </div>
-          <div className="task-info">
-            <div className="task-name">{t.title}</div>
-            <div className="task-reward-row">
-              <svg width="14" height="14" style="vertical-align:-2px">
-                <use href="#icon-p-coin" />
-              </svg>{' '}
-              <span>+{t.reward}</span>
-              {repeatLabel ? (
-                <span className="ml-2 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
-                  {repeatLabel}
+        <div className="bg-white border border-slate-200/90 hover:border-blue-300 rounded-2xl p-3.5 shadow-2xs flex items-center justify-between gap-3 transition">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className={`w-11 h-11 rounded-xl border flex items-center justify-center shrink-0 ${iconBoxClass}`}>
+              <TaskSvgIcon task={t} />
+            </div>
+
+            <div className="min-w-0">
+              <div className="text-[13px] font-extrabold text-slate-900 truncate">{t.title}</div>
+              <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200/80 text-amber-800 text-[11px] font-extrabold">
+                  <svg width="12" height="12">
+                    <use href="#icon-p-coin" />
+                  </svg>
+                  <span>+{t.reward}</span>
                 </span>
-              ) : null}
+                <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold">
+                  {categoryLabel}
+                </span>
+                <span className="text-[10px] font-semibold text-slate-400">• {timerHint}</span>
+                {repeatLabel ? (
+                  <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-extrabold uppercase">
+                    {repeatLabel}
+                  </span>
+                ) : null}
+              </div>
             </div>
           </div>
-          <div className="task-actions">
-            {t.done ? (
-              <button className="btn-done" disabled>
-                {repeatLabel ? `Done (${repeatLabel})` : 'Done'}
-              </button>
-            ) : (
-              <>
-                <button className="btn-open" onClick={() => doTask(t.id, t.url)}>
-                  Open
-                </button>
-                <button
-                  className="btn-verify"
-                  id={`verify-${t.id}`}
-                  disabled={waitRemaining > 0}
-                  onClick={() => claimTask(t.id)}
-                >
-                  {waitRemaining > 0 ? `${waitRemaining}s` : 'Verify'}
-                </button>
-              </>
-            )}
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-extrabold transition"
+              onClick={() => doTask(t.id, t.url)}
+            >
+              {openBtnLabel}
+            </button>
+            <button
+              type="button"
+              id={`verify-${t.id}`}
+              disabled={waitRemaining > 0}
+              onClick={() => claimTask(t.id)}
+              className={`px-3.5 py-2 rounded-xl text-xs font-extrabold text-white transition ${
+                waitRemaining > 0
+                  ? 'bg-slate-400 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700 shadow-xs'
+              }`}
+            >
+              {waitRemaining > 0 ? `${waitRemaining}s` : 'Verify'}
+            </button>
           </div>
         </div>
       );
@@ -761,6 +940,193 @@ function renderTasks(): void {
   );
 }
 
+function formatTimeAgo(iso: string): string {
+  const diffSec = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (diffSec < 45) return 'Just now';
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+  return `${Math.floor(diffSec / 86400)}d ago`;
+}
+
+function NotifTypeIcon({ type }: { type: ClientNotification['type'] }) {
+  if (type === 'task') {
+    return (
+      <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      </div>
+    );
+  }
+  if (type === 'reward') {
+    return (
+      <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+        <svg width="18" height="18">
+          <use href="#icon-gift" />
+        </svg>
+      </div>
+    );
+  }
+  if (type === 'withdraw') {
+    return (
+      <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <rect x="2" y="5" width="20" height="14" rx="2" />
+          <line x1="2" y1="10" x2="22" y2="10" />
+        </svg>
+      </div>
+    );
+  }
+  if (type === 'admin') {
+    return (
+      <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+        </svg>
+      </div>
+    );
+  }
+  return (
+    <div className="w-9 h-9 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
+      <svg width="18" height="18">
+        <use href="#icon-blue-tick" />
+      </svg>
+    </div>
+  );
+}
+
+function renderNotifications(): void {
+  const list = state?.notifications || [];
+  const unread = state?.unreadCount || 0;
+
+  const badge = $('notifUnreadBadge');
+  if (badge) {
+    if (unread > 0) {
+      badge.style.display = 'flex';
+      badge.textContent = unread > 9 ? '9+' : String(unread);
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  const subHeader = $('notifSubHeader');
+  if (subHeader) {
+    subHeader.textContent = unread > 0 ? `${unread} unread notification${unread > 1 ? 's' : ''}` : 'All caught up';
+  }
+
+  // Trigger toast if a brand new notification arrived after initial load
+  if (list.length > 0) {
+    const newest = list[0];
+    if (lastTopNotifId !== null && newest.id !== lastTopNotifId && !newest.read) {
+      toast(`${newest.title}: ${newest.message}`, 'success');
+    }
+    lastTopNotifId = newest.id;
+  } else if (lastTopNotifId === null) {
+    lastTopNotifId = '';
+  }
+
+  const listEl = $('notifList');
+  if (!listEl) return;
+
+  if (!list.length) {
+    listEl.replaceChildren(
+      <div className="py-12 text-center">
+        <div className="text-sm font-extrabold text-slate-700 mb-1">No notifications yet</div>
+        <div className="text-xs text-slate-400">
+          Task verifications, rewards, and Admin messages will appear here.
+        </div>
+      </div>
+    );
+    return;
+  }
+
+  listEl.replaceChildren(
+    ...list.map((n) => (
+      <div
+        className={`p-3.5 rounded-2xl border transition flex items-start gap-3 ${
+          n.read ? 'bg-white border-slate-100' : 'bg-blue-50/60 border-blue-200 shadow-2xs'
+        }`}
+      >
+        <NotifTypeIcon type={n.type} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-extrabold text-slate-900 truncate">{n.title}</span>
+            <span className="text-[10px] font-semibold text-slate-400 shrink-0">
+              {formatTimeAgo(n.createdAt)}
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-600 font-medium mt-0.5 leading-relaxed">{n.message}</p>
+          <div className="flex items-center gap-2 mt-1.5">
+            {n.coins ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-extrabold">
+                <svg width="11" height="11">
+                  <use href="#icon-p-coin" />
+                </svg>
+                <span>+{n.coins} Coins</span>
+              </span>
+            ) : null}
+            {n.type === 'admin' ? (
+              <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 text-[10px] font-bold">
+                Admin Broadcast
+              </span>
+            ) : null}
+          </div>
+        </div>
+        {!n.read ? <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0 mt-1.5" /> : null}
+      </div>
+    ))
+  );
+}
+
+function openNotificationsModal(): void {
+  tg?.HapticFeedback?.impactOccurred?.('light');
+  const modal = $('notifModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+  if ((state?.unreadCount || 0) > 0) {
+    markAllNotificationsRead();
+  }
+}
+
+function closeNotificationsModal(): void {
+  const modal = $('notifModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+}
+
+async function markAllNotificationsRead(): Promise<void> {
+  try {
+    const r = await api<{ notifications: ClientNotification[]; unreadCount: number }>(
+      '/api/notifications/read',
+      { method: 'POST', body: '{}' }
+    );
+    if (state && r.notifications) {
+      state.notifications = r.notifications;
+      state.unreadCount = r.unreadCount;
+      renderNotifications();
+    }
+  } catch {}
+}
+
+async function clearAllNotifications(): Promise<void> {
+  try {
+    const r = await api<{ notifications: ClientNotification[]; unreadCount: number }>(
+      '/api/notifications',
+      { method: 'DELETE' }
+    );
+    if (state && r.notifications) {
+      state.notifications = r.notifications;
+      state.unreadCount = r.unreadCount;
+      renderNotifications();
+    }
+    toast('Notifications cleared', 'success');
+  } catch {}
+}
 function startTaskCountdown(taskId: string, seconds: number): void {
   if (activeTimers[taskId]) return;
   activeTimers[taskId] = seconds;
@@ -834,43 +1200,87 @@ async function load(): Promise<void> {
   renderReferralsAndQualification();
   renderWithdrawMethodsAndCountries();
   renderTasks();
+  renderNotifications();
 
   try {
     const hData = await api<{ withdrawals: ClientWithdrawal[] }>('/api/my-withdrawals');
-    const wHist = $('wHistory');
-    if (wHist) {
-      const list = hData.withdrawals || [];
-      if (list.length) {
-        wHist.replaceChildren(
-          ...list.map((w) => (
-            <div className="withdraw-item" style="border-bottom:1px solid #F1F5F9;padding:10px 0">
-              <div>
-                <div className="withdraw-title">
-                  {w.method} • <span className="small">{w.account}</span>
-                </div>
-                <div className="small">
-                  {w.id} • {new Date(w.at).toLocaleDateString()}
-                </div>
-              </div>
-              <div style="text-align:right">
-                <div className="withdraw-amount">
-                  {w.coins.toLocaleString()}{' '}
-                  <svg width="14" height="14" style="vertical-align:-2px">
-                    <use href="#icon-p-coin" />
-                  </svg>
-                </div>
-                <span className={`status-badge status-${w.status}`}>{w.status.toUpperCase()}</span>
+    const withdrawals = hData.withdrawals || [];
+    const coinNotifs = (state.notifications || []).filter((n) => (n.coins || 0) > 0 && n.type !== 'withdraw');
+
+    const renderWithdrawNodes = () => {
+      if (!withdrawals.length) {
+        return [
+          <div className="p-4 text-center text-xs text-slate-400">
+            No withdrawal transactions yet.
+          </div>
+        ];
+      }
+      return withdrawals.map((w) => (
+        <div className="p-3.5 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-xs font-bold text-slate-900">
+              {w.method} <span className="text-slate-400 font-medium">• {w.account}</span>
+            </div>
+            <div className="text-[11px] text-slate-400 mt-0.5">
+              {w.id} • {new Date(w.at).toLocaleDateString()}
+            </div>
+          </div>
+          <div className="text-right shrink-0">
+            <div className="text-xs font-extrabold text-slate-900 flex items-center justify-end gap-1">
+              <span>-{w.coins.toLocaleString()}</span>
+              <svg width="13" height="13" className="inline-block">
+                <use href="#icon-p-coin" />
+              </svg>
+            </div>
+            <span className={`status-badge status-${w.status}`}>{w.status.toUpperCase()}</span>
+          </div>
+        </div>
+      ));
+    };
+
+    const renderFullTxNodes = () => {
+      const items: Node[] = [...renderWithdrawNodes()];
+      if (!withdrawals.length && coinNotifs.length) {
+        items.length = 0;
+      }
+      coinNotifs.forEach((n) => {
+        items.push(
+          <div className="p-3.5 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-slate-900 truncate">{n.title}</div>
+              <div className="text-[11px] text-slate-400 mt-0.5">
+                {new Date(n.createdAt).toLocaleDateString()} • {n.type.toUpperCase()}
               </div>
             </div>
-          ))
-        );
-      } else {
-        wHist.replaceChildren(
-          <div className="small" style="padding:10px 0">
-            No transactions yet.
+            <div className="text-right shrink-0">
+              <div className="text-xs font-extrabold text-emerald-600 flex items-center justify-end gap-1">
+                <span>+{(n.coins || 0).toLocaleString()}</span>
+                <svg width="13" height="13" className="inline-block">
+                  <use href="#icon-p-coin" />
+                </svg>
+              </div>
+              <span className="status-badge status-paid">CREDITED</span>
+            </div>
           </div>
         );
+      });
+      if (!items.length) {
+        return [
+          <div className="p-4 text-center text-xs text-slate-400">
+            No transactions yet.
+          </div>
+        ];
       }
+      return items;
+    };
+
+    const wHist = $('wHistory');
+    if (wHist) {
+      wHist.replaceChildren(...renderFullTxNodes());
+    }
+    const wPageHist = $('wWithdrawHistory');
+    if (wPageHist) {
+      wPageHist.replaceChildren(...renderWithdrawNodes());
     }
   } catch {}
 }
@@ -1068,17 +1478,8 @@ async function sendVerifyOtp(): Promise<void> {
     const otpBox = $('verifyOtpBox');
     if (otpBox) otpBox.style.display = 'block';
 
-    const previewBanner = $('otpPreviewBanner');
-    if (previewBanner) {
-      if (r.otpPreview) {
-        previewBanner.style.display = 'flex';
-        setText('otpPreviewCode', r.otpPreview);
-      } else {
-        previewBanner.style.display = 'none';
-      }
-    }
-
-    toast(`OTP sent to ${email}! Check & confirm below`, 'success');
+    await load();
+    toast(r.message || `Verification OTP sent to ${email}!`, 'success');
   } finally {
     if (btn) btn.disabled = false;
     setText('sendOtpBtnText', 'Resend OTP to Email');
@@ -1164,6 +1565,10 @@ window.claimDaily = claimDaily;
 window.copyRef = copyRef;
 window.shareRef = shareRef;
 window.withdraw = withdraw;
+window.openNotificationsModal = openNotificationsModal;
+window.closeNotificationsModal = closeNotificationsModal;
+window.markAllNotificationsRead = markAllNotificationsRead;
+window.clearAllNotifications = clearAllNotifications;
 
 document.addEventListener('DOMContentLoaded', () => {
   const root = document.getElementById('root');
@@ -1173,4 +1578,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   renderDummyAvatar();
   load();
+  // Real-time background poll for Admin broadcasts & activity notifications
+  window.setInterval(() => {
+    load();
+  }, 8000);
 });

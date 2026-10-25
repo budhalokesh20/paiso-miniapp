@@ -15,16 +15,25 @@ Object.defineProperty(exports, "__esModule", { value: true });
  */
 const express_1 = __importDefault(require("express"));
 const crypto_1 = __importDefault(require("crypto"));
+const dns_1 = __importDefault(require("dns"));
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
-// --- tiny .env loader (no dotenv dep) ---
+const nodemailer_1 = __importDefault(require("nodemailer"));
+// --- cross-platform .env loader (supports \r\n, \n, whitespace, comments) ---
 try {
     fs_1.default.readFileSync(path_1.default.join(__dirname, '.env'), 'utf8')
-        .split('\n')
+        .split(/\r?\n/)
         .forEach((l) => {
-        const m = l.match(/^\s*([^#=]+)=(.*)$/);
-        if (m)
-            process.env[m[1].trim()] = m[2].trim();
+        const line = l.trim();
+        if (!line || line.startsWith('#'))
+            return;
+        const idx = line.indexOf('=');
+        if (idx !== -1) {
+            const k = line.slice(0, idx).trim();
+            const v = line.slice(idx + 1).trim();
+            if (k)
+                process.env[k] = v;
+        }
     });
 }
 catch { }
@@ -76,7 +85,8 @@ let db = {
     withdrawals: [],
     claims: {},
     tasks: [...SEED_TASKS],
-    settings: { ...DEFAULT_SETTINGS }
+    settings: { ...DEFAULT_SETTINGS },
+    notifications: []
 };
 function normalizeDB(d) {
     const rawSettings = (d && d.settings) || {};
@@ -86,11 +96,19 @@ function normalizeDB(d) {
     const countries = Array.isArray(rawSettings.countries)
         ? rawSettings.countries
         : DEFAULT_SETTINGS.countries;
+    const loadedTasks = d && Array.isArray(d.tasks) && d.tasks.length ? [...d.tasks] : [...SEED_TASKS];
+    if (!loadedTasks.some((t) => t.type === 'app_task' || t.type === 'play_game')) {
+        SEED_TASKS.filter((t) => t.type === 'app_task' || t.type === 'play_game').forEach((seedT) => {
+            if (!loadedTasks.some((x) => x.id === seedT.id)) {
+                loadedTasks.push({ ...seedT });
+            }
+        });
+    }
     return {
         users: (d && d.users) || {},
         withdrawals: (d && d.withdrawals) || [],
         claims: (d && d.claims) || {},
-        tasks: d && Array.isArray(d.tasks) && d.tasks.length ? d.tasks : [...SEED_TASKS],
+        tasks: loadedTasks,
         settings: {
             ...DEFAULT_SETTINGS,
             ...rawSettings,
@@ -98,8 +116,46 @@ function normalizeDB(d) {
             allowedMethods: methods.filter((m) => m.enabled !== false).map((m) => m.name),
             countries,
             allowedCountries: countries.map((c) => c.name)
-        }
+        },
+        notifications: Array.isArray(d?.notifications) ? d.notifications : []
     };
+}
+function getNotifications() {
+    if (!Array.isArray(db.notifications)) {
+        db.notifications = [];
+    }
+    return db.notifications;
+}
+function pushNotification(params) {
+    const list = getNotifications();
+    const item = {
+        id: 'N' + Date.now() + Math.random().toString(36).slice(2, 6),
+        userId: params.userId,
+        title: params.title,
+        message: params.message,
+        type: params.type,
+        coins: params.coins,
+        createdAt: new Date().toISOString(),
+        readBy: []
+    };
+    list.push(item);
+    // Keep latest 300 notifications in DB
+    if (list.length > 300) {
+        db.notifications = list.slice(-300);
+    }
+    return item;
+}
+function getUserNotifications(userId) {
+    const list = getNotifications()
+        .filter((n) => n.userId === 'all' || n.userId === userId)
+        .slice(-40)
+        .reverse()
+        .map((n) => ({
+        ...n,
+        read: Array.isArray(n.readBy) ? n.readBy.includes(userId) : false
+    }));
+    const unreadCount = list.filter((n) => !n.read).length;
+    return { notifications: list, unreadCount };
 }
 function getTasks() {
     if (!db.tasks || !db.tasks.length) {
@@ -161,6 +217,23 @@ async function initDB() {
     catch { }
     console.log('🗄️  File DB mode (DATABASE_URL chhaina)');
 }
+function safeEqual(a, b) {
+    const ba = Buffer.from(String(a));
+    const bb = Buffer.from(String(b));
+    if (ba.length !== bb.length)
+        return false;
+    return crypto_1.default.timingSafeEqual(ba, bb);
+}
+// Real loopback connection only (Host header can be spoofed, socket address cannot)
+function isTrueLocalRequest(req) {
+    if (process.env.NODE_ENV === 'production')
+        return false;
+    if (req.headers['x-forwarded-for'])
+        return false;
+    const ip = String(req.socket.remoteAddress || '');
+    return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+}
+const INIT_DATA_MAX_AGE_SEC = +(process.env.INIT_DATA_MAX_AGE_SEC || 86400);
 function verifyInitData(initData) {
     if (!BOT_TOKEN)
         return null;
@@ -175,7 +248,11 @@ function verifyInitData(initData) {
         .join('\n');
     const secret = crypto_1.default.createHmac('sha256', 'WebAppData').update(BOT_TOKEN).digest();
     const calc = crypto_1.default.createHmac('sha256', secret).update(dataCheck).digest('hex');
-    if (calc !== hash)
+    if (!safeEqual(calc, hash))
+        return null;
+    // Reject stale / replayed initData
+    const authDate = +(params.get('auth_date') || 0);
+    if (!authDate || Date.now() / 1000 - authDate > INIT_DATA_MAX_AGE_SEC)
         return null;
     try {
         return JSON.parse(params.get('user') || 'null');
@@ -243,6 +320,13 @@ function checkAndPayReferralBonus(user) {
         user.qualifiedAt = new Date().toISOString();
         referrer.coins += REFERRAL_BONUS;
         referrer.totalEarned += REFERRAL_BONUS;
+        pushNotification({
+            userId: referrer.id,
+            title: 'Referral Qualified Bonus!',
+            message: `Your friend ${user.first_name || user.username || user.id} completed all requirements! +${REFERRAL_BONUS} Coins added.`,
+            type: 'referral',
+            coins: REFERRAL_BONUS
+        });
         saveDB();
         tgApi('sendMessage', {
             chat_id: referrer.id,
@@ -267,11 +351,23 @@ function getUser(tgUser, startParam) {
             refBonusPaid: false,
             joinedAt: new Date().toISOString()
         };
+        pushNotification({
+            userId: id,
+            title: 'Welcome to Paiso!',
+            message: 'Complete daily check-ins, watch ads, and verify social tasks to earn real rewards.',
+            type: 'system'
+        });
         const m = /^ref_(\d+)$/.exec(startParam || '');
         if (m && m[1] !== id && db.users[m[1]]) {
             db.users[id].referredBy = m[1];
             db.users[id].refBonusPaid = false;
             db.users[m[1]].referrals += 1;
+            pushNotification({
+                userId: m[1],
+                title: 'New Referral Joined!',
+                message: `${tgUser.first_name || 'A friend'} joined via your link! You will earn +${REFERRAL_BONUS} Coins once they qualify.`,
+                type: 'referral'
+            });
             tgApi('sendMessage', {
                 chat_id: m[1],
                 text: `👋 Naya referral (${tgUser.first_name || 'User'}) join bhayo! Usle 3 Ads, 2 Social Tasks ra 2 Days Daily Check-in pura garepachhi +${REFERRAL_BONUS} coins bonus aauchha.`
@@ -317,6 +413,43 @@ function getReferralHistory(referrerId) {
 }
 // --- Express ---
 const app = (0, express_1.default)();
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+// Basic security headers (no X-Frame-Options: Telegram Web loads the Mini App in an iframe)
+app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    next();
+});
+// Simple in-memory rate limiter (per IP + bucket)
+const rateBuckets = new Map();
+function rateLimit(bucket, max, windowMs) {
+    return (req, res, next) => {
+        const key = `${bucket}:${req.ip}`;
+        const now = Date.now();
+        const cur = rateBuckets.get(key);
+        if (!cur || now > cur.resetAt) {
+            rateBuckets.set(key, { count: 1, resetAt: now + windowMs });
+            next();
+            return;
+        }
+        cur.count += 1;
+        if (cur.count > max) {
+            res.status(429).json({ ok: false, error: 'Too many requests, please slow down.' });
+            return;
+        }
+        next();
+    };
+}
+setInterval(() => {
+    const now = Date.now();
+    rateBuckets.forEach((v, k) => {
+        if (now > v.resetAt)
+            rateBuckets.delete(k);
+    });
+}, 60 * 1000).unref();
+app.use('/api/', rateLimit('api', 180, 60 * 1000));
+app.use('/api/admin/', rateLimit('admin', 120, 60 * 1000));
 app.use(express_1.default.json({ limit: '5mb' }));
 app.use(express_1.default.static(path_1.default.join(__dirname, 'public')));
 app.get('/admin', (_req, res) => {
@@ -349,7 +482,7 @@ app.get('/api/countries', async (_req, res) => {
 });
 function auth(req, res, next) {
     const initData = String(req.headers['x-init-data'] || '');
-    const isLocalDev = !initData && (req.hostname === 'localhost' || req.hostname === '127.0.0.1');
+    const isLocalDev = !initData && isTrueLocalRequest(req);
     const tgUser = BOT_TOKEN && !isLocalDev
         ? verifyInitData(initData)
         : { id: 999001, first_name: 'Test User', username: 'test' };
@@ -380,8 +513,11 @@ app.get('/api/me', auth, (req, res) => {
     const dailyState = getDailyState(user);
     const cfg = getSettings();
     checkAndPayReferralBonus(user);
+    const notifData = getUserNotifications(user.id);
+    // Never expose secret fields (OTP) to the client
+    const { pendingOtp: _hiddenOtp, ...safeUser } = user;
     res.json({
-        user,
+        user: safeUser,
         tasks: getTasks().map((t) => {
             const st = getTaskClaimState(user.id, t);
             return { ...t, done: st.done, nextAvailableAt: st.nextAvailableAt };
@@ -401,8 +537,40 @@ app.get('/api/me', auth, (req, res) => {
         qualification: getQualification(user),
         referralHistory: getReferralHistory(user.id),
         withdrawSettings: cfg,
+        notifications: notifData.notifications,
+        unreadCount: notifData.unreadCount,
         refLink: `https://t.me/${process.env.BOT_USERNAME || 'YourBot'}?start=ref_${user.id}`
     });
+});
+app.post('/api/notifications/read', auth, (req, res) => {
+    const user = req.user;
+    const targetId = req.body?.id ? String(req.body.id) : '';
+    getNotifications().forEach((n) => {
+        if (n.userId === 'all' || n.userId === user.id) {
+            if (!targetId || n.id === targetId) {
+                if (!Array.isArray(n.readBy))
+                    n.readBy = [];
+                if (!n.readBy.includes(user.id))
+                    n.readBy.push(user.id);
+            }
+        }
+    });
+    saveDB();
+    res.json({ ok: true, ...getUserNotifications(user.id) });
+});
+app.delete('/api/notifications', auth, (req, res) => {
+    const user = req.user;
+    db.notifications = getNotifications().filter((n) => n.userId !== user.id);
+    getNotifications().forEach((n) => {
+        if (n.userId === 'all') {
+            if (!Array.isArray(n.readBy))
+                n.readBy = [];
+            if (!n.readBy.includes(user.id))
+                n.readBy.push(user.id);
+        }
+    });
+    saveDB();
+    res.json({ ok: true, ...getUserNotifications(user.id) });
 });
 app.post('/api/task/claim', auth, async (req, res) => {
     const user = req.user;
@@ -428,7 +596,7 @@ app.post('/api/task/claim', auth, async (req, res) => {
             return;
         }
     }
-    if (task.type === 'social_visit') {
+    else {
         const started = db.claims[`${key}:start`];
         const waitSec = task.waitSeconds || 15;
         if (!started) {
@@ -438,18 +606,25 @@ app.post('/api/task/claim', auth, async (req, res) => {
                 ok: false,
                 started: true,
                 waitSeconds: waitSec,
-                error: `Link kholyo. ${waitSec} sec parkha ani feri Verify dabau.`
+                error: `Opened! Wait ${waitSec}s and tap Verify.`
             });
             return;
         }
         if (Date.now() - started < waitSec * 1000) {
-            res.json({ ok: false, error: 'Wait time pugeko chhaina, link ma basera aau.' });
+            res.json({ ok: false, error: 'Wait time not finished yet, stay on the page and try again.' });
             return;
         }
     }
     db.claims[key] = Date.now();
     delete db.claims[`${key}:start`];
     user.totalTasksCompleted = (user.totalTasksCompleted || 0) + 1;
+    pushNotification({
+        userId: user.id,
+        title: `Task Verified: ${task.title}`,
+        message: `You completed "${task.title}" and earned +${task.reward} Coins!`,
+        type: 'task',
+        coins: task.reward
+    });
     credit(user, task.reward, 'task');
     checkAndPayReferralBonus(user);
     res.json({ ok: true, reward: task.reward, coins: user.coins });
@@ -468,11 +643,24 @@ function tryCreditAd(user) {
     user.adCount = (user.adCount || 0) + 1;
     user.totalAdsWatched = (user.totalAdsWatched || 0) + 1;
     user.lastAdAt = Date.now();
+    pushNotification({
+        userId: user.id,
+        title: 'Ad Reward Credited',
+        message: `You watched a rewarded ad (${user.adCount}/${AD_DAILY_CAP} today) and earned +${AD_REWARD} Coins!`,
+        type: 'reward',
+        coins: AD_REWARD
+    });
     credit(user, AD_REWARD, 'ad');
     checkAndPayReferralBonus(user);
     return true;
 }
 app.get('/api/adsgram/reward', (req, res) => {
+    // Optional shared secret: set ADSGRAM_REWARD_SECRET and append &secret=... to the Adsgram reward URL
+    const rewardSecret = process.env.ADSGRAM_REWARD_SECRET || '';
+    if (rewardSecret && !safeEqual(String(req.query.secret || ''), rewardSecret)) {
+        res.status(403).send('forbidden');
+        return;
+    }
     const uid = String(req.query.userid || '');
     const user = db.users[uid];
     if (user && ADSGRAM_BLOCK_ID)
@@ -501,6 +689,13 @@ app.post('/api/daily', auth, (req, res) => {
     user.lastDailyAt = now;
     user.dailyStreak = newStreak;
     user.totalDailyCheckins = (user.totalDailyCheckins || 0) + 1;
+    pushNotification({
+        userId: user.id,
+        title: `Day ${newStreak} Check-in Bonus!`,
+        message: `Daily check-in claimed! +${reward} Coins added to your balance.`,
+        type: 'reward',
+        coins: reward
+    });
     credit(user, reward, 'daily');
     checkAndPayReferralBonus(user);
     res.json({
@@ -559,6 +754,13 @@ app.post('/api/withdraw', auth, (req, res) => {
         at: new Date().toISOString()
     };
     db.withdrawals.push(w);
+    pushNotification({
+        userId: user.id,
+        title: 'Withdrawal Request Submitted',
+        message: `Your withdrawal of ${w.coins} Coins (NPR ${w.npr}) via ${w.method} (${w.account}) is pending admin approval.`,
+        type: 'withdraw',
+        coins: w.coins
+    });
     saveDB();
     if (ADMIN_ID) {
         tgApi('sendMessage', {
@@ -577,8 +779,62 @@ app.get('/api/my-withdrawals', auth, (req, res) => {
             .reverse()
     });
 });
-// --- Profile Verification (Details + Email OTP -> Blue Tick) ---
+// --- Profile Verification (Details + Real Email/Telegram OTP -> Blue Tick) ---
+const DISPOSABLE_EMAIL_DOMAINS = new Set([
+    'tempmail.com',
+    'temp-mail.org',
+    '10minutemail.com',
+    'mailinator.com',
+    'yopmail.com',
+    'guerrillamail.com',
+    'trashmail.com',
+    'sharklasers.com',
+    'getnada.com',
+    'maildrop.cc'
+]);
+async function hasValidEmailDomainMx(email) {
+    const domain = email.split('@')[1]?.toLowerCase() || '';
+    if (!domain || DISPOSABLE_EMAIL_DOMAINS.has(domain))
+        return false;
+    try {
+        const records = await dns_1.default.promises.resolveMx(domain);
+        return Array.isArray(records) && records.length > 0;
+    }
+    catch {
+        return false;
+    }
+}
 async function sendVerificationEmail(toEmail, fullName, otp) {
+    const htmlBody = `<div style="font-family:sans-serif;max-width:440px;margin:0 auto;padding:24px;border:1px solid #E2E8F0;border-radius:16px">
+    <h2 style="color:#091A3C;margin:0 0 8px">Verify your Paiso Account</h2>
+    <p style="color:#475569;font-size:14px">Hi <b>${fullName}</b>, use the 6-digit OTP below to complete your profile verification and unlock your Blue Tick badge:</p>
+    <div style="background:#EFF6FF;border:1px dashed #2563EB;border-radius:12px;padding:16px;text-align:center;font-size:28px;font-weight:800;letter-spacing:6px;color:#1D4ED8;margin:18px 0">${otp}</div>
+    <p style="color:#64748B;font-size:12px">This code expires in 10 minutes.</p>
+  </div>`;
+    // 1. Try SMTP via Nodemailer (e.g. Gmail App Password or custom SMTP)
+    const smtpUser = process.env.SMTP_USER || '';
+    const smtpPass = process.env.SMTP_PASS || '';
+    if (smtpUser && smtpPass) {
+        try {
+            const transporter = nodemailer_1.default.createTransport({
+                host: process.env.SMTP_HOST || 'smtp.gmail.com',
+                port: +(process.env.SMTP_PORT || 465),
+                secure: (process.env.SMTP_PORT || '465') === '465',
+                auth: { user: smtpUser, pass: smtpPass }
+            });
+            await transporter.sendMail({
+                from: process.env.EMAIL_FROM || `"Paiso Verification" <${smtpUser}>`,
+                to: toEmail,
+                subject: `${otp} is your Paiso Verification OTP`,
+                html: htmlBody
+            });
+            return true;
+        }
+        catch (e) {
+            console.error('SMTP email error:', e.message);
+        }
+    }
+    // 2. Try Resend API if configured
     const resendKey = process.env.RESEND_API_KEY || '';
     if (resendKey) {
         try {
@@ -592,12 +848,7 @@ async function sendVerificationEmail(toEmail, fullName, otp) {
                     from: process.env.EMAIL_FROM || 'Paiso Verification <onboarding@resend.dev>',
                     to: [toEmail],
                     subject: `${otp} is your Paiso Verification OTP`,
-                    html: `<div style="font-family:sans-serif;max-width:440px;margin:0 auto;padding:24px;border:1px solid #E2E8F0;border-radius:16px">
-            <h2 style="color:#091A3C;margin:0 0 8px">Verify your Paiso Account</h2>
-            <p style="color:#475569;font-size:14px">Hi <b>${fullName}</b>, use the 6-digit OTP below to complete your profile verification and unlock your Blue Tick badge:</p>
-            <div style="background:#EFF6FF;border:1px dashed #2563EB;border-radius:12px;padding:16px;text-align:center;font-size:28px;font-weight:800;letter-spacing:6px;color:#1D4ED8;margin:18px 0">${otp}</div>
-            <p style="color:#64748B;font-size:12px">This code expires in 10 minutes.</p>
-          </div>`
+                    html: htmlBody
                 })
             });
             if (r.ok)
@@ -617,48 +868,70 @@ app.post('/api/verify/send-otp', auth, async (req, res) => {
     const email = String(req.body?.email || '').trim().toLowerCase();
     const dob = String(req.body?.dob || '').trim();
     const gender = String(req.body?.gender || '').trim();
-    if (fullName.length < 2) {
-        res.json({ ok: false, error: 'Please enter your full name' });
+    if (fullName.length < 3 || !/^[a-zA-Z\s.'-]+$/.test(fullName)) {
+        res.json({ ok: false, error: 'Please enter your real full name (letters only)' });
         return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         res.json({ ok: false, error: 'Please enter a valid email address' });
         return;
     }
+    // Check if email is already used by another verified user
+    const emailTaken = Object.values(db.users).some((u) => u.id !== user.id && u.verified && u.verification?.email?.toLowerCase() === email);
+    if (emailTaken) {
+        res.json({ ok: false, error: 'This email address is already linked to another verified account' });
+        return;
+    }
+    // Real DNS MX record check on the email domain
+    const validDomain = await hasValidEmailDomainMx(email);
+    if (!validDomain) {
+        res.json({
+            ok: false,
+            error: 'Invalid or disposable email domain! Please use a real email (e.g. Gmail, Outlook, Yahoo, iCloud).'
+        });
+        return;
+    }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
         res.json({ ok: false, error: 'Please select your Date of Birth' });
+        return;
+    }
+    const birthYear = +dob.slice(0, 4);
+    const currentYear = new Date().getFullYear();
+    if (currentYear - birthYear < 13 || currentYear - birthYear > 100) {
+        res.json({ ok: false, error: 'You must be at least 13 years old to verify your account' });
         return;
     }
     if (gender !== 'Male' && gender !== 'Female') {
         res.json({ ok: false, error: 'Please select Male or Female' });
         return;
     }
-    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    const otp = String(crypto_1.default.randomInt(100000, 1000000));
+    const prevOtp = user.pendingOtp;
+    if (prevOtp?.sentAt && Date.now() - prevOtp.sentAt < 60 * 1000) {
+        res.json({ ok: false, error: 'Please wait 60 seconds before requesting a new OTP.' });
+        return;
+    }
+    const emailSent = await sendVerificationEmail(email, fullName, otp);
+    if (!emailSent) {
+        res.json({ ok: false, error: 'Could not send verification email right now. Please try again later.' });
+        return;
+    }
+    // OTP is delivered ONLY to the email inbox (proves email ownership)
     user.pendingOtp = {
         otp,
         fullName,
         email,
         dob,
         gender,
-        expiresAt: Date.now() + 10 * 60 * 1000
+        expiresAt: Date.now() + 10 * 60 * 1000,
+        attempts: 0,
+        sentAt: Date.now()
     };
     saveDB();
-    const emailSent = await sendVerificationEmail(email, fullName, otp);
-    // Also deliver OTP via Telegram bot chat if BOT_TOKEN is active
-    if (BOT_TOKEN) {
-        tgApi('sendMessage', {
-            chat_id: user.id,
-            text: `📧 Paiso Verification OTP: ${otp}\nName: ${fullName}\nEmail: ${email}\n\nEnter this 6-digit code in the app to get your Blue Tick!`
-        }).catch(() => { });
-    }
-    console.log(`📧 Verification OTP for ${email} (${user.id}): ${otp}`);
     res.json({
         ok: true,
         emailSent,
-        otpPreview: emailSent ? undefined : otp,
-        message: emailSent
-            ? `6-digit OTP sent to ${email}`
-            : `OTP generated for ${email}`
+        message: `6-digit verification code sent to ${email}`
     });
 });
 app.post('/api/verify/confirm-otp', auth, (req, res) => {
@@ -675,7 +948,23 @@ app.post('/api/verify/confirm-otp', auth, (req, res) => {
         return;
     }
     if (code !== user.pendingOtp.otp) {
-        res.json({ ok: false, error: 'Invalid OTP code! Please check and try again.' });
+        user.pendingOtp.attempts = (user.pendingOtp.attempts || 0) + 1;
+        if (user.pendingOtp.attempts >= 5) {
+            delete user.pendingOtp;
+            saveDB();
+            res.json({ ok: false, error: 'Too many wrong attempts! Please request a new OTP.' });
+            return;
+        }
+        saveDB();
+        res.json({ ok: false, error: `Invalid OTP code! ${5 - user.pendingOtp.attempts} attempts left.` });
+        return;
+    }
+    // Re-check email uniqueness at confirm time (race safety)
+    const emailTakenNow = Object.values(db.users).some((u) => u.id !== user.id && u.verified && u.verification?.email?.toLowerCase() === user.pendingOtp.email);
+    if (emailTakenNow) {
+        delete user.pendingOtp;
+        saveDB();
+        res.json({ ok: false, error: 'This email address is already linked to another verified account' });
         return;
     }
     const { fullName, email, dob, gender } = user.pendingOtp;
@@ -690,6 +979,12 @@ app.post('/api/verify/confirm-otp', auth, (req, res) => {
         verifiedAt: new Date().toISOString()
     };
     delete user.pendingOtp;
+    pushNotification({
+        userId: user.id,
+        title: 'Profile Verified (Blue Tick)!',
+        message: `Congratulations ${fullName}! Your email (${email}) is verified and your Blue Tick badge is now active.`,
+        type: 'system'
+    });
     saveDB();
     res.json({
         ok: true,
@@ -700,8 +995,14 @@ app.post('/api/verify/confirm-otp', auth, (req, res) => {
 // --- Admin endpoints ---
 function adminOnly(req, res, next) {
     const key = String(req.headers['x-admin-id'] || '').trim();
-    const isLocal = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
-    if ((ADMIN_ID && key === ADMIN_ID) || (isLocal && (key === 'admin' || key === ADMIN_ID))) {
+    // ADMIN_SECRET (strong password) is required. Telegram ADMIN_ID alone is NOT a secret.
+    const secret = process.env.ADMIN_SECRET || '';
+    if (secret && key && safeEqual(key, secret)) {
+        next();
+        return;
+    }
+    // Local dev convenience only when no ADMIN_SECRET is configured and request truly comes from loopback
+    if (!secret && isTrueLocalRequest(req) && key === 'admin') {
         next();
         return;
     }
@@ -753,8 +1054,64 @@ app.get('/api/admin/stats', adminOnly, (_req, res) => {
             const claimsCount = Object.keys(db.claims).filter((k) => k.endsWith(`:${t.id}`) && !k.endsWith(':start') && getTaskClaimState(k.split(':')[0], t).done).length;
             return { ...t, claimsCount };
         }),
-        settings: getSettings()
+        settings: getSettings(),
+        notifications: [...getNotifications()].reverse().slice(0, 50)
     });
+});
+app.post('/api/admin/notifications', adminOnly, (req, res) => {
+    const b = req.body || {};
+    const targetUserId = String(b.userId || 'all').trim() || 'all';
+    const title = String(b.title || '').trim();
+    const message = String(b.message || '').trim();
+    const bonusCoins = Math.max(0, Math.floor(+(b.coins || 0)));
+    if (!title || !message) {
+        res.status(400).json({ ok: false, error: 'Title and Message are required' });
+        return;
+    }
+    if (targetUserId !== 'all' && !db.users[targetUserId]) {
+        res.status(404).json({ ok: false, error: `User ID #${targetUserId} not found` });
+        return;
+    }
+    // Credit optional bonus coins
+    if (bonusCoins > 0) {
+        if (targetUserId === 'all') {
+            Object.values(db.users).forEach((u) => {
+                u.coins += bonusCoins;
+                u.totalEarned += bonusCoins;
+            });
+        }
+        else if (db.users[targetUserId]) {
+            db.users[targetUserId].coins += bonusCoins;
+            db.users[targetUserId].totalEarned += bonusCoins;
+        }
+    }
+    const notif = pushNotification({
+        userId: targetUserId,
+        title,
+        message,
+        type: 'admin',
+        coins: bonusCoins > 0 ? bonusCoins : undefined
+    });
+    saveDB();
+    // Also send via Telegram Bot if BOT_TOKEN is configured
+    if (BOT_TOKEN) {
+        const tgText = `🔔 *${title}*\n${message}${bonusCoins > 0 ? `\n\n🎁 Bonus: +${bonusCoins} Coins credited!` : ''}`;
+        if (targetUserId === 'all') {
+            Object.keys(db.users).forEach((uid) => {
+                tgApi('sendMessage', { chat_id: uid, text: tgText }).catch(() => { });
+            });
+        }
+        else {
+            tgApi('sendMessage', { chat_id: targetUserId, text: tgText }).catch(() => { });
+        }
+    }
+    res.json({ ok: true, notification: notif });
+});
+app.delete('/api/admin/notifications/:id', adminOnly, (req, res) => {
+    const nid = String(req.params.id);
+    db.notifications = getNotifications().filter((n) => n.id !== nid);
+    saveDB();
+    res.json({ ok: true });
 });
 app.post('/api/admin/settings', adminOnly, (req, res) => {
     const cur = getSettings();
@@ -799,7 +1156,8 @@ app.post('/api/admin/tasks', adminOnly, (req, res) => {
     const b = req.body || {};
     const title = String(b.title || '').trim();
     const reward = Math.max(1, Math.floor(+(b.reward || 100)));
-    const type = b.type === 'telegram_join' ? 'telegram_join' : 'social_visit';
+    const validTypes = ['telegram_join', 'social_visit', 'app_task', 'play_game'];
+    const type = validTypes.includes(b.type) ? b.type : 'social_visit';
     const url = String(b.url || '').trim();
     const target = String(b.target || url).trim();
     const waitSeconds = Math.max(5, Math.floor(+(b.waitSeconds || 15)));
@@ -808,11 +1166,17 @@ app.post('/api/admin/tasks', adminOnly, (req, res) => {
         res.status(400).json({ ok: false, error: 'Title and URL are required' });
         return;
     }
+    const iconMap = {
+        telegram_join: 'TG',
+        social_visit: 'WEB',
+        app_task: 'APP',
+        play_game: 'GAME'
+    };
     const newTask = {
         id: 'task_' + Date.now(),
         title,
         description: String(b.description || title),
-        icon: type === 'telegram_join' ? 'TG' : 'WEB',
+        icon: iconMap[type] || 'WEB',
         reward,
         type,
         target,
@@ -833,11 +1197,12 @@ app.put('/api/admin/tasks/:id', adminOnly, (req, res) => {
     }
     const b = req.body || {};
     const cur = list[idx];
+    const validTypes = ['telegram_join', 'social_visit', 'app_task', 'play_game'];
     list[idx] = {
         ...cur,
         title: String(b.title ?? cur.title).trim(),
         reward: Math.max(1, Math.floor(+(b.reward ?? cur.reward))),
-        type: b.type === 'telegram_join' || b.type === 'social_visit' ? b.type : cur.type,
+        type: validTypes.includes(b.type) ? b.type : cur.type,
         url: String(b.url ?? cur.url).trim(),
         target: String(b.target ?? cur.target).trim(),
         waitSeconds: Math.max(5, Math.floor(+(b.waitSeconds ?? cur.waitSeconds ?? 15))),
@@ -992,6 +1357,14 @@ app.post('/api/admin/user/:id/verify', adminOnly, (req, res) => {
     else if (u.verification) {
         u.verification.verified = u.verified;
     }
+    if (u.verified) {
+        pushNotification({
+            userId: uid,
+            title: 'Profile Verified by Admin!',
+            message: 'Your account has been verified with a Blue Tick badge.',
+            type: 'system'
+        });
+    }
     saveDB();
     res.json({ ok: true, verified: u.verified });
 });
@@ -1026,6 +1399,13 @@ app.post('/api/admin/withdrawals', adminOnly, (req, res) => {
         at: new Date().toISOString()
     };
     db.withdrawals.push(w);
+    pushNotification({
+        userId: w.userId,
+        title: 'Withdrawal Created',
+        message: `Withdrawal ${w.id} of ${w.coins} Coins (NPR ${w.npr}) via ${w.method} (${w.account}) — Status: ${w.status.toUpperCase()}.`,
+        type: 'withdraw',
+        coins: w.coins
+    });
     saveDB();
     res.json({ ok: true, withdraw: w });
 });
@@ -1064,10 +1444,23 @@ app.post('/api/admin/withdraw/:id', adminOnly, (req, res) => {
         res.status(404).json({ error: 'not found' });
         return;
     }
+    if (w.status !== 'pending') {
+        res.status(400).json({ ok: false, error: `Withdrawal already ${w.status}` });
+        return;
+    }
     w.status = req.body?.action === 'paid' ? 'paid' : 'rejected';
     if (w.status === 'rejected' && db.users[w.userId]) {
         db.users[w.userId].coins += w.coins;
     }
+    pushNotification({
+        userId: w.userId,
+        title: w.status === 'paid' ? `Withdrawal Approved (${w.id})` : `Withdrawal Rejected (${w.id})`,
+        message: w.status === 'paid'
+            ? `Your payout of NPR ${w.npr} (${w.coins} Coins) to ${w.method} (${w.account}) has been sent!`
+            : `Your withdrawal request ${w.id} was rejected and ${w.coins} Coins were refunded to your balance.`,
+        type: 'withdraw',
+        coins: w.coins
+    });
     saveDB();
     tgApi('sendMessage', {
         chat_id: w.userId,
@@ -1088,6 +1481,10 @@ async function poll() {
     while (true) {
         try {
             const r = await tgApi('getUpdates', { offset, timeout: 25 });
+            if (!r || r.ok === false) {
+                await new Promise((res2) => setTimeout(res2, 5000));
+                continue;
+            }
             for (const u of r.result || []) {
                 offset = u.update_id + 1;
                 const msg = u.message;

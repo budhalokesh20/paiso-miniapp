@@ -10,8 +10,10 @@
  */
 import express, { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
+import dns from 'dns';
 import fs from 'fs';
 import path from 'path';
+import nodemailer from 'nodemailer';
 import {
   User,
   UserGender,
@@ -22,6 +24,8 @@ import {
   CustomWithdrawMethod,
   AllowedCountryItem,
   WithdrawSettings,
+  AppNotification,
+  NotificationType,
   DatabaseSchema,
   QualificationStatus,
   ReferralHistoryItem
@@ -35,13 +39,19 @@ declare global {
   }
 }
 
-// --- tiny .env loader (no dotenv dep) ---
+// --- cross-platform .env loader (supports \r\n, \n, whitespace, comments) ---
 try {
   fs.readFileSync(path.join(__dirname, '.env'), 'utf8')
-    .split('\n')
+    .split(/\r?\n/)
     .forEach((l: string) => {
-      const m = l.match(/^\s*([^#=]+)=(.*)$/);
-      if (m) process.env[m[1].trim()] = m[2].trim();
+      const line = l.trim();
+      if (!line || line.startsWith('#')) return;
+      const idx = line.indexOf('=');
+      if (idx !== -1) {
+        const k = line.slice(0, idx).trim();
+        const v = line.slice(idx + 1).trim();
+        if (k) process.env[k] = v;
+      }
     });
 } catch {}
 
@@ -98,7 +108,8 @@ let db: DatabaseSchema = {
   withdrawals: [],
   claims: {},
   tasks: [...SEED_TASKS],
-  settings: { ...DEFAULT_SETTINGS }
+  settings: { ...DEFAULT_SETTINGS },
+  notifications: []
 };
 
 function normalizeDB(d: Partial<DatabaseSchema> | null | undefined): DatabaseSchema {
@@ -109,11 +120,19 @@ function normalizeDB(d: Partial<DatabaseSchema> | null | undefined): DatabaseSch
   const countries: AllowedCountryItem[] = Array.isArray(rawSettings.countries)
     ? rawSettings.countries
     : DEFAULT_SETTINGS.countries;
+  const loadedTasks: Task[] = d && Array.isArray(d.tasks) && d.tasks.length ? [...d.tasks] : [...SEED_TASKS];
+  if (!loadedTasks.some((t) => t.type === 'app_task' || t.type === 'play_game')) {
+    SEED_TASKS.filter((t) => t.type === 'app_task' || t.type === 'play_game').forEach((seedT) => {
+      if (!loadedTasks.some((x) => x.id === seedT.id)) {
+        loadedTasks.push({ ...seedT });
+      }
+    });
+  }
   return {
     users: (d && d.users) || {},
     withdrawals: (d && d.withdrawals) || [],
     claims: (d && d.claims) || {},
-    tasks: d && Array.isArray(d.tasks) && d.tasks.length ? d.tasks : [...SEED_TASKS],
+    tasks: loadedTasks,
     settings: {
       ...DEFAULT_SETTINGS,
       ...rawSettings,
@@ -121,8 +140,58 @@ function normalizeDB(d: Partial<DatabaseSchema> | null | undefined): DatabaseSch
       allowedMethods: methods.filter((m) => m.enabled !== false).map((m) => m.name),
       countries,
       allowedCountries: countries.map((c) => c.name)
-    }
+    },
+    notifications: Array.isArray(d?.notifications) ? d!.notifications! : []
   };
+}
+
+function getNotifications(): AppNotification[] {
+  if (!Array.isArray(db.notifications)) {
+    db.notifications = [];
+  }
+  return db.notifications;
+}
+
+function pushNotification(params: {
+  userId: string;
+  title: string;
+  message: string;
+  type: NotificationType;
+  coins?: number;
+}): AppNotification {
+  const list = getNotifications();
+  const item: AppNotification = {
+    id: 'N' + Date.now() + Math.random().toString(36).slice(2, 6),
+    userId: params.userId,
+    title: params.title,
+    message: params.message,
+    type: params.type,
+    coins: params.coins,
+    createdAt: new Date().toISOString(),
+    readBy: []
+  };
+  list.push(item);
+  // Keep latest 300 notifications in DB
+  if (list.length > 300) {
+    db.notifications = list.slice(-300);
+  }
+  return item;
+}
+
+function getUserNotifications(userId: string): {
+  notifications: Array<AppNotification & { read: boolean }>;
+  unreadCount: number;
+} {
+  const list = getNotifications()
+    .filter((n) => n.userId === 'all' || n.userId === userId)
+    .slice(-40)
+    .reverse()
+    .map((n) => ({
+      ...n,
+      read: Array.isArray(n.readBy) ? n.readBy.includes(userId) : false
+    }));
+  const unreadCount = list.filter((n) => !n.read).length;
+  return { notifications: list, unreadCount };
 }
 
 function getTasks(): Task[] {
@@ -195,6 +264,23 @@ interface TelegramUserPayload {
   username?: string;
 }
 
+function safeEqual(a: string, b: string): boolean {
+  const ba = Buffer.from(String(a));
+  const bb = Buffer.from(String(b));
+  if (ba.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ba, bb);
+}
+
+// Real loopback connection only (Host header can be spoofed, socket address cannot)
+function isTrueLocalRequest(req: Request): boolean {
+  if (process.env.NODE_ENV === 'production') return false;
+  if (req.headers['x-forwarded-for']) return false;
+  const ip = String(req.socket.remoteAddress || '');
+  return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+}
+
+const INIT_DATA_MAX_AGE_SEC: number = +(process.env.INIT_DATA_MAX_AGE_SEC || 86400);
+
 function verifyInitData(initData: string): TelegramUserPayload | null {
   if (!BOT_TOKEN) return null;
   const params = new URLSearchParams(initData);
@@ -207,7 +293,10 @@ function verifyInitData(initData: string): TelegramUserPayload | null {
     .join('\n');
   const secret = crypto.createHmac('sha256', 'WebAppData').update(BOT_TOKEN).digest();
   const calc = crypto.createHmac('sha256', secret).update(dataCheck).digest('hex');
-  if (calc !== hash) return null;
+  if (!safeEqual(calc, hash)) return null;
+  // Reject stale / replayed initData
+  const authDate = +(params.get('auth_date') || 0);
+  if (!authDate || Date.now() / 1000 - authDate > INIT_DATA_MAX_AGE_SEC) return null;
   try {
     return JSON.parse(params.get('user') || 'null');
   } catch {
@@ -275,6 +364,13 @@ function checkAndPayReferralBonus(user: User): void {
     user.qualifiedAt = new Date().toISOString();
     referrer.coins += REFERRAL_BONUS;
     referrer.totalEarned += REFERRAL_BONUS;
+    pushNotification({
+      userId: referrer.id,
+      title: 'Referral Qualified Bonus!',
+      message: `Your friend ${user.first_name || user.username || user.id} completed all requirements! +${REFERRAL_BONUS} Coins added.`,
+      type: 'referral',
+      coins: REFERRAL_BONUS
+    });
     saveDB();
     tgApi('sendMessage', {
       chat_id: referrer.id,
@@ -300,11 +396,23 @@ function getUser(tgUser: TelegramUserPayload, startParam: string): User {
       refBonusPaid: false,
       joinedAt: new Date().toISOString()
     };
+    pushNotification({
+      userId: id,
+      title: 'Welcome to Paiso!',
+      message: 'Complete daily check-ins, watch ads, and verify social tasks to earn real rewards.',
+      type: 'system'
+    });
     const m = /^ref_(\d+)$/.exec(startParam || '');
     if (m && m[1] !== id && db.users[m[1]]) {
       db.users[id].referredBy = m[1];
       db.users[id].refBonusPaid = false;
       db.users[m[1]].referrals += 1;
+      pushNotification({
+        userId: m[1],
+        title: 'New Referral Joined!',
+        message: `${tgUser.first_name || 'A friend'} joined via your link! You will earn +${REFERRAL_BONUS} Coins once they qualify.`,
+        type: 'referral'
+      });
       tgApi('sendMessage', {
         chat_id: m[1],
         text: `👋 Naya referral (${tgUser.first_name || 'User'}) join bhayo! Usle 3 Ads, 2 Social Tasks ra 2 Days Daily Check-in pura garepachhi +${REFERRAL_BONUS} coins bonus aauchha.`
@@ -353,6 +461,45 @@ function getReferralHistory(referrerId: string): ReferralHistoryItem[] {
 
 // --- Express ---
 const app = express();
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+
+// Basic security headers (no X-Frame-Options: Telegram Web loads the Mini App in an iframe)
+app.use((_req: Request, res: Response, next: NextFunction) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
+// Simple in-memory rate limiter (per IP + bucket)
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+function rateLimit(bucket: string, max: number, windowMs: number) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const key = `${bucket}:${req.ip}`;
+    const now = Date.now();
+    const cur = rateBuckets.get(key);
+    if (!cur || now > cur.resetAt) {
+      rateBuckets.set(key, { count: 1, resetAt: now + windowMs });
+      next();
+      return;
+    }
+    cur.count += 1;
+    if (cur.count > max) {
+      res.status(429).json({ ok: false, error: 'Too many requests, please slow down.' });
+      return;
+    }
+    next();
+  };
+}
+setInterval(() => {
+  const now = Date.now();
+  rateBuckets.forEach((v, k) => {
+    if (now > v.resetAt) rateBuckets.delete(k);
+  });
+}, 60 * 1000).unref();
+
+app.use('/api/', rateLimit('api', 180, 60 * 1000));
+app.use('/api/admin/', rateLimit('admin', 120, 60 * 1000));
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -392,7 +539,7 @@ app.get('/api/countries', async (_req: Request, res: Response) => {
 
 function auth(req: Request, res: Response, next: NextFunction): void {
   const initData = String(req.headers['x-init-data'] || '');
-  const isLocalDev = !initData && (req.hostname === 'localhost' || req.hostname === '127.0.0.1');
+  const isLocalDev = !initData && isTrueLocalRequest(req);
   const tgUser: TelegramUserPayload | null =
     BOT_TOKEN && !isLocalDev
       ? verifyInitData(initData)
@@ -430,8 +577,11 @@ app.get('/api/me', auth, (req: Request, res: Response) => {
   const dailyState = getDailyState(user);
   const cfg = getSettings();
   checkAndPayReferralBonus(user);
+  const notifData = getUserNotifications(user.id);
+  // Never expose secret fields (OTP) to the client
+  const { pendingOtp: _hiddenOtp, ...safeUser } = user;
   res.json({
-    user,
+    user: safeUser,
     tasks: getTasks().map((t) => {
       const st = getTaskClaimState(user.id, t);
       return { ...t, done: st.done, nextAvailableAt: st.nextAvailableAt };
@@ -451,8 +601,38 @@ app.get('/api/me', auth, (req: Request, res: Response) => {
     qualification: getQualification(user),
     referralHistory: getReferralHistory(user.id),
     withdrawSettings: cfg,
+    notifications: notifData.notifications,
+    unreadCount: notifData.unreadCount,
     refLink: `https://t.me/${process.env.BOT_USERNAME || 'YourBot'}?start=ref_${user.id}`
   });
+});
+
+app.post('/api/notifications/read', auth, (req: Request, res: Response) => {
+  const user = req.user!;
+  const targetId = req.body?.id ? String(req.body.id) : '';
+  getNotifications().forEach((n) => {
+    if (n.userId === 'all' || n.userId === user.id) {
+      if (!targetId || n.id === targetId) {
+        if (!Array.isArray(n.readBy)) n.readBy = [];
+        if (!n.readBy.includes(user.id)) n.readBy.push(user.id);
+      }
+    }
+  });
+  saveDB();
+  res.json({ ok: true, ...getUserNotifications(user.id) });
+});
+
+app.delete('/api/notifications', auth, (req: Request, res: Response) => {
+  const user = req.user!;
+  db.notifications = getNotifications().filter((n) => n.userId !== user.id);
+  getNotifications().forEach((n) => {
+    if (n.userId === 'all') {
+      if (!Array.isArray(n.readBy)) n.readBy = [];
+      if (!n.readBy.includes(user.id)) n.readBy.push(user.id);
+    }
+  });
+  saveDB();
+  res.json({ ok: true, ...getUserNotifications(user.id) });
 });
 
 app.post('/api/task/claim', auth, async (req: Request, res: Response) => {
@@ -478,8 +658,7 @@ app.post('/api/task/claim', auth, async (req: Request, res: Response) => {
       res.json({ ok: false, error: 'Pahila join gara, ani Verify dabau.' });
       return;
     }
-  }
-  if (task.type === 'social_visit') {
+  } else {
     const started = db.claims[`${key}:start`];
     const waitSec = task.waitSeconds || 15;
     if (!started) {
@@ -489,18 +668,25 @@ app.post('/api/task/claim', auth, async (req: Request, res: Response) => {
         ok: false,
         started: true,
         waitSeconds: waitSec,
-        error: `Link kholyo. ${waitSec} sec parkha ani feri Verify dabau.`
+        error: `Opened! Wait ${waitSec}s and tap Verify.`
       });
       return;
     }
     if (Date.now() - started < waitSec * 1000) {
-      res.json({ ok: false, error: 'Wait time pugeko chhaina, link ma basera aau.' });
+      res.json({ ok: false, error: 'Wait time not finished yet, stay on the page and try again.' });
       return;
     }
   }
   db.claims[key] = Date.now();
   delete db.claims[`${key}:start`];
   user.totalTasksCompleted = (user.totalTasksCompleted || 0) + 1;
+  pushNotification({
+    userId: user.id,
+    title: `Task Verified: ${task.title}`,
+    message: `You completed "${task.title}" and earned +${task.reward} Coins!`,
+    type: 'task',
+    coins: task.reward
+  });
   credit(user, task.reward, 'task');
   checkAndPayReferralBonus(user);
   res.json({ ok: true, reward: task.reward, coins: user.coins });
@@ -518,12 +704,25 @@ function tryCreditAd(user: User): boolean {
   user.adCount = (user.adCount || 0) + 1;
   user.totalAdsWatched = (user.totalAdsWatched || 0) + 1;
   user.lastAdAt = Date.now();
+  pushNotification({
+    userId: user.id,
+    title: 'Ad Reward Credited',
+    message: `You watched a rewarded ad (${user.adCount}/${AD_DAILY_CAP} today) and earned +${AD_REWARD} Coins!`,
+    type: 'reward',
+    coins: AD_REWARD
+  });
   credit(user, AD_REWARD, 'ad');
   checkAndPayReferralBonus(user);
   return true;
 }
 
 app.get('/api/adsgram/reward', (req: Request, res: Response) => {
+  // Optional shared secret: set ADSGRAM_REWARD_SECRET and append &secret=... to the Adsgram reward URL
+  const rewardSecret = process.env.ADSGRAM_REWARD_SECRET || '';
+  if (rewardSecret && !safeEqual(String(req.query.secret || ''), rewardSecret)) {
+    res.status(403).send('forbidden');
+    return;
+  }
   const uid = String(req.query.userid || '');
   const user = db.users[uid];
   if (user && ADSGRAM_BLOCK_ID) tryCreditAd(user);
@@ -554,6 +753,13 @@ app.post('/api/daily', auth, (req: Request, res: Response) => {
   user.lastDailyAt = now;
   user.dailyStreak = newStreak;
   user.totalDailyCheckins = (user.totalDailyCheckins || 0) + 1;
+  pushNotification({
+    userId: user.id,
+    title: `Day ${newStreak} Check-in Bonus!`,
+    message: `Daily check-in claimed! +${reward} Coins added to your balance.`,
+    type: 'reward',
+    coins: reward
+  });
   credit(user, reward, 'daily');
   checkAndPayReferralBonus(user);
 
@@ -615,6 +821,13 @@ app.post('/api/withdraw', auth, (req: Request, res: Response) => {
     at: new Date().toISOString()
   };
   db.withdrawals.push(w);
+  pushNotification({
+    userId: user.id,
+    title: 'Withdrawal Request Submitted',
+    message: `Your withdrawal of ${w.coins} Coins (NPR ${w.npr}) via ${w.method} (${w.account}) is pending admin approval.`,
+    type: 'withdraw',
+    coins: w.coins
+  });
   saveDB();
   if (ADMIN_ID) {
     tgApi('sendMessage', {
@@ -635,8 +848,63 @@ app.get('/api/my-withdrawals', auth, (req: Request, res: Response) => {
   });
 });
 
-// --- Profile Verification (Details + Email OTP -> Blue Tick) ---
+// --- Profile Verification (Details + Real Email/Telegram OTP -> Blue Tick) ---
+const DISPOSABLE_EMAIL_DOMAINS = new Set([
+  'tempmail.com',
+  'temp-mail.org',
+  '10minutemail.com',
+  'mailinator.com',
+  'yopmail.com',
+  'guerrillamail.com',
+  'trashmail.com',
+  'sharklasers.com',
+  'getnada.com',
+  'maildrop.cc'
+]);
+
+async function hasValidEmailDomainMx(email: string): Promise<boolean> {
+  const domain = email.split('@')[1]?.toLowerCase() || '';
+  if (!domain || DISPOSABLE_EMAIL_DOMAINS.has(domain)) return false;
+  try {
+    const records = await dns.promises.resolveMx(domain);
+    return Array.isArray(records) && records.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 async function sendVerificationEmail(toEmail: string, fullName: string, otp: string): Promise<boolean> {
+  const htmlBody = `<div style="font-family:sans-serif;max-width:440px;margin:0 auto;padding:24px;border:1px solid #E2E8F0;border-radius:16px">
+    <h2 style="color:#091A3C;margin:0 0 8px">Verify your Paiso Account</h2>
+    <p style="color:#475569;font-size:14px">Hi <b>${fullName}</b>, use the 6-digit OTP below to complete your profile verification and unlock your Blue Tick badge:</p>
+    <div style="background:#EFF6FF;border:1px dashed #2563EB;border-radius:12px;padding:16px;text-align:center;font-size:28px;font-weight:800;letter-spacing:6px;color:#1D4ED8;margin:18px 0">${otp}</div>
+    <p style="color:#64748B;font-size:12px">This code expires in 10 minutes.</p>
+  </div>`;
+
+  // 1. Try SMTP via Nodemailer (e.g. Gmail App Password or custom SMTP)
+  const smtpUser = process.env.SMTP_USER || '';
+  const smtpPass = process.env.SMTP_PASS || '';
+  if (smtpUser && smtpPass) {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        port: +(process.env.SMTP_PORT || 465),
+        secure: (process.env.SMTP_PORT || '465') === '465',
+        auth: { user: smtpUser, pass: smtpPass }
+      });
+      await transporter.sendMail({
+        from: process.env.EMAIL_FROM || `"Paiso Verification" <${smtpUser}>`,
+        to: toEmail,
+        subject: `${otp} is your Paiso Verification OTP`,
+        html: htmlBody
+      });
+      return true;
+    } catch (e) {
+      console.error('SMTP email error:', (e as Error).message);
+    }
+  }
+
+  // 2. Try Resend API if configured
   const resendKey = process.env.RESEND_API_KEY || '';
   if (resendKey) {
     try {
@@ -650,17 +918,13 @@ async function sendVerificationEmail(toEmail: string, fullName: string, otp: str
           from: process.env.EMAIL_FROM || 'Paiso Verification <onboarding@resend.dev>',
           to: [toEmail],
           subject: `${otp} is your Paiso Verification OTP`,
-          html: `<div style="font-family:sans-serif;max-width:440px;margin:0 auto;padding:24px;border:1px solid #E2E8F0;border-radius:16px">
-            <h2 style="color:#091A3C;margin:0 0 8px">Verify your Paiso Account</h2>
-            <p style="color:#475569;font-size:14px">Hi <b>${fullName}</b>, use the 6-digit OTP below to complete your profile verification and unlock your Blue Tick badge:</p>
-            <div style="background:#EFF6FF;border:1px dashed #2563EB;border-radius:12px;padding:16px;text-align:center;font-size:28px;font-weight:800;letter-spacing:6px;color:#1D4ED8;margin:18px 0">${otp}</div>
-            <p style="color:#64748B;font-size:12px">This code expires in 10 minutes.</p>
-          </div>`
+          html: htmlBody
         })
       });
       if (r.ok) return true;
     } catch {}
   }
+
   return false;
 }
 
@@ -676,53 +940,80 @@ app.post('/api/verify/send-otp', auth, async (req: Request, res: Response) => {
   const dob = String(req.body?.dob || '').trim();
   const gender = String(req.body?.gender || '').trim() as UserGender;
 
-  if (fullName.length < 2) {
-    res.json({ ok: false, error: 'Please enter your full name' });
+  if (fullName.length < 3 || !/^[a-zA-Z\s.'-]+$/.test(fullName)) {
+    res.json({ ok: false, error: 'Please enter your real full name (letters only)' });
     return;
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     res.json({ ok: false, error: 'Please enter a valid email address' });
     return;
   }
+
+  // Check if email is already used by another verified user
+  const emailTaken = Object.values(db.users).some(
+    (u) => u.id !== user.id && u.verified && u.verification?.email?.toLowerCase() === email
+  );
+  if (emailTaken) {
+    res.json({ ok: false, error: 'This email address is already linked to another verified account' });
+    return;
+  }
+
+  // Real DNS MX record check on the email domain
+  const validDomain = await hasValidEmailDomainMx(email);
+  if (!validDomain) {
+    res.json({
+      ok: false,
+      error: 'Invalid or disposable email domain! Please use a real email (e.g. Gmail, Outlook, Yahoo, iCloud).'
+    });
+    return;
+  }
+
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
     res.json({ ok: false, error: 'Please select your Date of Birth' });
     return;
   }
+  const birthYear = +dob.slice(0, 4);
+  const currentYear = new Date().getFullYear();
+  if (currentYear - birthYear < 13 || currentYear - birthYear > 100) {
+    res.json({ ok: false, error: 'You must be at least 13 years old to verify your account' });
+    return;
+  }
+
   if (gender !== 'Male' && gender !== 'Female') {
     res.json({ ok: false, error: 'Please select Male or Female' });
     return;
   }
 
-  const otp = String(Math.floor(100000 + Math.random() * 900000));
+  const otp = String(crypto.randomInt(100000, 1000000));
+  const prevOtp = user.pendingOtp;
+  if (prevOtp?.sentAt && Date.now() - prevOtp.sentAt < 60 * 1000) {
+    res.json({ ok: false, error: 'Please wait 60 seconds before requesting a new OTP.' });
+    return;
+  }
+
+  const emailSent = await sendVerificationEmail(email, fullName, otp);
+  if (!emailSent) {
+    res.json({ ok: false, error: 'Could not send verification email right now. Please try again later.' });
+    return;
+  }
+
+  // OTP is delivered ONLY to the email inbox (proves email ownership)
   user.pendingOtp = {
     otp,
     fullName,
     email,
     dob,
     gender,
-    expiresAt: Date.now() + 10 * 60 * 1000
+    expiresAt: Date.now() + 10 * 60 * 1000,
+    attempts: 0,
+    sentAt: Date.now()
   };
   saveDB();
-
-  const emailSent = await sendVerificationEmail(email, fullName, otp);
-
-  // Also deliver OTP via Telegram bot chat if BOT_TOKEN is active
-  if (BOT_TOKEN) {
-    tgApi('sendMessage', {
-      chat_id: user.id,
-      text: `📧 Paiso Verification OTP: ${otp}\nName: ${fullName}\nEmail: ${email}\n\nEnter this 6-digit code in the app to get your Blue Tick!`
-    }).catch(() => {});
-  }
-
-  console.log(`📧 Verification OTP for ${email} (${user.id}): ${otp}`);
 
   res.json({
     ok: true,
     emailSent,
-    otpPreview: emailSent ? undefined : otp,
-    message: emailSent
-      ? `6-digit OTP sent to ${email}`
-      : `OTP generated for ${email}`
+    message: `6-digit verification code sent to ${email}`
   });
 });
 
@@ -741,7 +1032,26 @@ app.post('/api/verify/confirm-otp', auth, (req: Request, res: Response) => {
     return;
   }
   if (code !== user.pendingOtp.otp) {
-    res.json({ ok: false, error: 'Invalid OTP code! Please check and try again.' });
+    user.pendingOtp.attempts = (user.pendingOtp.attempts || 0) + 1;
+    if (user.pendingOtp.attempts >= 5) {
+      delete user.pendingOtp;
+      saveDB();
+      res.json({ ok: false, error: 'Too many wrong attempts! Please request a new OTP.' });
+      return;
+    }
+    saveDB();
+    res.json({ ok: false, error: `Invalid OTP code! ${5 - user.pendingOtp.attempts} attempts left.` });
+    return;
+  }
+
+  // Re-check email uniqueness at confirm time (race safety)
+  const emailTakenNow = Object.values(db.users).some(
+    (u) => u.id !== user.id && u.verified && u.verification?.email?.toLowerCase() === user.pendingOtp!.email
+  );
+  if (emailTakenNow) {
+    delete user.pendingOtp;
+    saveDB();
+    res.json({ ok: false, error: 'This email address is already linked to another verified account' });
     return;
   }
 
@@ -757,6 +1067,12 @@ app.post('/api/verify/confirm-otp', auth, (req: Request, res: Response) => {
     verifiedAt: new Date().toISOString()
   };
   delete user.pendingOtp;
+  pushNotification({
+    userId: user.id,
+    title: 'Profile Verified (Blue Tick)!',
+    message: `Congratulations ${fullName}! Your email (${email}) is verified and your Blue Tick badge is now active.`,
+    type: 'system'
+  });
   saveDB();
 
   res.json({
@@ -769,8 +1085,14 @@ app.post('/api/verify/confirm-otp', auth, (req: Request, res: Response) => {
 // --- Admin endpoints ---
 function adminOnly(req: Request, res: Response, next: NextFunction): void {
   const key = String(req.headers['x-admin-id'] || '').trim();
-  const isLocal = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
-  if ((ADMIN_ID && key === ADMIN_ID) || (isLocal && (key === 'admin' || key === ADMIN_ID))) {
+  // ADMIN_SECRET (strong password) is required. Telegram ADMIN_ID alone is NOT a secret.
+  const secret = process.env.ADMIN_SECRET || '';
+  if (secret && key && safeEqual(key, secret)) {
+    next();
+    return;
+  }
+  // Local dev convenience only when no ADMIN_SECRET is configured and request truly comes from loopback
+  if (!secret && isTrueLocalRequest(req) && key === 'admin') {
     next();
     return;
   }
@@ -827,8 +1149,70 @@ app.get('/api/admin/stats', adminOnly, (_req: Request, res: Response) => {
       ).length;
       return { ...t, claimsCount };
     }),
-    settings: getSettings()
+    settings: getSettings(),
+    notifications: [...getNotifications()].reverse().slice(0, 50)
   });
+});
+
+app.post('/api/admin/notifications', adminOnly, (req: Request, res: Response) => {
+  const b = req.body || {};
+  const targetUserId = String(b.userId || 'all').trim() || 'all';
+  const title = String(b.title || '').trim();
+  const message = String(b.message || '').trim();
+  const bonusCoins = Math.max(0, Math.floor(+(b.coins || 0)));
+
+  if (!title || !message) {
+    res.status(400).json({ ok: false, error: 'Title and Message are required' });
+    return;
+  }
+
+  if (targetUserId !== 'all' && !db.users[targetUserId]) {
+    res.status(404).json({ ok: false, error: `User ID #${targetUserId} not found` });
+    return;
+  }
+
+  // Credit optional bonus coins
+  if (bonusCoins > 0) {
+    if (targetUserId === 'all') {
+      Object.values(db.users).forEach((u) => {
+        u.coins += bonusCoins;
+        u.totalEarned += bonusCoins;
+      });
+    } else if (db.users[targetUserId]) {
+      db.users[targetUserId].coins += bonusCoins;
+      db.users[targetUserId].totalEarned += bonusCoins;
+    }
+  }
+
+  const notif = pushNotification({
+    userId: targetUserId,
+    title,
+    message,
+    type: 'admin',
+    coins: bonusCoins > 0 ? bonusCoins : undefined
+  });
+  saveDB();
+
+  // Also send via Telegram Bot if BOT_TOKEN is configured
+  if (BOT_TOKEN) {
+    const tgText = `🔔 *${title}*\n${message}${bonusCoins > 0 ? `\n\n🎁 Bonus: +${bonusCoins} Coins credited!` : ''}`;
+    if (targetUserId === 'all') {
+      Object.keys(db.users).forEach((uid) => {
+        tgApi('sendMessage', { chat_id: uid, text: tgText }).catch(() => {});
+      });
+    } else {
+      tgApi('sendMessage', { chat_id: targetUserId, text: tgText }).catch(() => {});
+    }
+  }
+
+  res.json({ ok: true, notification: notif });
+});
+
+app.delete('/api/admin/notifications/:id', adminOnly, (req: Request, res: Response) => {
+  const nid = String(req.params.id);
+  db.notifications = getNotifications().filter((n) => n.id !== nid);
+  saveDB();
+  res.json({ ok: true });
 });
 
 app.post('/api/admin/settings', adminOnly, (req: Request, res: Response) => {
@@ -880,7 +1264,8 @@ app.post('/api/admin/tasks', adminOnly, (req: Request, res: Response) => {
   const b = req.body || {};
   const title = String(b.title || '').trim();
   const reward = Math.max(1, Math.floor(+(b.reward || 100)));
-  const type: TaskType = b.type === 'telegram_join' ? 'telegram_join' : 'social_visit';
+  const validTypes: TaskType[] = ['telegram_join', 'social_visit', 'app_task', 'play_game'];
+  const type: TaskType = validTypes.includes(b.type) ? b.type : 'social_visit';
   const url = String(b.url || '').trim();
   const target = String(b.target || url).trim();
   const waitSeconds = Math.max(5, Math.floor(+(b.waitSeconds || 15)));
@@ -891,11 +1276,18 @@ app.post('/api/admin/tasks', adminOnly, (req: Request, res: Response) => {
     return;
   }
 
+  const iconMap: Record<TaskType, string> = {
+    telegram_join: 'TG',
+    social_visit: 'WEB',
+    app_task: 'APP',
+    play_game: 'GAME'
+  };
+
   const newTask: Task = {
     id: 'task_' + Date.now(),
     title,
     description: String(b.description || title),
-    icon: type === 'telegram_join' ? 'TG' : 'WEB',
+    icon: iconMap[type] || 'WEB',
     reward,
     type,
     target,
@@ -917,11 +1309,12 @@ app.put('/api/admin/tasks/:id', adminOnly, (req: Request, res: Response) => {
   }
   const b = req.body || {};
   const cur = list[idx];
+  const validTypes: TaskType[] = ['telegram_join', 'social_visit', 'app_task', 'play_game'];
   list[idx] = {
     ...cur,
     title: String(b.title ?? cur.title).trim(),
     reward: Math.max(1, Math.floor(+(b.reward ?? cur.reward))),
-    type: b.type === 'telegram_join' || b.type === 'social_visit' ? b.type : cur.type,
+    type: validTypes.includes(b.type) ? b.type : cur.type,
     url: String(b.url ?? cur.url).trim(),
     target: String(b.target ?? cur.target).trim(),
     waitSeconds: Math.max(5, Math.floor(+(b.waitSeconds ?? cur.waitSeconds ?? 15))),
@@ -1076,6 +1469,14 @@ app.post('/api/admin/user/:id/verify', adminOnly, (req: Request, res: Response) 
   } else if (u.verification) {
     u.verification.verified = u.verified;
   }
+  if (u.verified) {
+    pushNotification({
+      userId: uid,
+      title: 'Profile Verified by Admin!',
+      message: 'Your account has been verified with a Blue Tick badge.',
+      type: 'system'
+    });
+  }
   saveDB();
   res.json({ ok: true, verified: u.verified });
 });
@@ -1114,6 +1515,13 @@ app.post('/api/admin/withdrawals', adminOnly, (req: Request, res: Response) => {
     at: new Date().toISOString()
   };
   db.withdrawals.push(w);
+  pushNotification({
+    userId: w.userId,
+    title: 'Withdrawal Created',
+    message: `Withdrawal ${w.id} of ${w.coins} Coins (NPR ${w.npr}) via ${w.method} (${w.account}) — Status: ${w.status.toUpperCase()}.`,
+    type: 'withdraw',
+    coins: w.coins
+  });
   saveDB();
   res.json({ ok: true, withdraw: w });
 });
@@ -1153,10 +1561,24 @@ app.post('/api/admin/withdraw/:id', adminOnly, (req: Request, res: Response) => 
     res.status(404).json({ error: 'not found' });
     return;
   }
+  if (w.status !== 'pending') {
+    res.status(400).json({ ok: false, error: `Withdrawal already ${w.status}` });
+    return;
+  }
   w.status = req.body?.action === 'paid' ? 'paid' : 'rejected';
   if (w.status === 'rejected' && db.users[w.userId]) {
     db.users[w.userId].coins += w.coins;
   }
+  pushNotification({
+    userId: w.userId,
+    title: w.status === 'paid' ? `Withdrawal Approved (${w.id})` : `Withdrawal Rejected (${w.id})`,
+    message:
+      w.status === 'paid'
+        ? `Your payout of NPR ${w.npr} (${w.coins} Coins) to ${w.method} (${w.account}) has been sent!`
+        : `Your withdrawal request ${w.id} was rejected and ${w.coins} Coins were refunded to your balance.`,
+    type: 'withdraw',
+    coins: w.coins
+  });
   saveDB();
   tgApi('sendMessage', {
     chat_id: w.userId,
@@ -1179,6 +1601,10 @@ async function poll(): Promise<void> {
   while (true) {
     try {
       const r = await tgApi('getUpdates', { offset, timeout: 25 });
+      if (!r || r.ok === false) {
+        await new Promise((res2) => setTimeout(res2, 5000));
+        continue;
+      }
       for (const u of r.result || []) {
         offset = u.update_id + 1;
         const msg = u.message;
