@@ -1049,6 +1049,7 @@ app.get('/api/admin/stats', adminOnly, (_req, res) => {
             };
         }),
         recentWithdrawals: [...db.withdrawals].reverse(),
+        dbMode: sql ? 'postgres' : 'file',
         tasks: getTasks().map((t) => {
             const claimsCount = Object.keys(db.claims).filter((k) => k.endsWith(`:${t.id}`) && !k.endsWith(':start') && getTaskClaimState(k.split(':')[0], t).done).length;
             return { ...t, claimsCount };

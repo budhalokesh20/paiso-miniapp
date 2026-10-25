@@ -1,6 +1,6 @@
 import { h } from './jsx';
 
-type AdminTab = 'dashboard' | 'users' | 'withdrawal' | 'tasks' | 'transactions';
+type AdminTab = 'dashboard' | 'users' | 'withdrawal' | 'tasks' | 'transactions' | 'settings';
 
 interface CustomWithdrawMethod {
   id: string;
@@ -97,6 +97,7 @@ interface AdminStatsResponse {
   recentWithdrawals: AdminWithdrawalRow[];
   tasks: AdminTaskRow[];
   settings: AdminWithdrawSettings;
+  dbMode?: 'postgres' | 'file';
   notifications?: AdminNotificationRow[];
 }
 
@@ -114,6 +115,7 @@ let showUserEditor = false;
 let editingUserId: string | null = null;
 
 let editingTaskId: string | null = null;
+let taskCategoryFilter: 'all' | 'app_task' | 'play_game' | 'telegram_join' | 'social_visit' = 'all';
 
 let showWithdrawEditor = false;
 let editingWithdrawId: string | null = null;
@@ -499,6 +501,14 @@ function UsersTabView(props: { s: AdminStatsResponse }) {
                   <td className="py-3 px-3 text-right space-x-1.5 whitespace-nowrap">
                     <button
                       type="button"
+                      onClick={() => quickAdjustCoins(u.id, u.coins)}
+                      className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold rounded text-[11px]"
+                      title="Add or deduct coins"
+                    >
+                      +/- Coins
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => openAdminNotifModal(u.id)}
                       className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded text-[11px]"
                     >
@@ -649,12 +659,8 @@ function WithdrawalTabView(props: { s: AdminStatsResponse }) {
 
           <button
             type="button"
-            onClick={() => toggleWithdrawSettingsModal()}
-            className={`px-4 py-2 rounded-lg border text-xs font-extrabold flex items-center gap-2 transition ${
-              showWithdrawSettings
-                ? 'bg-[#16A34A] border-[#16A34A] text-white'
-                : 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-[#16A34A] hover:text-white'
-            }`}
+            onClick={() => switchAdminTab('settings')}
+            className="px-4 py-2 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-[#16A34A] text-emerald-800 hover:text-white text-xs font-extrabold flex items-center gap-2 transition shadow-xs"
           >
             <svg
               width="15"
@@ -669,271 +675,10 @@ function WithdrawalTabView(props: { s: AdminStatsResponse }) {
               <circle cx="12" cy="12" r="3" />
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
             </svg>
-            <span>{showWithdrawSettings ? 'Close Settings' : 'Withdrawal Settings'}</span>
+            <span>Withdrawal Settings</span>
           </button>
         </div>
       </div>
-
-      {/* Clean Withdrawal Settings Panel */}
-      {showWithdrawSettings ? (
-        <div className="bg-white border-2 border-[#16A34A] rounded-xl p-5 shadow-sm space-y-6">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div>
-              <h3 className="text-sm font-extrabold text-slate-900">Withdrawal Configuration</h3>
-              <p className="text-xs text-slate-500">
-                Manage custom payout methods (logo &amp; name), minimum withdrawal limit, and allowed countries. Changes save automatically.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => toggleWithdrawSettingsModal(false)}
-              className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700"
-            >
-              ✕ Done
-            </button>
-          </div>
-
-          {/* Step 1: Minimum Withdrawal & Conversion Rate */}
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-            <div className="text-xs font-extrabold uppercase text-slate-800 mb-3">
-              1. Minimum Withdrawal &amp; Conversion Rate
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end text-xs">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 mb-1">
-                  Minimum Withdraw (Coins)
-                </label>
-                <input
-                  id="setMinCoins"
-                  type="number"
-                  value={draftSettings.minWithdrawCoins}
-                  className="w-full px-3 py-2 font-extrabold bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#16A34A]"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 mb-1">
-                  Coins per NPR 1
-                </label>
-                <input
-                  id="setCoinRate"
-                  type="number"
-                  value={draftSettings.coinPerNpr}
-                  className="w-full px-3 py-2 font-extrabold bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#16A34A]"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => saveWithdrawSettings()}
-                className="px-4 py-2 bg-[#16A34A] hover:bg-[#15803D] text-white font-bold rounded-lg transition"
-              >
-                Save Limit &amp; Rate
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {/* Step 2: Custom Payout Methods (Custom Logo & Name) */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col justify-between space-y-4">
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-extrabold uppercase text-slate-800">
-                    2. Custom Payout Methods ({draftSettings.methods.length})
-                  </span>
-                  <span className="text-[11px] text-slate-500 font-semibold">Custom Logo &amp; Name</span>
-                </div>
-
-                {/* Existing Custom Methods List */}
-                <div className="space-y-2 mb-4 max-h-56 overflow-y-auto pr-1">
-                  {draftSettings.methods.length ? (
-                    draftSettings.methods.map((m) => (
-                      <div
-                        className={`flex items-center justify-between gap-3 p-2.5 rounded-xl border bg-white ${
-                          m.enabled !== false ? 'border-slate-200' : 'border-slate-200 opacity-50'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          {m.logo ? (
-                            <img
-                              src={m.logo}
-                              className="w-10 h-10 rounded-lg object-contain bg-slate-50 border border-slate-200 p-1 shrink-0"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-extrabold text-sm shrink-0">
-                              {m.name.slice(0, 1).toUpperCase()}
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <div className="text-xs font-extrabold text-slate-900 truncate">{m.name}</div>
-                            <div className="text-[11px] text-slate-500 truncate">
-                              {m.country && m.country !== 'All' ? m.country : 'All Countries'} •{' '}
-                              {m.placeholder || `Enter ${m.name} ID`}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => toggleCustomMethod(m.id)}
-                            className={`px-2.5 py-1 rounded-md text-[11px] font-bold ${
-                              m.enabled !== false
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-slate-200 text-slate-600'
-                            }`}
-                          >
-                            {m.enabled !== false ? 'Active' : 'Disabled'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => removeCustomMethod(m.id)}
-                            className="px-2.5 py-1 rounded-md bg-red-50 hover:bg-red-100 text-red-600 text-[11px] font-bold"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="py-6 text-center text-xs text-slate-400 bg-white rounded-xl border border-dashed border-slate-200">
-                      No withdrawal methods added yet. Add one below!
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Clean Add Custom Method Form */}
-              <div className="bg-white border border-slate-200 rounded-xl p-3.5 space-y-3 text-xs">
-                <div className="font-extrabold text-slate-800">Add New Payout Method</div>
-
-                <div className="flex items-center gap-3">
-                  {/* Clickable Logo Preview / Upload Box */}
-                  <label
-                    title="Click to upload logo image"
-                    className="w-14 h-14 rounded-xl border-2 border-dashed border-slate-300 hover:border-[#16A34A] bg-slate-50 flex flex-col items-center justify-center cursor-pointer shrink-0 overflow-hidden"
-                  >
-                    <img
-                      id="newMethodLogoPreview"
-                      src={uploadedMethodLogoData || ''}
-                      className={`w-full h-full object-contain p-1 ${uploadedMethodLogoData ? '' : 'hidden'}`}
-                    />
-                    <span
-                      id="newMethodLogoPlaceholder"
-                      className={`text-[10px] font-bold text-slate-400 text-center leading-tight px-1 ${
-                        uploadedMethodLogoData ? 'hidden' : ''
-                      }`}
-                    >
-                      Upload Logo
-                    </span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e: Event) => handleMethodLogoUpload(e.target as HTMLInputElement)}
-                      className="hidden"
-                    />
-                  </label>
-
-                  <div className="flex-1 space-y-2">
-                    <input
-                      id="newMethodName"
-                      type="text"
-                      placeholder="Method Name (e.g. eSewa, Khalti, UPI, PayPal)"
-                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold focus:outline-none focus:border-[#16A34A]"
-                    />
-                    <input
-                      id="newMethodLogoUrl"
-                      type="text"
-                      placeholder="Or paste Logo Image URL here..."
-                      onInput={(e: Event) => previewMethodLogoUrl((e.target as HTMLInputElement).value)}
-                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#16A34A]"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <select
-                    id="newMethodCountry"
-                    className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-semibold"
-                  >
-                    <option value="All">All Allowed Countries</option>
-                    {draftSettings.countries.map((c) => (
-                      <option value={c.name}>{c.name}</option>
-                    ))}
-                  </select>
-                  <input
-                    id="newMethodPlaceholder"
-                    type="text"
-                    placeholder="Input Hint (e.g. Enter Wallet ID)"
-                    className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg"
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => addCustomMethod()}
-                  className="w-full py-2 bg-[#16A34A] hover:bg-[#15803D] text-white font-extrabold rounded-lg transition"
-                >
-                  + Add &amp; Save Method
-                </button>
-              </div>
-            </div>
-
-            {/* Step 3: Allowed Countries (REST Countries API) */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col justify-between space-y-4">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-extrabold uppercase text-slate-800">
-                    3. Allowed Countries ({draftSettings.countries.length})
-                  </span>
-                  <span className="text-[11px] text-slate-500 font-semibold">Live Country API</span>
-                </div>
-
-                {/* Selected Countries Pills */}
-                <div className="bg-white border border-slate-200 rounded-xl p-3 mb-3 min-h-[54px] flex flex-wrap items-center gap-2">
-                  {draftSettings.countries.length ? (
-                    draftSettings.countries.map((c) => (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-[#16A34A] text-emerald-950 text-xs font-bold">
-                        {c.flag ? <img src={c.flag} className="w-4 h-3 object-cover rounded-sm" /> : null}
-                        <span>{c.name}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeAllowedCountry(c.code)}
-                          className="ml-1 text-red-500 hover:text-red-700 font-extrabold"
-                        >
-                          ✕
-                        </button>
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-xs text-slate-400">
-                      No country restriction (or select allowed countries below)
-                    </span>
-                  )}
-                </div>
-
-                {/* Search Input (Updates list in-place without losing focus) */}
-                <div className="mb-2">
-                  <input
-                    id="countrySearchInput"
-                    type="text"
-                    value={countryApiQuery}
-                    onInput={(e: Event) => filterCountryApiSearch((e.target as HTMLInputElement).value)}
-                    placeholder="Type country name to search (e.g. Nepal, India, Bangladesh, USA)..."
-                    className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg font-semibold focus:outline-none focus:border-[#16A34A]"
-                  />
-                </div>
-
-                {/* API Country Results Grid */}
-                <div
-                  id="countryApiResultsList"
-                  className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1"
-                >
-                  {renderCountryApiListNodes(countryApiQuery)}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       {/* Manual Withdrawal Editor */}
       {showWithdrawEditor ? (
@@ -1305,12 +1050,70 @@ function TasksTabView(props: { s: AdminStatsResponse }) {
 
         {/* Right: Clean Tasks List Table with Per-Task Reset */}
         <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl p-5">
-          <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+          <div className="flex flex-wrap items-center justify-between pb-3 mb-3 border-b border-slate-100 gap-2">
             <div>
               <h2 className="text-sm font-extrabold text-slate-900">Active Tasks ({s.tasks.length})</h2>
               <p className="text-[11px] text-slate-500">
                 Click "Reset" on any task to clear user completions so everyone can do it again.
               </p>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setTaskCategoryFilter('all')}
+                className={`px-2.5 py-1 rounded-md text-xs font-bold transition ${
+                  taskCategoryFilter === 'all'
+                    ? 'bg-[#16A34A] text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                All ({s.tasks.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTaskCategoryFilter('app_task')}
+                className={`px-2.5 py-1 rounded-md text-xs font-bold transition ${
+                  taskCategoryFilter === 'app_task'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                }`}
+              >
+                App Task ({appTasksCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTaskCategoryFilter('play_game')}
+                className={`px-2.5 py-1 rounded-md text-xs font-bold transition ${
+                  taskCategoryFilter === 'play_game'
+                    ? 'bg-violet-600 text-white shadow-xs'
+                    : 'bg-violet-50 text-violet-700 hover:bg-violet-100'
+                }`}
+              >
+                Play Game ({gameTasksCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTaskCategoryFilter('telegram_join')}
+                className={`px-2.5 py-1 rounded-md text-xs font-bold transition ${
+                  taskCategoryFilter === 'telegram_join'
+                    ? 'bg-sky-600 text-white shadow-xs'
+                    : 'bg-sky-50 text-sky-700 hover:bg-sky-100'
+                }`}
+              >
+                Telegram ({tgTasksCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTaskCategoryFilter('social_visit')}
+                className={`px-2.5 py-1 rounded-md text-xs font-bold transition ${
+                  taskCategoryFilter === 'social_visit'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                }`}
+              >
+                Social ({socialTasksCount})
+              </button>
             </div>
           </div>
 
@@ -1327,8 +1130,12 @@ function TasksTabView(props: { s: AdminStatsResponse }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {s.tasks.length ? (
-                  s.tasks.map((t) => {
+                {s.tasks
+                  .filter((t) => taskCategoryFilter === 'all' || t.type === taskCategoryFilter)
+                  .length ? (
+                  s.tasks
+                    .filter((t) => taskCategoryFilter === 'all' || t.type === taskCategoryFilter)
+                    .map((t) => {
                     const isTg = t.type === 'telegram_join';
                     const isApp = t.type === 'app_task';
                     const isGame = t.type === 'play_game';
@@ -1621,6 +1428,377 @@ function TransactionsTabView(props: { s: AdminStatsResponse }) {
   );
 }
 
+function SettingsTabView(props: { s: AdminStatsResponse }) {
+  const reqQual = draftSettings.requireQualification !== false;
+  const methods = draftSettings.methods || [];
+  const countries = draftSettings.countries || [];
+
+  return (
+    <div className="space-y-6 max-w-6xl mx-auto pb-12">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">System &amp; Payout Settings</h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Configure withdrawal currency rates, qualification prerequisites, custom payment gateways, and country availability.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => saveWithdrawSettings()}
+            className="px-4 py-2 bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-extrabold rounded-lg shadow-sm transition"
+          >
+            Save All Settings
+          </button>
+        </div>
+      </div>
+
+      {/* Grid: 1. Exchange Rules & Qualification */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Currency & Exchange */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
+          <div className="flex items-center gap-2">
+            <span className="w-7 h-7 rounded-lg bg-emerald-50 text-[#16A34A] flex items-center justify-center font-extrabold text-sm">
+              ₹
+            </span>
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900">Exchange &amp; Minimums</h3>
+              <p className="text-[11px] text-slate-400">Set coins required for 1 unit of fiat currency</p>
+            </div>
+          </div>
+
+          <div className="space-y-3 text-xs">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                Minimum Withdrawal (Coins)
+              </label>
+              <input
+                id="setMinCoins"
+                type="number"
+                defaultValue={String(draftSettings.minWithdrawCoins)}
+                placeholder="10000"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-900 focus:outline-none focus:border-[#16A34A]"
+              />
+              <span className="text-[10px] text-slate-400 mt-1 block">Users must reach this coin balance to request payout.</span>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                Coin Conversion Rate (Coins per 1 NPR/INR)
+              </label>
+              <input
+                id="setCoinRate"
+                type="number"
+                defaultValue={String(draftSettings.coinPerNpr)}
+                placeholder="100"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-900 focus:outline-none focus:border-[#16A34A]"
+              />
+              <span className="text-[10px] text-slate-400 mt-1 block">e.g. 100 means 10,000 Coins = 100 NPR.</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => saveWithdrawSettings()}
+              className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg transition"
+            >
+              Update Exchange Rules
+            </button>
+          </div>
+        </div>
+
+        {/* Security & Qualification Switch */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
+          <div className="flex items-center gap-2">
+            <span className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-extrabold text-sm">
+              🛡️
+            </span>
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900">Anti-Fraud &amp; Qualification</h3>
+              <p className="text-[11px] text-slate-400">Withdrawal qualification prerequisites</p>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-xs font-extrabold text-slate-900">Require 15 Ads + 1 Referral</div>
+                <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                  When enabled, users must have watched at least 15 verified ads and referred at least 1 active friend before unlocking payouts.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => toggleQualificationReq()}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  reqQual ? 'bg-[#16A34A]' : 'bg-slate-300'
+                }`}
+                title="Toggle qualification requirement"
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                    reqQual ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
+              <span className="font-semibold text-slate-500">Qualification Status:</span>
+              <span className={`font-extrabold uppercase px-2 py-0.5 rounded text-[10px] ${
+                reqQual ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+              }`}>
+                {reqQual ? 'Enforced (Active)' : 'Bypassed (Instant)'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Database & System Info */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
+          <div className="flex items-center gap-2">
+            <span className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-extrabold text-sm">
+              🗄️
+            </span>
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900">Database &amp; Engine</h3>
+              <p className="text-[11px] text-slate-400">Current storage and runtime state</p>
+            </div>
+          </div>
+
+          <div className="space-y-2.5 text-xs">
+            <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-100">
+              <span className="text-slate-600 font-semibold">Active Database:</span>
+              <span className="font-extrabold text-slate-900 flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${props.s.dbMode === 'postgres' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                {props.s.dbMode === 'postgres' ? 'Neon PostgreSQL (Cloud)' : 'Local File JSON'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-100">
+              <span className="text-slate-600 font-semibold">Registered Users:</span>
+              <span className="font-extrabold text-slate-900">{props.s.totalUsers.toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-100">
+              <span className="text-slate-600 font-semibold">Total Payouts:</span>
+              <span className="font-extrabold text-slate-900">NPR {props.s.paidNpr.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Section 2: Custom Payout Gateways & Methods */}
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-slate-100 gap-2">
+          <div>
+            <h3 className="text-sm font-extrabold text-slate-900">Custom Payout Methods</h3>
+            <p className="text-xs text-slate-500">
+              Add payment services (eSewa, Khalti, bKash, JazzCash, UPI, etc.) with custom logos and localized restrictions.
+            </p>
+          </div>
+          <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md self-start">
+            {methods.length} methods configured
+          </span>
+        </div>
+
+        {/* Add Payout Method Form */}
+        <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+          <div className="text-xs font-extrabold text-slate-800 uppercase tracking-wide">
+            Add New Payout Gateway
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 mb-1">Method Name *</label>
+              <input
+                id="newMethodName"
+                type="text"
+                placeholder="e.g. eSewa, Khalti, UPI"
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-bold focus:outline-none focus:border-[#16A34A]"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 mb-1">Country Scope</label>
+              <select
+                id="newMethodCountry"
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-bold focus:outline-none focus:border-[#16A34A]"
+              >
+                <option value="All">All Countries</option>
+                {countries.map((c) => (
+                  <option value={c.name}>{c.name} ({c.code})</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 mb-1">Input Field Placeholder</label>
+              <input
+                id="newMethodPlaceholder"
+                type="text"
+                placeholder="e.g. Enter Phone / Account ID"
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-medium focus:outline-none focus:border-[#16A34A]"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 mb-1">Logo URL or Upload</label>
+              <div className="flex gap-2 items-center">
+                <input
+                  id="newMethodLogoUrl"
+                  type="text"
+                  placeholder="https://... or upload"
+                  onInput={(e: Event) => previewMethodLogoUrl((e.target as HTMLInputElement).value)}
+                  className="flex-1 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-[#16A34A]"
+                />
+                <label className="cursor-pointer px-2.5 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold shrink-0">
+                  📁
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e: Event) => handleMethodLogoUpload(e.target as HTMLInputElement)}
+                  />
+                </label>
+                <div className="w-8 h-8 rounded-lg border border-slate-200 bg-white flex items-center justify-center shrink-0 overflow-hidden">
+                  <img id="newMethodLogoPreview" className="w-full h-full object-contain hidden" />
+                  <span id="newMethodLogoPlaceholder" className="text-[10px] text-slate-400 font-bold">Logo</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end pt-1">
+            <button
+              type="button"
+              onClick={() => addCustomMethod()}
+              className="px-4 py-2 bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-bold rounded-lg transition"
+            >
+              + Add Payout Gateway
+            </button>
+          </div>
+        </div>
+
+        {/* Existing Methods List */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {methods.length ? (
+            methods.map((m) => (
+              <div
+                className={`p-3.5 rounded-xl border transition flex items-center justify-between gap-3 ${
+                  m.enabled !== false
+                    ? 'bg-white border-slate-200 hover:border-slate-300'
+                    : 'bg-slate-50 border-slate-200 opacity-60'
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                    {m.logo ? (
+                      <img src={m.logo} alt={m.name} className="w-full h-full object-contain p-1" />
+                    ) : (
+                      <span className="text-xs font-extrabold text-slate-500">{m.name.slice(0, 2).toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-extrabold text-slate-900 truncate">{m.name}</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 shrink-0">
+                        {m.country || 'All'}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-400 truncate mt-0.5 font-mono">{m.placeholder}</div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => toggleCustomMethod(m.id)}
+                    className={`px-2 py-1 rounded text-[11px] font-bold ${
+                      m.enabled !== false
+                        ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                        : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                    }`}
+                  >
+                    {m.enabled !== false ? 'Active' : 'Disabled'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeCustomMethod(m.id)}
+                    className="p-1 rounded text-red-500 hover:bg-red-50"
+                    title="Remove method"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="col-span-full py-8 text-center text-xs text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+              No custom methods added yet. Add your first payment gateway above!
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Section 3: Allowed / Supported Countries */}
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-slate-100 gap-2">
+          <div>
+            <h3 className="text-sm font-extrabold text-slate-900">Allowed Countries Filter</h3>
+            <p className="text-xs text-slate-500">
+              Limit withdrawals to specific countries or leave empty to allow users from all countries worldwide.
+            </p>
+          </div>
+          <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md self-start">
+            {countries.length ? `${countries.length} countries whitelisted` : 'Worldwide (All Countries)'}
+          </span>
+        </div>
+
+        {/* Current Active Whitelist */}
+        <div>
+          <div className="text-xs font-bold text-slate-700 mb-2">Active Country Whitelist:</div>
+          <div className="flex flex-wrap gap-2">
+            {countries.length ? (
+              countries.map((c) => (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs font-bold text-slate-800">
+                  {c.flag ? <img src={c.flag} className="w-4 h-3 object-cover rounded-sm" /> : null}
+                  <span>{c.name}</span>
+                  <span className="text-[10px] text-slate-400 font-mono">({c.code})</span>
+                  <button
+                    type="button"
+                    onClick={() => removeAllowedCountry(c.code)}
+                    className="ml-1 text-slate-400 hover:text-red-600 font-bold"
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))
+            ) : (
+              <span className="text-xs font-semibold text-slate-400 italic">
+                No country restriction active — users from any country can withdraw.
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Add Countries via REST Countries API Search */}
+        <div className="pt-3 border-t border-slate-100 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-700">Search &amp; Add Supported Countries:</span>
+            <span className="text-[11px] text-slate-400">Live REST Countries API</span>
+          </div>
+          <input
+            type="text"
+            placeholder="Type country name or code (e.g. Nepal, India, Bangladesh, Pakistan, United States)..."
+            onInput={(e: Event) => filterCountryApiSearch((e.target as HTMLInputElement).value)}
+            className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:border-[#16A34A]"
+          />
+          <div
+            id="countryApiResultsList"
+            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-56 overflow-y-auto pr-1"
+          >
+            {renderCountryApiListNodes(countryApiQuery)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AdminApp() {
   return (
     <div className="w-screen h-screen overflow-hidden flex flex-col bg-[#F8FAFC] text-[#0F172A] font-sans">
@@ -1629,10 +1807,16 @@ function AdminApp() {
       <header className="w-full bg-white border-b border-slate-200 shrink-0 z-20">
         <div className="w-full px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[#16A34A] flex items-center justify-center text-white font-extrabold text-sm">
+            <div className="w-8 h-8 rounded-lg bg-[#16A34A] flex items-center justify-center text-white font-extrabold text-sm shadow-xs">
               P
             </div>
-            <span className="text-base font-extrabold tracking-tight text-slate-900">Paiso Admin</span>
+            <div className="flex items-center gap-2.5">
+              <span className="text-base font-extrabold tracking-tight text-slate-900">Paiso Admin</span>
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 border border-slate-200 text-slate-700">
+                <span className={`w-2 h-2 rounded-full ${data?.dbMode === 'postgres' ? 'bg-emerald-500 animate-pulse' : 'bg-emerald-500'}`} />
+                <span>{data?.dbMode === 'postgres' ? 'Neon DB' : 'DB Ready'}</span>
+              </div>
+            </div>
           </div>
 
           <div className="flex items-center gap-2.5">
@@ -1714,6 +1898,14 @@ function AdminApp() {
           >
             Transaction
           </button>
+          <button
+            type="button"
+            data-admintab="settings"
+            onClick={() => switchAdminTab('settings')}
+            className="admin-tab-btn py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap border-b-2 border-transparent text-slate-500 hover:text-slate-900"
+          >
+            Settings
+          </button>
         </div>
       </header>
 
@@ -1726,6 +1918,9 @@ function AdminApp() {
             type="password"
             defaultValue={adminKey}
             placeholder="Admin ID"
+            onKeyDown={(e: KeyboardEvent) => {
+              if (e.key === 'Enter') adminLogin();
+            }}
             className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-[#16A34A] mb-3"
           />
           <button
@@ -1857,6 +2052,7 @@ function renderActiveTab(): void {
   else if (activeTab === 'users') viewNode = <UsersTabView s={data} />;
   else if (activeTab === 'withdrawal') viewNode = <WithdrawalTabView s={data} />;
   else if (activeTab === 'tasks') viewNode = <TasksTabView s={data} />;
+  else if (activeTab === 'settings') viewNode = <SettingsTabView s={data} />;
   else viewNode = <TransactionsTabView s={data} />;
 
   container.replaceChildren(viewNode);
@@ -2037,6 +2233,35 @@ async function removeAllowedCountry(code: string): Promise<void> {
 
 async function saveWithdrawSettings(): Promise<void> {
   await persistDraftSettings('Minimum withdrawal & rate saved');
+}
+
+function setTaskCategoryFilter(cat: typeof taskCategoryFilter): void {
+  taskCategoryFilter = cat;
+  renderActiveTab();
+}
+
+function quickAdjustCoins(userId: string, currentCoins: number): void {
+  const input = prompt(
+    `Adjust coins for User #${userId} (Current: ${currentCoins.toLocaleString()} Coins):\n\nEnter amount to add (e.g. 500) or subtract (e.g. -200):`,
+    '500'
+  );
+  if (!input) return;
+  const delta = parseInt(input, 10);
+  if (isNaN(delta) || delta === 0) return;
+  adminApi(`/api/admin/user/${userId}/coins`, {
+    method: 'POST',
+    body: JSON.stringify({ delta })
+  })
+    .then(() => {
+      notify(`Updated balance for #${userId} (${delta > 0 ? '+' : ''}${delta.toLocaleString()} Coins)`);
+      refreshAdmin();
+    })
+    .catch((e) => notify(e.message, true));
+}
+
+function toggleQualificationReq(): void {
+  draftSettings.requireQualification = !draftSettings.requireQualification;
+  persistDraftSettings(`User qualification requirement ${draftSettings.requireQualification ? 'Enabled' : 'Disabled'}`);
 }
 
 function filterAdminUsers(q: string): void {
