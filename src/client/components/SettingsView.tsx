@@ -487,7 +487,7 @@ export function SettingsView() {
               </svg>
             </div>
             <h3 className="verify-done-title">Verified Profile</h3>
-            <p className="verify-done-sub">Your identity &amp; email are verified. Blue Tick is active on your profile.</p>
+            <p className="verify-done-sub">Your identity is verified. Blue Tick is active on your profile.</p>
             <div className="verify-details-list">
               <div className="uid-detail-row">
                 <span className="small">Full Name</span>
@@ -518,14 +518,14 @@ export function SettingsView() {
               </div>
               <div>
                 <div className="verify-banner-title">Get Verified Blue Tick</div>
-                <div className="verify-banner-sub">Complete your profile details &amp; confirm Email OTP</div>
+                <div className="verify-banner-sub">Complete your profile details &amp; confirm Telegram OTP</div>
               </div>
             </div>
 
             <div className="verify-field-label">Full Name</div>
             <input className="form-input" id="vFullName" type="text" placeholder="Enter your full name" />
 
-            <div className="verify-field-label">Email Address</div>
+            <div className="verify-field-label">Email Address (optional)</div>
             <input className="form-input" id="vEmail" type="email" placeholder="you@example.com" />
 
             <div className="verify-field-label">Date of Birth</div>
@@ -572,14 +572,14 @@ export function SettingsView() {
                 <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
                 <polyline points="22,6 12,13 2,6" />
               </svg>
-              <span id="sendOtpBtnText">Send OTP to Email</span>
+              <span id="sendOtpBtnText">Send OTP to Telegram</span>
             </button>
 
             {/* Step 2: OTP Confirmation Section */}
             <div className="verify-otp-box" id="verifyOtpBox" style={{ display: 'none' }}>
               <div className="verify-otp-divider" />
               <div className="verify-otp-info">
-                Enter the 6-digit verification code sent to <b id="otpTargetEmail">your email</b>
+                Enter the 6-digit verification code sent to <b id="otpTargetEmail">your Telegram chat</b>
               </div>
               <input
                 className="form-input otp-code-input"
