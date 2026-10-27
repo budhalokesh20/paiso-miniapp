@@ -26,7 +26,7 @@ const FAQ_STEPS = [
 const FAQ_LIST = [
   {
     q: 'How are coins converted to cash?',
-    a: '100 Coins = NPR 1. The default minimum withdrawal is 10,000 Coins (NPR 100).'
+    a: 'Your current conversion rate and minimum are shown on the Withdrawal screen.'
   },
   {
     q: 'Why do completed tasks disappear?',
@@ -34,7 +34,7 @@ const FAQ_LIST = [
   },
   {
     q: 'How does the referral reward work?',
-    a: 'You receive +500 Coins when your invited friend completes 3 Ads, 2 Tasks, and 2 Check-ins, plus 10% of their task earnings.'
+    a: 'You receive the referral bonus when your invited friend meets the qualification targets, plus 10% of their task earnings.'
   },
   {
     q: 'How long do withdrawals take?',
@@ -148,6 +148,7 @@ function WithdrawSection() {
       {/* 5. Submit Button */}
       <button
         type="button"
+        id="withdrawBtn"
         className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-lg transition"
         onClick={() => window.withdraw()}
       >

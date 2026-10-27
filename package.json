@@ -7,7 +7,9 @@
   "scripts": {
     "build": "node scripts/build.js",
     "dev": "npm run build && node --watch server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "build:admin": "npx tsc -p tsconfig.client.json && node scripts/build-admin.js",
+    "build:app": "npx tsc -p tsconfig.client.json && node scripts/build-app.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.1",

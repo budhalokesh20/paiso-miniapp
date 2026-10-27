@@ -64,6 +64,16 @@ interface ClientTask {
   done?: boolean;
 }
 
+interface ClientGame {
+  id: string;
+  title: string;
+  description: string;
+  priceCoins: number;
+  enabled: boolean;
+  plays: number;
+  coinsCollected: number;
+}
+
 interface ClientAdsInfo {
   blockId: string;
   reward: number;
@@ -101,7 +111,7 @@ interface ClientNotification {
   userId: string;
   title: string;
   message: string;
-  type: 'task' | 'reward' | 'withdraw' | 'referral' | 'admin' | 'system';
+  type: 'task' | 'reward' | 'withdraw' | 'referral' | 'admin' | 'system' | 'game';
   coins?: number;
   createdAt: string;
   read: boolean;
@@ -110,8 +120,10 @@ interface ClientNotification {
 interface ClientMeResponse {
   user: ClientUser;
   tasks: ClientTask[];
+  games: ClientGame[];
   coinPerNpr: number;
   minWithdrawCoins: number;
+  referralBonusCoins?: number;
   dailyBonus: number;
   ads: ClientAdsInfo;
   canDaily: boolean;
@@ -192,6 +204,7 @@ declare global {
     };
     showTab: (name: TabName, filter?: TaskFilter) => void;
     filterExplore: (query: string) => void;
+    filterTasks: (query: string) => void;
     clearSearch: () => void;
     setTaskFilter: (filter: TaskFilter) => void;
     selectMethod: (method: ClientWithdrawMethod) => void;
@@ -207,6 +220,8 @@ declare global {
     confirmVerifyOtp: () => Promise<void>;
     doTask: (id: string, url: string) => void;
     claimTask: (id: string) => Promise<void>;
+    playGame: (id: string) => Promise<void>;
+    closeGame: () => void;
     watchAd: () => Promise<void>;
     claimDaily: () => Promise<void>;
     copyRef: () => void;
@@ -302,6 +317,11 @@ tg?.expand();
 const initData: string = tg?.initData || '';
 let state: ClientMeResponse | null = null;
 let currentTaskFilter: TaskFilter = 'all';
+let taskSearchQuery = '';
+let isDailyClaiming = false;
+let isWithdrawing = false;
+let startingGameId: string | null = null;
+const claimingTaskIds = new Set<string>();
 let AdController: AdsgramController | null = null;
 let toastTimer: number | undefined;
 let dailyCountdownTimer: number | undefined;
@@ -479,7 +499,7 @@ function filterExplore(query: string): void {
   const clearBtn = $('searchClearBtn');
   if (clearBtn) clearBtn.style.display = term ? 'inline-flex' : 'none';
 
-  document.querySelectorAll<HTMLElement>('#exploreGrid .explore-card').forEach((card) => {
+  document.querySelectorAll<HTMLElement>('#exploreGrid .explore-card, #exploreGames .explore-game-card').forEach((card) => {
     const titleData = (card.dataset.title || '').toLowerCase();
     card.style.display = !term || titleData.includes(term) ? 'flex' : 'none';
   });
@@ -499,6 +519,11 @@ function setTaskFilter(filter: TaskFilter): void {
   document.querySelectorAll<HTMLButtonElement>('.filter-chip').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.filter === filter);
   });
+  renderTasks();
+}
+
+function filterTasks(query: string): void {
+  taskSearchQuery = (query || '').trim().toLowerCase();
   renderTasks();
 }
 
@@ -653,11 +678,11 @@ function renderDailyCheckin(): void {
 
   if (canDaily) {
     if (btn) {
-      btn.disabled = false;
+      btn.disabled = isDailyClaiming;
       btn.classList.remove('claimed-state');
     }
     if (btnIcon) btnIcon.innerHTML = `<svg width="16" height="16"><use href="#icon-gift"/></svg>`;
-    if (btnText) btnText.textContent = `Claim Day ${targetDay} Bonus (+${nextReward})`;
+    if (btnText) btnText.textContent = isDailyClaiming ? 'Claiming...' : `Claim Day ${targetDay} Bonus (+${nextReward})`;
     if (btnCoin) btnCoin.style.display = 'inline-block';
     if (subText) subText.textContent = `7 day streak! Keep it going!`;
   } else {
@@ -824,16 +849,28 @@ function renderTasks(): void {
     }`;
   }
 
-  // Completed tasks automatically disappear from the screen (!t.done)
-  const filtered = availableTasks.filter((t) => {
-    if (currentTaskFilter === 'telegram_join') return t.type === 'telegram_join';
-    if (currentTaskFilter === 'social_visit') return t.type === 'social_visit';
-    if (currentTaskFilter === 'app_task') return t.type === 'app_task';
-    if (currentTaskFilter === 'play_game') return t.type === 'play_game';
-    return true;
+  const sourceTasks = currentTaskFilter === 'done' ? allTasks.filter((t) => t.done) : availableTasks;
+  const filtered = sourceTasks.filter((t) => {
+    const matchesFilter = currentTaskFilter === 'all' || currentTaskFilter === 'done' || t.type === currentTaskFilter;
+    const searchable = `${t.title} ${t.description || ''} ${t.target || ''} ${t.type}`.toLowerCase();
+    return matchesFilter && (!taskSearchQuery || searchable.includes(taskSearchQuery));
   });
 
   if (!filtered.length) {
+    const emptyTitle = taskSearchQuery
+      ? 'No matching tasks'
+      : currentTaskFilter === 'done'
+      ? 'No completed tasks yet'
+      : availableTasks.length === 0
+      ? 'All tasks completed!'
+      : 'No tasks in this category';
+    const emptyMessage = taskSearchQuery
+      ? 'Try another title, category, or keyword.'
+      : currentTaskFilter === 'done'
+      ? 'Tasks you verify will appear here.'
+      : availableTasks.length === 0
+      ? 'New or repeatable tasks will appear here when ready.'
+      : 'Try another category or check back later.';
     listEl.replaceChildren(
       <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-2xs my-2">
         <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto mb-3">
@@ -841,9 +878,9 @@ function renderTasks(): void {
             <polyline points="20 6 9 17 4 12" />
           </svg>
         </div>
-        <div className="text-sm font-extrabold text-slate-900">All Tasks Completed!</div>
+        <div className="text-sm font-extrabold text-slate-900">{emptyTitle}</div>
         <div className="text-xs text-slate-500 mt-1 leading-relaxed">
-          You have completed all available tasks in this category. New or repeatable tasks will appear here when ready!
+          {emptyMessage}
         </div>
       </div>
     );
@@ -893,12 +930,17 @@ function renderTasks(): void {
             <div className="min-w-0">
               <div className="text-[13px] font-extrabold text-slate-900 truncate">{t.title}</div>
               <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200/80 text-amber-800 text-[11px] font-extrabold">
-                  <svg width="12" height="12">
-                    <use href="#icon-p-coin" />
-                  </svg>
-                  <span>+{t.reward}</span>
-                </span>
+                {t.done ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-extrabold">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m5 12 4 4L19 6" /></svg>
+                    Completed
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200/80 text-amber-800 text-[11px] font-extrabold">
+                    <svg width="12" height="12"><use href="#icon-p-coin" /></svg>
+                    <span>+{t.reward}</span>
+                  </span>
+                )}
                 <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold">
                   {categoryLabel}
                 </span>
@@ -912,7 +954,7 @@ function renderTasks(): void {
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
+          {t.done ? null : <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
               className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-extrabold transition"
@@ -923,17 +965,17 @@ function renderTasks(): void {
             <button
               type="button"
               id={`verify-${t.id}`}
-              disabled={waitRemaining > 0}
+              disabled={waitRemaining > 0 || claimingTaskIds.has(t.id)}
               onClick={() => claimTask(t.id)}
               className={`px-3.5 py-2 rounded-xl text-xs font-extrabold text-white transition ${
-                waitRemaining > 0
+                waitRemaining > 0 || claimingTaskIds.has(t.id)
                   ? 'bg-slate-400 cursor-not-allowed'
                   : 'bg-blue-600 hover:bg-blue-700 shadow-xs'
               }`}
             >
-              {waitRemaining > 0 ? `${waitRemaining}s` : 'Verify'}
+              {claimingTaskIds.has(t.id) ? 'Checking...' : waitRemaining > 0 ? `${waitRemaining}s` : 'Verify'}
             </button>
-          </div>
+          </div>}
         </div>
       );
     })
@@ -1193,6 +1235,7 @@ async function load(): Promise<void> {
   }
 
   setText('refCount', u.referrals);
+  setText('refBonusValue', `+${(state.referralBonusCoins || 500).toLocaleString()}`);
   const refInput = $<HTMLInputElement>('refLink');
   if (refInput) refInput.value = state.refLink;
   setText('minW', state.minWithdrawCoins.toLocaleString());
@@ -1200,12 +1243,13 @@ async function load(): Promise<void> {
   renderReferralsAndQualification();
   renderWithdrawMethodsAndCountries();
   renderTasks();
+  renderGames();
   renderNotifications();
 
   try {
     const hData = await api<{ withdrawals: ClientWithdrawal[] }>('/api/my-withdrawals');
     const withdrawals = hData.withdrawals || [];
-    const coinNotifs = (state.notifications || []).filter((n) => (n.coins || 0) > 0 && n.type !== 'withdraw');
+    const coinNotifs = (state.notifications || []).filter((n) => Boolean(n.coins) && n.type !== 'withdraw');
 
     const renderWithdrawNodes = () => {
       if (!withdrawals.length) {
@@ -1252,14 +1296,14 @@ async function load(): Promise<void> {
                 {new Date(n.createdAt).toLocaleDateString()} • {n.type.toUpperCase()}
               </div>
             </div>
-            <div className="text-right shrink-0">
-              <div className="text-xs font-extrabold text-emerald-600 flex items-center justify-end gap-1">
-                <span>+{(n.coins || 0).toLocaleString()}</span>
+              <div className="text-right shrink-0">
+              <div className={`text-xs font-extrabold flex items-center justify-end gap-1 ${n.coins! < 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                <span>{n.coins! < 0 ? '−' : '+'}{Math.abs(n.coins || 0).toLocaleString()}</span>
                 <svg width="13" height="13" className="inline-block">
                   <use href="#icon-p-coin" />
                 </svg>
               </div>
-              <span className="status-badge status-paid">CREDITED</span>
+              <span className={`status-badge ${n.coins! < 0 ? 'status-pending' : 'status-paid'}`}>{n.coins! < 0 ? 'SPENT' : 'CREDITED'}</span>
             </div>
           </div>
         );
@@ -1295,18 +1339,122 @@ function doTask(id: string, url: string): void {
 }
 
 async function claimTask(id: string): Promise<void> {
-  const r = await api<ClaimTaskResult>('/api/task/claim', {
-    method: 'POST',
-    body: JSON.stringify({ taskId: id })
-  });
-  if (r.ok) {
-    toast(`+${r.reward} coins credited!`, 'success');
-    await load();
-  } else if (r.started && r.waitSeconds) {
-    toast(r.error || `Wait ${r.waitSeconds}s before verifying`, 'warning');
-    startTaskCountdown(id, r.waitSeconds);
-  } else {
-    toast(r.error || 'Could not verify task', 'warning');
+  if (claimingTaskIds.has(id)) return;
+  claimingTaskIds.add(id);
+  renderTasks();
+  try {
+    const r = await api<ClaimTaskResult>('/api/task/claim', {
+      method: 'POST',
+      body: JSON.stringify({ taskId: id })
+    });
+    if (r.ok) {
+      toast(`+${r.reward} coins credited!`, 'success');
+      await load();
+    } else if (r.started && r.waitSeconds) {
+      toast(r.error || `Wait ${r.waitSeconds}s before verifying`, 'warning');
+      startTaskCountdown(id, r.waitSeconds);
+    } else {
+      toast(r.error || 'Could not verify task', 'warning');
+    }
+  } catch {
+    toast('Network error. Please try again.', 'error');
+  } finally {
+    claimingTaskIds.delete(id);
+    renderTasks();
+  }
+}
+
+function renderGames(): void {
+  const grid = $('gamesGrid');
+  if (!grid || !state) return;
+  const games = state.games || [];
+  if (!games.length) {
+    grid.replaceChildren(
+      <div className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center">
+        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50"><img src="/assets/icon-games.png" alt="" className="h-7 w-7 object-contain" /></div>
+        <div className="text-sm font-extrabold text-slate-900">No games yet</div>
+        <div className="mt-1 text-xs text-slate-500">New games will show up here when they are published.</div>
+      </div>
+    );
+    return;
+  }
+  grid.replaceChildren(
+    ...games.map((game) => (
+      <article className="explore-game-card flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" data-title={`${game.title} ${game.description || ''} game play online`}>
+        <div className="flex items-start gap-3 p-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-50"><img src="/assets/icon-games.png" alt="" className="h-6 w-6 object-contain" /></div>
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate text-sm font-extrabold text-slate-900">{game.title}</h3>
+            <p className="mt-1 line-clamp-2 min-h-8 text-xs leading-4 text-slate-500">{game.description || 'Ready to play.'}</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/70 p-3.5">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+            <svg width="15" height="15"><use href="#icon-p-coin" /></svg>
+            {game.priceCoins > 0 ? `${game.priceCoins.toLocaleString()} coins / play` : 'Free to play'}
+          </div>
+          <button
+            type="button"
+            disabled={startingGameId === game.id}
+            onClick={() => window.playGame(game.id)}
+            className="shrink-0 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-extrabold text-white transition hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-60"
+          >
+            {startingGameId === game.id ? 'Starting...' : 'Play'}
+          </button>
+        </div>
+      </article>
+    ))
+  );
+}
+
+async function playGame(id: string): Promise<void> {
+  if (startingGameId) return;
+  const game = state?.games?.find((item) => item.id === id);
+  if (!game || !state) return;
+  if (state.user.coins < game.priceCoins) {
+    toast(`You need ${game.priceCoins.toLocaleString()} coins to play this game.`, 'warning');
+    return;
+  }
+  startingGameId = id;
+  renderGames();
+  try {
+    const result = await api<{ ok: boolean; coins?: number; playUrl?: string; error?: string }>(`/api/games/${encodeURIComponent(id)}/play`, {
+      method: 'POST',
+      body: '{}'
+    });
+    if (!result.ok || !result.playUrl) {
+      toast(result.error || 'Could not start this game.', 'warning');
+      return;
+    }
+    state.user.coins = result.coins ?? state.user.coins;
+    setText('headerCoins', state.user.coins.toLocaleString());
+    setText('wCoins', state.user.coins.toLocaleString());
+    setText('npr', (state.user.coins / state.coinPerNpr).toFixed(2));
+    const gameTitle = $('activeGameTitle');
+    if (gameTitle) gameTitle.textContent = game.title;
+    const frame = $<HTMLIFrameElement>('gameFrame');
+    const modal = $('gameModal');
+    if (frame && modal) {
+      frame.src = result.playUrl;
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+    toast(game.priceCoins ? `${game.priceCoins.toLocaleString()} coins used. Have fun!` : 'Game started. Have fun!', 'success');
+  } catch {
+    toast('Network error. Your balance was not charged.', 'error');
+  } finally {
+    startingGameId = null;
+    renderGames();
+  }
+}
+
+function closeGame(): void {
+  const frame = $<HTMLIFrameElement>('gameFrame');
+  if (frame) frame.src = 'about:blank';
+  const modal = $('gameModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
   }
 }
 
@@ -1345,17 +1493,28 @@ async function watchAd(): Promise<void> {
 }
 
 async function claimDaily(): Promise<void> {
-  const r = await api<DailyClaimResult>('/api/daily', {
-    method: 'POST',
-    body: '{}'
-  });
-  if (r.ok) {
-    const claimedDay = r.dailyStreak || 1;
-    const reward = r.reward || 100;
-    triggerClaimAnimation(claimedDay, reward);
-    toast(`Day ${claimedDay} Check-in: +${reward} coins milyo!`, 'success');
-  } else {
-    toast(r.error || 'Aaja ko bonus liyi sakyo', 'warning');
+  if (isDailyClaiming || !state?.canDaily) return;
+  isDailyClaiming = true;
+  const btn = $<HTMLButtonElement>('dailyBtn');
+  if (btn) btn.disabled = true;
+  try {
+    const r = await api<DailyClaimResult>('/api/daily', {
+      method: 'POST',
+      body: '{}'
+    });
+    if (r.ok) {
+      const claimedDay = r.dailyStreak || 1;
+      const reward = r.reward || 100;
+      triggerClaimAnimation(claimedDay, reward);
+      toast(`Day ${claimedDay} Check-in: +${reward} coins milyo!`, 'success');
+    } else {
+      toast(r.error || 'Aaja ko bonus liyi sakyo', 'warning');
+    }
+  } catch {
+    toast('Network error. Please try again.', 'error');
+  } finally {
+    isDailyClaiming = false;
+    await load();
   }
   await load();
 }
@@ -1520,31 +1679,53 @@ async function confirmVerifyOtp(): Promise<void> {
 }
 
 async function withdraw(): Promise<void> {
+  if (isWithdrawing) return;
   const methodEl = $<HTMLSelectElement>('wMethod');
   const accEl = $<HTMLInputElement>('wAccount');
   const amtEl = $<HTMLInputElement>('wAmount');
   if (!methodEl || !accEl || !amtEl) return;
+  const amount = Math.floor(Number(amtEl.value));
+  if (!methodEl.value) return toast('Choose a payout method first', 'warning');
+  if (accEl.value.trim().length < 5) return toast('Enter a valid payout account or ID (at least 5 characters)', 'warning');
+  if (!Number.isFinite(amount) || amount <= 0) return toast('Enter a valid coin amount', 'warning');
+  if (amount < (state?.minWithdrawCoins || 0)) return toast(`Minimum withdrawal is ${state?.minWithdrawCoins.toLocaleString()} coins`, 'warning');
+  if (amount > (state?.user.coins || 0)) return toast('Amount is higher than your balance', 'warning');
 
-  const r = await api<{ ok: boolean; error?: string }>('/api/withdraw', {
-    method: 'POST',
-    body: JSON.stringify({
-      method: methodEl.value,
-      account: accEl.value.trim(),
-      amountCoins: amtEl.value
-    })
-  });
-  if (r.ok) {
-    toast('Withdraw request gayo! Admin le 1-2 din ma approve garcha', 'success');
-    accEl.value = '';
-    amtEl.value = '';
-  } else {
-    toast(r.error || 'Withdraw request failed', 'error');
+  isWithdrawing = true;
+  const btn = $<HTMLButtonElement>('withdrawBtn');
+  const originalText = btn?.textContent || 'Submit Withdrawal';
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Submitting...';
   }
-  await load();
+  try {
+    const r = await api<{ ok: boolean; error?: string }>('/api/withdraw', {
+      method: 'POST',
+      body: JSON.stringify({ method: methodEl.value, account: accEl.value.trim(), amountCoins: amount })
+    });
+    if (r.ok) {
+      toast('Withdraw request gayo! Admin le 1-2 din ma approve garcha', 'success');
+      accEl.value = '';
+      amtEl.value = '';
+      updateWithdrawPreview();
+    } else {
+      toast(r.error || 'Withdraw request failed', 'error');
+    }
+  } catch {
+    toast('Network error. Please try again.', 'error');
+  } finally {
+    isWithdrawing = false;
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+    await load();
+  }
 }
 
 window.showTab = showTab;
 window.filterExplore = filterExplore;
+window.filterTasks = filterTasks;
 window.clearSearch = clearSearch;
 window.setTaskFilter = setTaskFilter;
 window.selectMethod = selectMethod;
@@ -1560,6 +1741,8 @@ window.sendVerifyOtp = sendVerifyOtp;
 window.confirmVerifyOtp = confirmVerifyOtp;
 window.doTask = doTask;
 window.claimTask = claimTask;
+window.playGame = playGame;
+window.closeGame = closeGame;
 window.watchAd = watchAd;
 window.claimDaily = claimDaily;
 window.copyRef = copyRef;

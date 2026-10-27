@@ -26,6 +26,7 @@ const clientModules = [
   'dist/client/components/Icons.js',
   'dist/client/components/HomeView.js',
   'dist/client/components/TasksView.js',
+  'dist/client/components/GamesView.js',
   'dist/client/components/FriendsView.js',
   'dist/client/components/SettingsView.js',
   'dist/client/components/BottomNav.js',
@@ -44,6 +45,9 @@ fs.writeFileSync(path.join(ROOT, 'public/app.js'), appBundle);
 // 4. Bundle compiled Admin TSX module -> public/admin.js
 const adminModules = [
   'dist/client/jsx.js',
+  'dist/client/admin/AdminNavigation.js',
+  'dist/client/admin/AdminStatCard.js',
+  'dist/client/admin/AdminUserEditor.js',
   'dist/client/admin.js'
 ];
 

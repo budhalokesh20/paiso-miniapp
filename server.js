@@ -85,6 +85,8 @@ let db = {
     withdrawals: [],
     claims: {},
     tasks: [...SEED_TASKS],
+    games: [],
+    gamePlays: [],
     settings: { ...DEFAULT_SETTINGS },
     notifications: []
 };
@@ -109,6 +111,8 @@ function normalizeDB(d) {
         withdrawals: (d && d.withdrawals) || [],
         claims: (d && d.claims) || {},
         tasks: loadedTasks,
+        games: Array.isArray(d?.games) ? d.games : [],
+        gamePlays: Array.isArray(d?.gamePlays) ? d.gamePlays : [],
         settings: {
             ...DEFAULT_SETTINGS,
             ...rawSettings,
@@ -163,6 +167,61 @@ function getTasks() {
     }
     return db.tasks;
 }
+function getGames() {
+    if (!Array.isArray(db.games))
+        db.games = [];
+    return db.games;
+}
+function getGamePlays() {
+    if (!Array.isArray(db.gamePlays))
+        db.gamePlays = [];
+    return db.gamePlays;
+}
+function publicGame(game) {
+    const plays = getGamePlays().filter((p) => p.gameId === game.id);
+    return {
+        ...game,
+        plays: plays.length,
+        coinsCollected: plays.reduce((sum, p) => sum + p.coins, 0)
+    };
+}
+function validGameFields(body) {
+    if (!body || typeof body !== 'object' || Array.isArray(body))
+        return 'Invalid game details.';
+    if (body.title !== undefined && typeof body.title !== 'string')
+        return 'Game title must be text.';
+    if (body.description !== undefined && typeof body.description !== 'string')
+        return 'Description must be text.';
+    if (body.url !== undefined && typeof body.url !== 'string')
+        return 'Game URL must be text.';
+    if (body.enabled !== undefined && typeof body.enabled !== 'boolean')
+        return 'Game status must be enabled or paused.';
+    const title = String(body?.title || '').trim();
+    const description = String(body?.description || '').trim();
+    const rawUrl = String(body?.url || '').trim();
+    const priceCoins = Number(body?.priceCoins);
+    if (title.length < 2 || title.length > 60)
+        return 'Game title must be 2–60 characters.';
+    if (description.length > 240)
+        return 'Description must be 240 characters or less.';
+    if (rawUrl.length > 2000)
+        return 'Game URL is too long.';
+    let parsedUrl;
+    try {
+        parsedUrl = new URL(rawUrl);
+    }
+    catch {
+        return 'Enter a valid HTTPS game URL.';
+    }
+    if (parsedUrl.protocol !== 'https:' || !parsedUrl.hostname || parsedUrl.username || parsedUrl.password) {
+        return 'Game URL must use HTTPS and cannot include login credentials.';
+    }
+    if (!Number.isSafeInteger(priceCoins) || priceCoins < 0 || priceCoins > 100000) {
+        return 'Play price must be a whole number between 0 and 100,000 coins.';
+    }
+    return { title, description, url: parsedUrl.toString(), priceCoins, enabled: body?.enabled !== false };
+}
+const gamePlayTickets = new Map();
 function getSettings() {
     if (!db.settings) {
         db.settings = { ...DEFAULT_SETTINGS };
@@ -522,8 +581,13 @@ app.get('/api/me', auth, (req, res) => {
             const st = getTaskClaimState(user.id, t);
             return { ...t, done: st.done, nextAvailableAt: st.nextAvailableAt };
         }),
+        games: getGames().filter((g) => g.enabled).map((g) => {
+            const { url: _hiddenUrl, ...safeGame } = publicGame(g);
+            return safeGame;
+        }),
         coinPerNpr: cfg.coinPerNpr || COIN_PER_NPR,
         minWithdrawCoins: cfg.minWithdrawCoins || MIN_WITHDRAW_COINS,
+        referralBonusCoins: REFERRAL_BONUS,
         dailyBonus: DAILY_BONUS,
         ads: {
             blockId: ADSGRAM_BLOCK_ID,
@@ -541,6 +605,70 @@ app.get('/api/me', auth, (req, res) => {
         unreadCount: notifData.unreadCount,
         refLink: `https://t.me/${process.env.BOT_USERNAME || 'YourBot'}?start=ref_${user.id}`
     });
+});
+app.post('/api/games/:id/play', auth, async (req, res) => {
+    const user = req.user;
+    const game = getGames().find((g) => g.id === String(req.params.id) && g.enabled);
+    if (!game) {
+        res.status(404).json({ ok: false, error: 'Game is not available.' });
+        return;
+    }
+    if (typeof validGameFields(game) === 'string') {
+        res.status(503).json({ ok: false, error: 'Game URL is invalid. No coins were charged.' });
+        return;
+    }
+    if (user.coins < game.priceCoins) {
+        res.status(402).json({ ok: false, error: `You need ${game.priceCoins.toLocaleString()} coins to play this game.` });
+        return;
+    }
+    user.coins -= game.priceCoins;
+    const play = {
+        id: 'GP' + Date.now() + crypto_1.default.randomBytes(3).toString('hex'),
+        gameId: game.id,
+        gameTitle: game.title,
+        userId: user.id,
+        coins: game.priceCoins,
+        at: new Date().toISOString()
+    };
+    getGamePlays().push(play);
+    pushNotification({
+        userId: user.id,
+        title: `Played ${game.title}`,
+        message: game.priceCoins ? `${game.priceCoins.toLocaleString()} coins used to start the game.` : 'Game started for free.',
+        type: 'game',
+        coins: game.priceCoins ? -game.priceCoins : undefined
+    });
+    await saveDB();
+    const now = Date.now();
+    gamePlayTickets.forEach((ticket, token) => {
+        if (ticket.expiresAt <= now)
+            gamePlayTickets.delete(token);
+    });
+    const ticket = crypto_1.default.randomBytes(24).toString('hex');
+    gamePlayTickets.set(ticket, { gameId: game.id, expiresAt: now + 30 * 60 * 1000 });
+    res.json({ ok: true, coins: user.coins, playUrl: `/api/games/${encodeURIComponent(game.id)}/content?ticket=${ticket}` });
+});
+app.get('/api/games/:id/content', (req, res) => {
+    const id = String(req.params.id || '');
+    const ticket = String(req.query.ticket || '');
+    const session = gamePlayTickets.get(ticket);
+    if (!/^[a-zA-Z0-9_-]{3,80}$/.test(id) || !session || session.gameId !== id || session.expiresAt <= Date.now()) {
+        res.status(403).type('text/plain').send('Play session expired. Start the game again.');
+        return;
+    }
+    const game = getGames().find((g) => g.id === id && g.enabled);
+    if (!game) {
+        res.status(404).type('text/plain').send('Game is no longer available.');
+        return;
+    }
+    const validUrl = validGameFields(game);
+    if (typeof validUrl === 'string') {
+        res.status(410).type('text/plain').send('Game URL is invalid.');
+        return;
+    }
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('Cache-Control', 'no-store');
+    res.redirect(302, validUrl.url);
 });
 app.post('/api/notifications/read', auth, (req, res) => {
     const user = req.user;
@@ -1041,6 +1169,7 @@ app.get('/api/admin/withdrawals', adminOnly, (_req, res) => {
 });
 app.get('/api/admin/stats', adminOnly, (_req, res) => {
     const users = Object.values(db.users);
+    const gamePlays = getGamePlays();
     const pendingList = db.withdrawals.filter((w) => w.status === 'pending');
     const paidList = db.withdrawals.filter((w) => w.status === 'paid');
     const rejectedList = db.withdrawals.filter((w) => w.status === 'rejected');
@@ -1055,6 +1184,9 @@ app.get('/api/admin/stats', adminOnly, (_req, res) => {
         rejectedWithdrawals: rejectedList.length,
         pendingNpr: +pendingList.reduce((s, w) => s + w.npr, 0).toFixed(2),
         paidNpr: +paidList.reduce((s, w) => s + w.npr, 0).toFixed(2),
+        games: getGames().map(publicGame),
+        gameStarts: gamePlays.length,
+        gameCoinsCollected: gamePlays.reduce((sum, p) => sum + p.coins, 0),
         users: users
             .sort((a, b) => b.coins - a.coins)
             .map((u) => {
@@ -1086,6 +1218,52 @@ app.get('/api/admin/stats', adminOnly, (_req, res) => {
         settings: getSettings(),
         notifications: [...getNotifications()].reverse().slice(0, 50)
     });
+});
+app.post('/api/admin/games', adminOnly, async (req, res) => {
+    const fields = validGameFields(req.body);
+    if (typeof fields === 'string') {
+        res.status(400).json({ ok: false, error: fields });
+        return;
+    }
+    const game = {
+        id: `game_${Date.now()}_${crypto_1.default.randomBytes(4).toString('hex')}`,
+        ...fields,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+    };
+    getGames().push(game);
+    await saveDB();
+    res.json({ ok: true, game: publicGame(game) });
+});
+app.put('/api/admin/games/:id', adminOnly, async (req, res) => {
+    const game = getGames().find((g) => g.id === String(req.params.id));
+    if (!game) {
+        res.status(404).json({ ok: false, error: 'Game not found.' });
+        return;
+    }
+    const fields = validGameFields({ ...game, ...(req.body || {}) });
+    if (typeof fields === 'string') {
+        res.status(400).json({ ok: false, error: fields });
+        return;
+    }
+    Object.assign(game, fields, { updatedAt: new Date().toISOString() });
+    await saveDB();
+    res.json({ ok: true, game: publicGame(game) });
+});
+app.delete('/api/admin/games/:id', adminOnly, async (req, res) => {
+    const id = String(req.params.id || '');
+    const index = getGames().findIndex((g) => g.id === id);
+    if (index === -1) {
+        res.status(404).json({ ok: false, error: 'Game not found.' });
+        return;
+    }
+    getGames().splice(index, 1);
+    gamePlayTickets.forEach((ticket, token) => {
+        if (ticket.gameId === id)
+            gamePlayTickets.delete(token);
+    });
+    await saveDB();
+    res.json({ ok: true });
 });
 app.post('/api/admin/notifications', adminOnly, (req, res) => {
     const b = req.body || {};

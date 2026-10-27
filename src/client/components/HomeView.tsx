@@ -1,4 +1,5 @@
 import { h } from '../jsx';
+import { GamesView } from './GamesView';
 
 function DayCheckBox(props: { day: number }) {
   return (
@@ -97,7 +98,8 @@ export function HomeView() {
           <input
             type="text"
             id="searchInput"
-            placeholder="Search tasks, games..."
+            placeholder="Search ways to earn..."
+            aria-label="Search ways to earn"
             onInput={(e: Event) => window.filterExplore((e.target as HTMLInputElement).value)}
           />
           <button type="button" className="search-clear" id="searchClearBtn" onClick={() => window.clearSearch()}>
@@ -173,7 +175,8 @@ export function HomeView() {
         </div>
 
         <div className="explore-grid" id="exploreGrid">
-          <div
+          <button
+            type="button"
             className="explore-card card-ads"
             data-title="watch ads earn coins video"
             id="adBtn"
@@ -188,9 +191,10 @@ export function HomeView() {
                 Earn coins
               </div>
             </div>
-          </div>
+          </button>
 
-          <div
+          <button
+            type="button"
             className="explore-card card-tasks"
             data-title="complete tasks easy fast"
             onClick={() => window.showTab('tasks', 'all')}
@@ -202,22 +206,25 @@ export function HomeView() {
               <div className="explore-title">Complete Tasks</div>
               <div className="explore-sub">Easy &amp; Fast</div>
             </div>
-          </div>
+          </button>
 
-          <div
+          <button
+            type="button"
             className="explore-card card-games"
-            data-title="play and earn games more fun coins"
-            onClick={() => window.showTab('tasks', 'play_game')}
+            data-title="play games arcade html fun"
+            onClick={() => document.getElementById('exploreGames')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
           >
             <div className="explore-icon-wrap">
-              <img src="/assets/icon-games.png" alt="Play & Earn" className="explore-icon" />
+              <img src="/assets/icon-games.png" alt="Games" className="explore-icon" />
             </div>
             <div className="explore-info">
-              <div className="explore-title">Play &amp; Earn</div>
-              <div className="explore-sub">More Fun, Coins</div>
+              <div className="explore-title">Games</div>
+              <div className="explore-sub">Play instantly</div>
             </div>
-          </div>
+          </button>
         </div>
+
+        <GamesView />
 
         <div style={{ display: 'none' }}>
           <span id="adReward" />

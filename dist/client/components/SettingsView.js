@@ -24,7 +24,7 @@ const FAQ_STEPS = [
 const FAQ_LIST = [
     {
         q: 'How are coins converted to cash?',
-        a: '100 Coins = NPR 1. The default minimum withdrawal is 10,000 Coins (NPR 100).'
+        a: 'Your current conversion rate and minimum are shown on the Withdrawal screen.'
     },
     {
         q: 'Why do completed tasks disappear?',
@@ -32,7 +32,7 @@ const FAQ_LIST = [
     },
     {
         q: 'How does the referral reward work?',
-        a: 'You receive +500 Coins when your invited friend completes 3 Ads, 2 Tasks, and 2 Check-ins, plus 10% of their task earnings.'
+        a: 'You receive the referral bonus when your invited friend meets the qualification targets, plus 10% of their task earnings.'
     },
     {
         q: 'How long do withdrawals take?',
@@ -98,7 +98,7 @@ function WithdrawSection() {
             h("div", { className: "flex items-center justify-between text-xs pt-2" },
                 h("span", { className: "text-slate-400 font-medium" }, "Receive"),
                 h("b", { className: "text-slate-900 font-extrabold", id: "wReceivePreview" }, "NPR 0.00"))),
-        h("button", { type: "button", className: "w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-lg transition", onClick: () => window.withdraw() }, "Withdraw"),
+        h("button", { type: "button", id: "withdrawBtn", className: "w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-lg transition", onClick: () => window.withdraw() }, "Withdraw"),
         h("div", { className: "hidden" },
             h("span", { id: "coins" }, "0"),
             h("span", { id: "total" }, "0"),
@@ -241,7 +241,7 @@ export function SettingsView() {
                         h("svg", { width: "54", height: "54" },
                             h("use", { href: "#icon-blue-tick" }))),
                     h("h3", { className: "verify-done-title" }, "Verified Profile"),
-                    h("p", { className: "verify-done-sub" }, "Your identity & email are verified. Blue Tick is active on your profile."),
+                    h("p", { className: "verify-done-sub" }, "Your identity is verified. Blue Tick is active on your profile."),
                     h("div", { className: "verify-details-list" },
                         h("div", { className: "uid-detail-row" },
                             h("span", { className: "small" }, "Full Name"),
@@ -262,10 +262,10 @@ export function SettingsView() {
                                 h("use", { href: "#icon-blue-tick" }))),
                         h("div", null,
                             h("div", { className: "verify-banner-title" }, "Get Verified Blue Tick"),
-                            h("div", { className: "verify-banner-sub" }, "Complete your profile details & confirm Email OTP"))),
+                            h("div", { className: "verify-banner-sub" }, "Complete your profile details & confirm Telegram OTP"))),
                     h("div", { className: "verify-field-label" }, "Full Name"),
                     h("input", { className: "form-input", id: "vFullName", type: "text", placeholder: "Enter your full name" }),
-                    h("div", { className: "verify-field-label" }, "Email Address"),
+                    h("div", { className: "verify-field-label" }, "Email Address (optional)"),
                     h("input", { className: "form-input", id: "vEmail", type: "email", placeholder: "you@example.com" }),
                     h("div", { className: "verify-field-label" }, "Date of Birth"),
                     h("input", { className: "form-input", id: "vDob", type: "date" }),
@@ -288,12 +288,12 @@ export function SettingsView() {
                         h("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2", "stroke-linecap": "round", "stroke-linejoin": "round" },
                             h("path", { d: "M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" }),
                             h("polyline", { points: "22,6 12,13 2,6" })),
-                        h("span", { id: "sendOtpBtnText" }, "Send OTP to Email")),
+                        h("span", { id: "sendOtpBtnText" }, "Send OTP to Telegram")),
                     h("div", { className: "verify-otp-box", id: "verifyOtpBox", style: { display: 'none' } },
                         h("div", { className: "verify-otp-divider" }),
                         h("div", { className: "verify-otp-info" },
                             "Enter the 6-digit verification code sent to ",
-                            h("b", { id: "otpTargetEmail" }, "your email")),
+                            h("b", { id: "otpTargetEmail" }, "your Telegram chat")),
                         h("input", { className: "form-input otp-code-input", id: "vOtpInput", type: "text", maxLength: 6, placeholder: "Enter 6-digit OTP" }),
                         h("button", { type: "button", className: "primary-btn btn-with-icon verify-confirm-btn", id: "confirmOtpBtn", onClick: () => window.confirmVerifyOtp() },
                             h("svg", { width: "17", height: "17" },

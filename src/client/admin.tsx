@@ -1,6 +1,8 @@
 import { h } from './jsx';
-
-type AdminTab = 'dashboard' | 'users' | 'withdrawal' | 'tasks' | 'transactions' | 'settings';
+import { AdminNavigation } from './admin/AdminNavigation';
+import { AdminStatCard } from './admin/AdminStatCard';
+import { AdminUserEditor } from './admin/AdminUserEditor';
+import type { AdminTab } from './admin/AdminNavigation';
 
 interface CustomWithdrawMethod {
   id: string;
@@ -62,6 +64,19 @@ interface AdminTaskRow {
   claimsCount?: number;
 }
 
+interface AdminGameRow {
+  id: string;
+  title: string;
+  description: string;
+  url: string;
+  priceCoins: number;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  plays: number;
+  coinsCollected: number;
+}
+
 interface AdminWithdrawSettings {
   methods: CustomWithdrawMethod[];
   allowedMethods: string[];
@@ -77,7 +92,7 @@ interface AdminNotificationRow {
   userId: string;
   title: string;
   message: string;
-  type: 'task' | 'reward' | 'withdraw' | 'referral' | 'admin' | 'system';
+  type: 'task' | 'reward' | 'withdraw' | 'referral' | 'admin' | 'system' | 'game';
   coins?: number;
   createdAt: string;
 }
@@ -96,12 +111,17 @@ interface AdminStatsResponse {
   users: AdminUserRow[];
   recentWithdrawals: AdminWithdrawalRow[];
   tasks: AdminTaskRow[];
+  games: AdminGameRow[];
+  gameStarts: number;
+  gameCoinsCollected: number;
   settings: AdminWithdrawSettings;
   dbMode?: 'postgres' | 'file';
   notifications?: AdminNotificationRow[];
 }
 
-let adminKey = sessionStorage.getItem('paiso_admin_key') || '8990374489';
+let adminKey = sessionStorage.getItem('paiso_admin_key') || '';
+let isRefreshing = false;
+let isSavingUser = false;
 let activeTab: AdminTab = 'dashboard';
 let data: AdminStatsResponse | null = null;
 let apiCountries: AllowedCountryItem[] = [];
@@ -115,6 +135,7 @@ let showUserEditor = false;
 let editingUserId: string | null = null;
 
 let editingTaskId: string | null = null;
+let editingGameId: string | null = null;
 let taskCategoryFilter: 'all' | 'app_task' | 'play_game' | 'telegram_join' | 'social_visit' = 'all';
 
 let showWithdrawEditor = false;
@@ -153,12 +174,11 @@ async function adminApi<T = any>(path: string, opts: RequestInit = {}): Promise<
       ...((opts.headers as Record<string, string>) || {})
     }
   });
-  if (r.status === 403) {
-    throw new Error('Invalid Admin Key');
-  }
-  return r.json() as Promise<T>;
+  const body = await r.json().catch(() => ({}));
+  if (r.status === 403) throw new Error('Invalid admin ID');
+  if (!r.ok) throw new Error(body?.error || body?.message || 'Request failed (' + r.status + ')');
+  return body as T;
 }
-
 async function loadCountriesFromApi(): Promise<void> {
   try {
     const r = await fetch('/api/countries');
@@ -177,35 +197,17 @@ function DashboardTabView(props: { s: AdminStatsResponse }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <div className="text-[11px] font-bold text-slate-400 uppercase">Total Users</div>
-          <div className="text-2xl font-extrabold text-slate-900 mt-1">{s.totalUsers}</div>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <div className="text-[11px] font-bold text-slate-400 uppercase">Verified Users</div>
-          <div className="text-2xl font-extrabold text-sky-600 mt-1">{s.verifiedUsers}</div>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <div className="text-[11px] font-bold text-slate-400 uppercase">Pending Withdraw</div>
-          <div className="text-2xl font-extrabold text-amber-600 mt-1">{s.pendingWithdrawals}</div>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <div className="text-[11px] font-bold text-slate-400 uppercase">Pending NPR</div>
-          <div className="text-2xl font-extrabold text-slate-900 mt-1">Rs {s.pendingNpr}</div>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <div className="text-[11px] font-bold text-slate-400 uppercase">Total Paid</div>
-          <div className="text-2xl font-extrabold text-[#16A34A] mt-1">Rs {s.paidNpr}</div>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <div className="text-[11px] font-bold text-slate-400 uppercase">Active Tasks</div>
-          <div className="text-2xl font-extrabold text-slate-900 mt-1">{s.tasks.length}</div>
-        </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-7">
+        <AdminStatCard label="Total users" value={s.totalUsers.toLocaleString()} detail="Registered members" />
+        <AdminStatCard label="Verified" value={s.verifiedUsers.toLocaleString()} detail="Verified members" tone="blue" />
+        <AdminStatCard label="Pending payouts" value={s.pendingWithdrawals.toLocaleString()} detail="Needs review" tone="amber" />
+        <AdminStatCard label="Pending value" value={'Rs ' + s.pendingNpr.toLocaleString()} detail="Awaiting approval" tone="amber" />
+        <AdminStatCard label="Paid out" value={'Rs ' + s.paidNpr.toLocaleString()} detail="Completed payouts" tone="green" />
+        <AdminStatCard label="Active tasks" value={s.tasks.length.toLocaleString()} detail="Available in app" />
+        <AdminStatCard label="Game coins" value={(s.gameCoinsCollected || 0).toLocaleString()} detail={`${(s.gameStarts || 0).toLocaleString()} starts`} tone="green" />
       </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-extrabold text-slate-900">Pending Withdrawals</h3>
             <button
@@ -244,18 +246,15 @@ function DashboardTabView(props: { s: AdminStatsResponse }) {
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-extrabold text-slate-900">Withdrawal Configuration</h3>
             <button
               type="button"
-              onClick={() => {
-                switchAdminTab('withdrawal');
-                toggleWithdrawSettingsModal(true);
-              }}
+              onClick={() => switchAdminTab('settings')}
               className="text-xs font-bold text-[#16A34A] hover:underline"
             >
-              Configure
+              Settings
             </button>
           </div>
           <div className="space-y-2.5 text-xs">
@@ -316,8 +315,10 @@ function UsersTabView(props: { s: AdminStatsResponse }) {
   );
   const editUser = editingUserId ? s.users.find((u) => u.id === editingUserId) : null;
 
+  if (showUserEditor) return <AdminUserEditor user={editUser || null} saving={isSavingUser} onBack={closeUserForm} onSave={saveUserCrud} />;
+
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-5">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h2 className="text-base font-extrabold text-slate-900">User Management ({filtered.length})</h2>
         <div className="flex items-center gap-2.5">
@@ -325,7 +326,7 @@ function UsersTabView(props: { s: AdminStatsResponse }) {
             type="text"
             value={userSearchQuery}
             onInput={(e: Event) => filterAdminUsers((e.target as HTMLInputElement).value)}
-            placeholder="Search user, ID, email..."
+            placeholder="Search name, username, ID or email..."
             className="w-60 px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#16A34A]"
           />
           <button
@@ -338,114 +339,8 @@ function UsersTabView(props: { s: AdminStatsResponse }) {
         </div>
       </div>
 
-      {showUserEditor ? (
-        <div className="mb-5 p-4 bg-slate-50 border border-slate-200 rounded-xl">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xs font-extrabold uppercase text-slate-700">
-              {editUser ? `Edit User #${editUser.id}` : 'Create New User'}
-            </h3>
-            <button
-              type="button"
-              onClick={() => closeUserForm()}
-              className="text-xs font-bold text-slate-400 hover:text-slate-700"
-            >
-              ✕ Close
-            </button>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 text-xs">
-            <div>
-              <label className="block text-[11px] text-slate-500 font-semibold mb-1">User ID</label>
-              <input
-                id="crudUserId"
-                type="text"
-                value={editUser ? editUser.id : ''}
-                disabled={Boolean(editUser)}
-                placeholder="e.g. 9812345"
-                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] text-slate-500 font-semibold mb-1">Full Name</label>
-              <input
-                id="crudUserName"
-                type="text"
-                value={editUser ? editUser.name : ''}
-                placeholder="Full Name"
-                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] text-slate-500 font-semibold mb-1">Username</label>
-              <input
-                id="crudUserHandle"
-                type="text"
-                value={editUser ? editUser.username : ''}
-                placeholder="username"
-                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] text-slate-500 font-semibold mb-1">Coins Balance</label>
-              <input
-                id="crudUserCoins"
-                type="number"
-                value={editUser ? editUser.coins : 0}
-                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg font-bold"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] text-slate-500 font-semibold mb-1">Email</label>
-              <input
-                id="crudUserEmail"
-                type="email"
-                value={editUser ? editUser.email : ''}
-                placeholder="user@mail.com"
-                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] text-slate-500 font-semibold mb-1">Ads / Check-ins</label>
-              <div className="grid grid-cols-2 gap-1.5">
-                <input
-                  id="crudUserAds"
-                  type="number"
-                  value={editUser ? editUser.adsDone : 0}
-                  title="Ads Done"
-                  className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg"
-                />
-                <input
-                  id="crudUserDaily"
-                  type="number"
-                  value={editUser ? editUser.dailyDone : 0}
-                  title="Daily Check-ins"
-                  className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg"
-                />
-              </div>
-            </div>
-            <div className="flex flex-col justify-end">
-              <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 mb-2 cursor-pointer">
-                <input
-                  id="crudUserVerified"
-                  type="checkbox"
-                  checked={Boolean(editUser?.verified)}
-                  className="rounded"
-                />
-                <span>Blue Tick Verified</span>
-              </label>
-              <button
-                type="button"
-                onClick={() => saveUserCrud()}
-                className="w-full py-1.5 bg-[#16A34A] hover:bg-[#15803D] text-white font-bold rounded-lg"
-              >
-                {editUser ? 'Update User' : 'Create User'}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse text-xs">
+        <table className="w-full min-w-[760px] border-collapse text-left text-xs">
           <thead>
             <tr className="border-b border-slate-200 text-slate-400 uppercase font-bold text-[11px]">
               <th className="py-2.5 px-3">User</th>
@@ -453,7 +348,7 @@ function UsersTabView(props: { s: AdminStatsResponse }) {
               <th className="py-2.5 px-3">Qualification</th>
               <th className="py-2.5 px-3">Coins</th>
               <th className="py-2.5 px-3">Referrals</th>
-              <th className="py-2.5 px-3 text-right">CRUD Actions</th>
+              <th className="py-2.5 px-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -590,103 +485,22 @@ function WithdrawalTabView(props: { s: AdminStatsResponse }) {
 
   return (
     <div className="space-y-4">
-      {/* Top Summary Bar */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-6">
-          <div>
-            <div className="text-[11px] font-bold uppercase text-slate-400">Active Methods ({activeMethods.length})</div>
-            <div className="flex flex-wrap items-center gap-1.5 mt-1">
-              {activeMethods.length ? (
-                activeMethods.map((m) => (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 text-xs font-bold">
-                    {m.logo ? (
-                      <img src={m.logo} className="w-4 h-4 rounded object-contain bg-white" />
-                    ) : (
-                      <span className="w-4 h-4 rounded bg-slate-300 text-[10px] flex items-center justify-center font-extrabold">
-                        {m.name.slice(0, 1).toUpperCase()}
-                      </span>
-                    )}
-                    <span>{m.name}</span>
-                  </span>
-                ))
-              ) : (
-                <span className="text-xs font-bold text-amber-600">No methods added</span>
-              )}
-            </div>
-          </div>
-
-          <div className="h-8 w-px bg-slate-200 hidden sm:block" />
-
-          <div>
-            <div className="text-[11px] font-bold uppercase text-slate-400">Minimum Payout</div>
-            <div className="text-sm font-extrabold text-slate-900 mt-0.5">
-              {s.settings.minWithdrawCoins.toLocaleString()} Coins{' '}
-              <span className="text-xs font-semibold text-slate-500">
-                (NPR {(s.settings.minWithdrawCoins / (s.settings.coinPerNpr || 100)).toFixed(0)})
-              </span>
-            </div>
-          </div>
-
-          <div className="h-8 w-px bg-slate-200 hidden sm:block" />
-
-          <div>
-            <div className="text-[11px] font-bold uppercase text-slate-400">
-              Allowed Countries ({activeCountries.length})
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5 mt-1">
-              {activeCountries.length ? (
-                activeCountries.map((c) => (
-                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold">
-                    {c.flag ? <img src={c.flag} className="w-4 h-3 object-cover rounded-sm" /> : null}
-                    <span>{c.name}</span>
-                  </span>
-                ))
-              ) : (
-                <span className="text-xs font-bold text-slate-400">All Countries</span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => openWithdrawForm()}
-            className="px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition"
-          >
-            + Manual Withdrawal
-          </button>
-
-          <button
-            type="button"
-            onClick={() => switchAdminTab('settings')}
-            className="px-4 py-2 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-[#16A34A] text-emerald-800 hover:text-white text-xs font-extrabold flex items-center gap-2 transition shadow-xs"
-          >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-            <span>Withdrawal Settings</span>
-          </button>
-        </div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <AdminStatCard label="Pending requests" value={s.pendingWithdrawals.toLocaleString()} detail="Waiting for review" tone="amber" />
+        <AdminStatCard label="Pending value" value={'Rs ' + s.pendingNpr.toLocaleString()} detail="Ready to process" tone="amber" />
+        <AdminStatCard label="Paid requests" value={s.paidWithdrawals.toLocaleString()} detail="Completed payouts" tone="green" />
+        <AdminStatCard label="Total paid" value={'Rs ' + s.paidNpr.toLocaleString()} detail="Successfully sent" tone="green" />
       </div>
 
-      {/* Manual Withdrawal Editor */}
+      <div>
+        <h2 className="text-lg font-extrabold tracking-tight text-slate-950">Payout requests</h2>
+        <p className="mt-1 text-sm text-slate-500">Review and process pending requests.</p>
+      </div>
+      {/* Edit payout details */}
       {showWithdrawEditor ? (
         <div className="p-4 bg-white border border-slate-200 rounded-xl">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xs font-extrabold uppercase text-slate-700">
-              {editW ? `Edit Withdrawal ${editW.id}` : 'Create Manual Withdrawal'}
-            </h3>
+            <h3 className="text-sm font-bold text-slate-900">Edit payout</h3>
             <button
               type="button"
               onClick={() => closeWithdrawForm()}
@@ -702,7 +516,7 @@ function WithdrawalTabView(props: { s: AdminStatsResponse }) {
                 id="crudWUserId"
                 type="text"
                 value={editW ? editW.userId : ''}
-                disabled={Boolean(editW)}
+                disabled
                 placeholder="User ID"
                 className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg"
               />
@@ -766,12 +580,12 @@ function WithdrawalTabView(props: { s: AdminStatsResponse }) {
       ) : null}
 
       {/* Pending Withdrawals Table */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <h2 className="text-base font-extrabold text-slate-900 mb-3">
           Pending Withdrawal Requests ({pending.length})
         </h2>
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
+          <table className="w-full min-w-[760px] border-collapse text-left text-xs">
             <thead>
               <tr className="border-b border-slate-200 text-slate-400 uppercase font-bold text-[11px]">
                 <th className="py-2.5 px-3">ID</th>
@@ -859,86 +673,24 @@ function TasksTabView(props: { s: AdminStatsResponse }) {
 
   return (
     <div className="space-y-4">
-      {/* Top Task Summary & Global Reset Bar */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-6">
-          <div>
-            <div className="text-[11px] font-bold uppercase text-slate-400">Total Tasks</div>
-            <div className="text-base font-extrabold text-slate-900 mt-0.5">{s.tasks.length} Tasks</div>
-          </div>
-
-          <div className="h-8 w-px bg-slate-200 hidden sm:block" />
-
-          <div>
-            <div className="text-[11px] font-bold uppercase text-slate-400">Categories</div>
-            <div className="flex flex-wrap items-center gap-1.5 mt-1 text-xs font-bold">
-              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">
-                App Task: {appTasksCount}
-              </span>
-              <span className="px-2 py-0.5 rounded-md bg-violet-50 text-violet-700 border border-violet-200">
-                Play Game: {gameTasksCount}
-              </span>
-              <span className="px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200">
-                Telegram: {tgTasksCount}
-              </span>
-              <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
-                Social/Web: {socialTasksCount}
-              </span>
-            </div>
-          </div>
-
-          <div className="h-8 w-px bg-slate-200 hidden sm:block" />
-
-          <div>
-            <div className="text-[11px] font-bold uppercase text-slate-400">Auto-Resetting</div>
-            <div className="text-sm font-extrabold text-emerald-700 mt-0.5">
-              {repeatableCount} Repeatable
-            </div>
-          </div>
-
-          <div className="h-8 w-px bg-slate-200 hidden sm:block" />
-
-          <div>
-            <div className="text-[11px] font-bold uppercase text-slate-400">Active Completions</div>
-            <div className="text-sm font-extrabold text-slate-900 mt-0.5">{totalActiveClaims} Claims</div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => resetAllTasksClaims()}
-            className="px-3.5 py-2 rounded-lg bg-amber-50 hover:bg-amber-500 text-amber-800 hover:text-white border border-amber-300 text-xs font-extrabold flex items-center gap-1.5 transition"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.3"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <polyline points="23 4 23 10 17 10" />
-              <polyline points="1 20 1 14 7 14" />
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-            </svg>
-            <span>Reset All Tasks Claims</span>
-          </button>
-        </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <AdminStatCard label="Tasks" value={s.tasks.length.toLocaleString()} detail="Published" />
+        <AdminStatCard label="Repeatable" value={repeatableCount.toLocaleString()} detail="Scheduled reset" tone="blue" />
+        <AdminStatCard label="Completions" value={totalActiveClaims.toLocaleString()} detail="Current total" tone="green" />
       </div>
-
+      <div className="flex justify-end">
+        <button type="button" onClick={() => resetAllTasksClaims()} className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-bold text-amber-800 transition hover:bg-amber-100">Reset all completions</button>
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Left: Create / Edit Task Card */}
-        <div className="bg-white border border-slate-200 rounded-xl p-5 h-fit">
+        <div className="h-fit rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
             <div>
               <h2 className="text-sm font-extrabold text-slate-900">
-                {editTask ? `Edit Task` : 'Create New Task'}
+                {editTask ? `Edit Task` : 'New task'}
               </h2>
               <p className="text-[11px] text-slate-500">
-                {editTask ? `Editing ID: ${editTask.id}` : 'Add a one-time or repeatable task'}
+                {editTask ? `Editing ID: ${editTask.id}` : 'Create task'}
               </p>
             </div>
             <button
@@ -952,7 +704,7 @@ function TasksTabView(props: { s: AdminStatsResponse }) {
 
           <div className="space-y-3.5 text-xs">
             <div>
-              <label className="block text-[11px] text-slate-600 font-bold mb-1">Task Title</label>
+              <label className="block text-[11px] text-slate-600 font-bold mb-1">Title</label>
               <input
                 id="newTaskTitle"
                 type="text"
@@ -964,7 +716,7 @@ function TasksTabView(props: { s: AdminStatsResponse }) {
 
             <div className="grid grid-cols-2 gap-2.5">
               <div>
-                <label className="block text-[11px] text-slate-600 font-bold mb-1">Task Type</label>
+                <label className="block text-[11px] text-slate-600 font-bold mb-1">Type</label>
                 <select
                   id="newTaskType"
                   value={editTask?.type || 'app_task'}
@@ -978,7 +730,7 @@ function TasksTabView(props: { s: AdminStatsResponse }) {
               </div>
 
               <div>
-                <label className="block text-[11px] text-slate-600 font-bold mb-1">Reset Frequency</label>
+                <label className="block text-[11px] text-slate-600 font-bold mb-1">Reset</label>
                 <select
                   id="newTaskResetHours"
                   value={String(editTask?.resetHours || 0)}
@@ -995,7 +747,7 @@ function TasksTabView(props: { s: AdminStatsResponse }) {
 
             <div className="grid grid-cols-2 gap-2.5">
               <div>
-                <label className="block text-[11px] text-slate-600 font-bold mb-1">Reward (Coins)</label>
+                <label className="block text-[11px] text-slate-600 font-bold mb-1">Reward</label>
                 <input
                   id="newTaskReward"
                   type="number"
@@ -1004,7 +756,7 @@ function TasksTabView(props: { s: AdminStatsResponse }) {
                 />
               </div>
               <div>
-                <label className="block text-[11px] text-slate-600 font-bold mb-1">Verify Timer (Sec)</label>
+                <label className="block text-[11px] text-slate-600 font-bold mb-1">Wait (sec)</label>
                 <input
                   id="newTaskWait"
                   type="number"
@@ -1015,7 +767,7 @@ function TasksTabView(props: { s: AdminStatsResponse }) {
             </div>
 
             <div>
-              <label className="block text-[11px] text-slate-600 font-bold mb-1">Task Destination URL</label>
+              <label className="block text-[11px] text-slate-600 font-bold mb-1">Destination URL</label>
               <input
                 id="newTaskUrl"
                 type="text"
@@ -1027,7 +779,7 @@ function TasksTabView(props: { s: AdminStatsResponse }) {
 
             <div>
               <label className="block text-[11px] text-slate-600 font-bold mb-1">
-                Telegram @Channel (For Telegram Join)
+                Telegram target
               </label>
               <input
                 id="newTaskTarget"
@@ -1041,23 +793,20 @@ function TasksTabView(props: { s: AdminStatsResponse }) {
             <button
               type="button"
               onClick={() => saveTaskCrud()}
-              className="w-full bg-[#16A34A] hover:bg-[#15803D] text-white font-extrabold py-2.5 rounded-lg transition"
+              className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-800"
             >
-              {editTask ? 'Save Task Changes' : '+ Create Task'}
+              {editTask ? 'Save changes' : '+ Create Task'}
             </button>
           </div>
         </div>
 
         {/* Right: Clean Tasks List Table with Per-Task Reset */}
-        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl p-5">
+        <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <div className="flex flex-wrap items-center justify-between pb-3 mb-3 border-b border-slate-100 gap-2">
             <div>
-              <h2 className="text-sm font-extrabold text-slate-900">Active Tasks ({s.tasks.length})</h2>
-              <p className="text-[11px] text-slate-500">
-                Click "Reset" on any task to clear user completions so everyone can do it again.
-              </p>
+              <h2 className="text-sm font-extrabold text-slate-900">Tasks ({s.tasks.length})</h2>
             </div>
-            
+
             <div className="flex flex-wrap items-center gap-1.5">
               <button
                 type="button"
@@ -1079,7 +828,7 @@ function TasksTabView(props: { s: AdminStatsResponse }) {
                     : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
                 }`}
               >
-                App Task ({appTasksCount})
+                App ({appTasksCount})
               </button>
               <button
                 type="button"
@@ -1090,7 +839,7 @@ function TasksTabView(props: { s: AdminStatsResponse }) {
                     : 'bg-violet-50 text-violet-700 hover:bg-violet-100'
                 }`}
               >
-                Play Game ({gameTasksCount})
+                Games ({gameTasksCount})
               </button>
               <button
                 type="button"
@@ -1118,7 +867,7 @@ function TasksTabView(props: { s: AdminStatsResponse }) {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full min-w-[760px] border-collapse text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-200 text-slate-400 uppercase font-bold text-[11px]">
                   <th className="py-2.5 px-3">Task Details</th>
@@ -1232,202 +981,160 @@ function TasksTabView(props: { s: AdminStatsResponse }) {
   );
 }
 
+function GamesTabView(props: { s: AdminStatsResponse }) {
+  const games = props.s.games || [];
+  const editGame = editingGameId ? games.find((game) => game.id === editingGameId) : null;
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <AdminStatCard label="Published games" value={games.filter((g) => g.enabled).length.toLocaleString()} detail={`${games.length} total`} />
+        <AdminStatCard label="Game starts" value={(props.s.gameStarts || 0).toLocaleString()} detail="Paid and free starts" tone="blue" />
+        <AdminStatCard label="Coins collected" value={(props.s.gameCoinsCollected || 0).toLocaleString()} detail="Spent to start games" tone="green" />
+      </div>
+
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(300px,380px)_1fr]">
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div><h2 className="text-sm font-extrabold text-slate-900">{editGame ? 'Edit game' : 'Add a game'}</h2><p className="mt-1 text-xs text-slate-500">Add a secure iframe game URL.</p></div>
+            {editGame ? <button type="button" onClick={() => clearGameForm()} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-bold text-slate-600">Cancel</button> : null}
+          </div>
+          <div className="space-y-3.5">
+            <label className="block text-xs font-bold text-slate-700">Game title
+              <input id="gameTitle" maxLength={60} value={editGame?.title || ''} placeholder="e.g. Gem Runner" className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-medium outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
+            </label>
+            <label className="block text-xs font-bold text-slate-700">Short description <span className="font-medium text-slate-400">(optional)</span>
+              <textarea id="gameDescription" maxLength={240} rows={3} value={editGame?.description || ''} placeholder="Tell players what to expect" className="mt-1.5 w-full resize-y rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-medium outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
+            </label>
+            <label className="block text-xs font-bold text-slate-700">Coins per start
+              <input id="gamePrice" type="number" min="0" max="100000" step="1" value={editGame ? editGame.priceCoins : 10} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-medium outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
+              <span className="mt-1 block text-[11px] font-medium text-slate-400">Set 0 for a free game. Coins are charged on each start.</span>
+            </label>
+            <label className="block text-xs font-bold text-slate-700">Game iframe URL
+              <input id="gameUrl" type="url" value={editGame?.url || ''} maxLength={2000} placeholder="https://games.example.com/embed/..." className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-medium outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
+              <span className="mt-1 block text-[11px] font-medium text-slate-400">Use an HTTPS embed URL. Paste the iframe source URL, not HTML code.</span>
+            </label>
+            <div className="rounded-xl bg-amber-50 px-3 py-2.5 text-[11px] leading-4 text-amber-800">Game providers must allow iframe embedding. The game opens in a sandboxed player.</div>
+            <button type="button" onClick={() => saveGameCrud()} className="w-full rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-extrabold text-white transition hover:bg-emerald-800">{editGame ? 'Save game' : 'Publish game'}</button>
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <div className="flex items-end justify-between gap-3"><div><h2 className="text-sm font-extrabold text-slate-900">Game library</h2><p className="mt-1 text-xs text-slate-500">Iframe games and coin usage.</p></div><span className="text-xs font-bold text-slate-500">{games.length} games</span></div>
+          {games.length ? games.map((game) => (
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50"><img src="/assets/icon-games.png" alt="" className="h-6 w-6 object-contain" /></div>
+                  <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="truncate text-sm font-extrabold text-slate-900">{game.title}</h3><span className={'rounded-full px-2 py-0.5 text-[10px] font-bold '+(game.enabled?'bg-emerald-50 text-emerald-700':'bg-slate-100 text-slate-500')}>{game.enabled?'Live':'Paused'}</span></div><p className="mt-1 line-clamp-2 text-xs text-slate-500">{game.description || 'No description'}</p><div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-semibold text-slate-600"><span>{game.priceCoins ? `${game.priceCoins.toLocaleString()} coins / start` : 'Free'}</span><span>{game.plays.toLocaleString()} plays</span><span>{game.coinsCollected.toLocaleString()} coins collected</span></div></div>
+                </div>
+                <div className="flex shrink-0 flex-wrap gap-1.5">
+                  <button type="button" onClick={() => editGameForm(game.id)} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-slate-50">Edit</button>
+                  <button type="button" onClick={() => setGameEnabled(game.id, !game.enabled)} className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] font-bold text-amber-800 hover:bg-amber-100">{game.enabled?'Pause':'Publish'}</button>
+                  <button type="button" onClick={() => deleteGame(game.id, game.title)} className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-bold text-rose-700 hover:bg-rose-100">Delete</button>
+                </div>
+              </div>
+            </article>
+          )) : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center"><div className="text-sm font-bold text-slate-800">No games published</div><p className="mt-1 text-xs text-slate-500">Add an iframe game URL to make it available in Explore.</p></div>}
+        </section>
+      </div>
+    </div>
+  );
+}
+
 function TransactionsTabView(props: { s: AdminStatsResponse }) {
   const { s } = props;
   const q = txSearchQuery.trim().toLowerCase();
   const list = s.recentWithdrawals.filter((w) => {
     if (txStatusFilter !== 'all' && w.status !== txStatusFilter) return false;
     if (!q) return true;
-    return (
-      w.id.toLowerCase().includes(q) ||
+    return w.id.toLowerCase().includes(q) ||
       (w.username || '').toLowerCase().includes(q) ||
       w.userId.toLowerCase().includes(q) ||
       w.account.toLowerCase().includes(q) ||
-      w.method.toLowerCase().includes(q)
-    );
+      w.method.toLowerCase().includes(q);
   });
-
   const editW = editingWithdrawId ? s.recentWithdrawals.find((w) => w.id === editingWithdrawId) : null;
-  const methodOptions = draftSettings.methods.length
-    ? draftSettings.methods.map((m) => m.name)
-    : ['Custom'];
+  const methodOptions = draftSettings.methods.length ? draftSettings.methods.map((m) => m.name) : ['Custom'];
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h2 className="text-base font-extrabold text-slate-900">Transactions ({list.length})</h2>
-        <div className="flex flex-wrap items-center gap-2">
-          {(['all', 'pending', 'paid', 'rejected'] as const).map((st) => (
-            <button
-              type="button"
-              onClick={() => setTxFilter(st)}
-              className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase ${
-                txStatusFilter === st ? 'bg-[#16A34A] text-white' : 'bg-slate-100 text-slate-600'
-              }`}
-            >
-              {st}
-            </button>
-          ))}
-          <input
-            type="text"
-            value={txSearchQuery}
-            onInput={(e: Event) => filterTxSearch((e.target as HTMLInputElement).value)}
-            placeholder="Search TX, user, account..."
-            className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg"
-          />
-          <button
-            type="button"
-            onClick={() => openWithdrawForm()}
-            className="px-3 py-1.5 bg-[#16A34A] text-white text-xs font-bold rounded-lg"
-          >
-            + Add TX
-          </button>
-        </div>
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <AdminStatCard label="Pending" value={s.pendingWithdrawals.toLocaleString()} detail="Requests" tone="amber" />
+        <AdminStatCard label="Paid" value={s.paidWithdrawals.toLocaleString()} detail="Requests" tone="green" />
+        <AdminStatCard label="Rejected" value={s.rejectedWithdrawals.toLocaleString()} detail="Requests" />
+        <AdminStatCard label="Paid total" value={'Rs ' + s.paidNpr.toLocaleString()} detail="NPR" tone="green" />
       </div>
 
-      {showWithdrawEditor ? (
-        <div className="mb-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xs font-extrabold uppercase text-slate-700">
-              {editW ? `Edit Transaction ${editW.id}` : 'Create Transaction'}
-            </h3>
-            <button
-              type="button"
-              onClick={() => closeWithdrawForm()}
-              className="text-xs font-bold text-slate-400 hover:text-slate-700"
-            >
-              ✕ Close
-            </button>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 text-xs">
-            <input
-              id="crudWUserId"
-              type="text"
-              value={editW ? editW.userId : ''}
-              disabled={Boolean(editW)}
-              placeholder="User ID"
-              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg"
-            />
-            <select
-              id="crudWMethod"
-              value={editW?.method || methodOptions[0]}
-              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg font-bold"
-            >
-              {methodOptions.map((m) => (
-                <option value={m} selected={editW?.method === m}>
-                  {m}
-                </option>
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-sm font-extrabold text-slate-900">Recent transactions <span className="font-medium text-slate-400">({list.length})</span></h2>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="flex flex-wrap gap-1.5">
+              {(['all', 'pending', 'paid', 'rejected'] as const).map((st) => (
+                <button type="button" onClick={() => setTxFilter(st)} className={'rounded-lg px-3 py-2 text-xs font-semibold capitalize transition ' + (txStatusFilter === st ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+                  {st}
+                </button>
               ))}
-            </select>
-            <input
-              id="crudWAccount"
-              type="text"
-              value={editW ? editW.account : ''}
-              placeholder="Account ID"
-              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg"
-            />
-            <input
-              id="crudWCoins"
-              type="number"
-              value={editW ? editW.coins : 10000}
-              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg font-bold"
-            />
-            <div className="flex gap-2">
-              <select
-                id="crudWStatus"
-                value={editW?.status || 'pending'}
-                className="flex-1 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg font-bold"
-              >
-                <option value="pending">pending</option>
-                <option value="paid">paid</option>
-                <option value="rejected">rejected</option>
-              </select>
-              <button
-                type="button"
-                onClick={() => saveWithdrawCrud()}
-                className="px-4 py-1.5 bg-[#16A34A] text-white font-bold rounded-lg"
-              >
-                Save
-              </button>
+            </div>
+            <input type="search" id="txSearchInput" value={txSearchQuery} onInput={(e: Event) => filterTxSearch((e.target as HTMLInputElement).value)} placeholder="Search transactions" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs sm:w-52" />
+          </div>
+        </div>
+
+        {showWithdrawEditor ? (
+          <div className="my-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900">Edit payout</h3>
+              <button type="button" onClick={() => closeWithdrawForm()} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-200">Cancel</button>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <label className="text-xs font-semibold text-slate-600">User ID
+                <input id="crudWUserId" type="text" value={editW?.userId || ''} disabled className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm" />
+              </label>
+              <label className="text-xs font-semibold text-slate-600">Method
+                <select id="crudWMethod" value={editW?.method || methodOptions[0]} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">{methodOptions.map((m) => <option value={m}>{m}</option>)}</select>
+              </label>
+              <label className="text-xs font-semibold text-slate-600">Account
+                <input id="crudWAccount" type="text" value={editW?.account || ''} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" />
+              </label>
+              <label className="text-xs font-semibold text-slate-600">Coins
+                <input id="crudWCoins" type="number" value={editW?.coins || 0} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" />
+              </label>
+              <div className="flex items-end gap-2">
+                <select id="crudWStatus" value={editW?.status || 'pending'} className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                  <option value="pending">Pending</option><option value="paid">Paid</option><option value="rejected">Rejected</option>
+                </select>
+                <button type="button" onClick={() => saveWithdrawCrud()} className="rounded-lg bg-emerald-700 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-800">Save</button>
+              </div>
             </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse text-xs">
-          <thead>
-            <tr className="border-b border-slate-200 text-slate-400 uppercase font-bold text-[11px]">
-              <th className="py-2.5 px-3">TX ID</th>
-              <th className="py-2.5 px-3">User</th>
-              <th className="py-2.5 px-3">Method / Account</th>
-              <th className="py-2.5 px-3">Amount</th>
-              <th className="py-2.5 px-3">Status</th>
-              <th className="py-2.5 px-3 text-right">CRUD Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {list.length ? (
-              list.map((w) => (
-                <tr className="hover:bg-slate-50">
-                  <td className="py-3 px-3">
-                    <div className="font-bold text-slate-900">{w.id}</div>
-                    <div className="text-[11px] text-slate-400">{new Date(w.at).toLocaleString()}</div>
-                  </td>
-                  <td className="py-3 px-3">
-                    @{w.username || w.userId} <span className="text-slate-400">(#{w.userId})</span>
-                  </td>
-                  <td className="py-3 px-3">
-                    <b>{w.method}</b>: <span className="font-mono">{w.account}</span>
-                  </td>
-                  <td className="py-3 px-3 font-extrabold text-slate-900">
-                    {w.coins.toLocaleString()} (NPR {w.npr})
-                  </td>
-                  <td className="py-3 px-3">
-                    <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                        w.status === 'paid'
-                          ? 'bg-emerald-50 text-emerald-700'
-                          : w.status === 'rejected'
-                          ? 'bg-red-50 text-red-600'
-                          : 'bg-amber-50 text-amber-700'
-                      }`}
-                    >
-                      {w.status}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 text-right space-x-1.5 whitespace-nowrap">
-                    <button
-                      type="button"
-                      onClick={() => openWithdrawForm(w.id)}
-                      className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded text-[11px]"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteWithdrawCrud(w.id)}
-                      className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded text-[11px]"
-                    >
-                      Delete
-                    </button>
+        <div className="overflow-x-auto pt-3">
+          <table className="w-full min-w-[760px] border-collapse text-left text-xs">
+            <thead><tr className="border-b border-slate-200 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+              <th className="px-3 py-2.5">Transaction</th><th className="px-3 py-2.5">User</th><th className="px-3 py-2.5">Method / account</th><th className="px-3 py-2.5">Amount</th><th className="px-3 py-2.5">Status</th><th className="px-3 py-2.5 text-right">Actions</th>
+            </tr></thead>
+            <tbody className="divide-y divide-slate-100">
+              {list.length ? list.map((w) => (
+                <tr className="transition hover:bg-slate-50">
+                  <td className="px-3 py-3"><div className="font-bold text-slate-900">{w.id}</div><div className="mt-1 text-[10px] text-slate-400">{new Date(w.at).toLocaleString()}</div></td>
+                  <td className="px-3 py-3"><div className="font-semibold text-slate-800">@{w.username || w.userId}</div><div className="mt-1 text-[10px] text-slate-400">ID {w.userId}</div></td>
+                  <td className="px-3 py-3"><div className="font-semibold text-slate-800">{w.method}</div><div className="mt-1 max-w-48 truncate font-mono text-[10px] text-slate-500">{w.account}</div></td>
+                  <td className="px-3 py-3 font-bold text-slate-900">{w.coins.toLocaleString()} coins<div className="mt-1 text-[10px] font-medium text-slate-400">NPR {w.npr.toLocaleString()}</div></td>
+                  <td className="px-3 py-3"><span className={'rounded-full px-2.5 py-1 text-[10px] font-bold capitalize ' + (w.status === 'paid' ? 'bg-emerald-50 text-emerald-700' : w.status === 'rejected' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700')}>{w.status}</span></td>
+                  <td className="space-x-1.5 whitespace-nowrap px-3 py-3 text-right">
+                    <button type="button" onClick={() => openWithdrawForm(w.id)} className="rounded-lg bg-slate-100 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-200">Edit</button>
+                    <button type="button" onClick={() => deleteWithdrawCrud(w.id)} className="rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-rose-600 hover:bg-rose-50">Delete</button>
                   </td>
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="6" className="py-8 text-center text-slate-400">
-                  No transactions found
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+              )) : <tr><td colSpan="6" className="px-3 py-12 text-center text-sm text-slate-400">No transactions found</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 }
-
 function SettingsTabView(props: { s: AdminStatsResponse }) {
   const reqQual = draftSettings.requireQualification !== false;
   const methods = draftSettings.methods || [];
@@ -1438,9 +1145,9 @@ function SettingsTabView(props: { s: AdminStatsResponse }) {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">System &amp; Payout Settings</h2>
+          <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Settings</h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Configure withdrawal currency rates, qualification prerequisites, custom payment gateways, and country availability.
+            Payout rules, methods and country access.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -1449,13 +1156,13 @@ function SettingsTabView(props: { s: AdminStatsResponse }) {
             onClick={() => saveWithdrawSettings()}
             className="px-4 py-2 bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-extrabold rounded-lg shadow-sm transition"
           >
-            Save All Settings
+            Save Changes
           </button>
         </div>
       </div>
 
       {/* Grid: 1. Exchange Rules & Qualification */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Currency & Exchange */}
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
           <div className="flex items-center gap-2">
@@ -1464,14 +1171,14 @@ function SettingsTabView(props: { s: AdminStatsResponse }) {
             </span>
             <div>
               <h3 className="text-sm font-extrabold text-slate-900">Exchange &amp; Minimums</h3>
-              <p className="text-[11px] text-slate-400">Set coins required for 1 unit of fiat currency</p>
+              <p className="text-[11px] text-slate-400">Payout limits and coin conversion</p>
             </div>
           </div>
 
           <div className="space-y-3 text-xs">
             <div>
               <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                Minimum Withdrawal (Coins)
+                Minimum payout (coins)
               </label>
               <input
                 id="setMinCoins"
@@ -1480,12 +1187,11 @@ function SettingsTabView(props: { s: AdminStatsResponse }) {
                 placeholder="10000"
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-900 focus:outline-none focus:border-[#16A34A]"
               />
-              <span className="text-[10px] text-slate-400 mt-1 block">Users must reach this coin balance to request payout.</span>
             </div>
 
             <div>
               <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                Coin Conversion Rate (Coins per 1 NPR/INR)
+                Coin rate (coins per NPR)
               </label>
               <input
                 id="setCoinRate"
@@ -1494,16 +1200,9 @@ function SettingsTabView(props: { s: AdminStatsResponse }) {
                 placeholder="100"
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-900 focus:outline-none focus:border-[#16A34A]"
               />
-              <span className="text-[10px] text-slate-400 mt-1 block">e.g. 100 means 10,000 Coins = 100 NPR.</span>
             </div>
 
-            <button
-              type="button"
-              onClick={() => saveWithdrawSettings()}
-              className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg transition"
-            >
-              Update Exchange Rules
-            </button>
+
           </div>
         </div>
 
@@ -1514,18 +1213,16 @@ function SettingsTabView(props: { s: AdminStatsResponse }) {
               🛡️
             </span>
             <div>
-              <h3 className="text-sm font-extrabold text-slate-900">Anti-Fraud &amp; Qualification</h3>
-              <p className="text-[11px] text-slate-400">Withdrawal qualification prerequisites</p>
+              <h3 className="text-sm font-extrabold text-slate-900">Payout eligibility</h3>
+
             </div>
           </div>
 
           <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-xs font-extrabold text-slate-900">Require 15 Ads + 1 Referral</div>
-                <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                  When enabled, users must have watched at least 15 verified ads and referred at least 1 active friend before unlocking payouts.
-                </p>
+                <div className="text-xs font-extrabold text-slate-900">Require 15 ads + 1 referral</div>
+
               </div>
               <button
                 type="button"
@@ -1548,66 +1245,33 @@ function SettingsTabView(props: { s: AdminStatsResponse }) {
               <span className={`font-extrabold uppercase px-2 py-0.5 rounded text-[10px] ${
                 reqQual ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
               }`}>
-                {reqQual ? 'Enforced (Active)' : 'Bypassed (Instant)'}
+                {reqQual ? 'Enabled' : 'Disabled'}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Database & System Info */}
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
-          <div className="flex items-center gap-2">
-            <span className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-extrabold text-sm">
-              🗄️
-            </span>
-            <div>
-              <h3 className="text-sm font-extrabold text-slate-900">Database &amp; Engine</h3>
-              <p className="text-[11px] text-slate-400">Current storage and runtime state</p>
-            </div>
-          </div>
-
-          <div className="space-y-2.5 text-xs">
-            <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-100">
-              <span className="text-slate-600 font-semibold">Active Database:</span>
-              <span className="font-extrabold text-slate-900 flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full ${props.s.dbMode === 'postgres' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-                {props.s.dbMode === 'postgres' ? 'Neon PostgreSQL (Cloud)' : 'Local File JSON'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-100">
-              <span className="text-slate-600 font-semibold">Registered Users:</span>
-              <span className="font-extrabold text-slate-900">{props.s.totalUsers.toLocaleString()}</span>
-            </div>
-            <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-100">
-              <span className="text-slate-600 font-semibold">Total Payouts:</span>
-              <span className="font-extrabold text-slate-900">NPR {props.s.paidNpr.toLocaleString()}</span>
-            </div>
-          </div>
-        </div>
       </div>
 
-      {/* Section 2: Custom Payout Gateways & Methods */}
+      {/* Payment methods */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-slate-100 gap-2">
           <div>
-            <h3 className="text-sm font-extrabold text-slate-900">Custom Payout Methods</h3>
-            <p className="text-xs text-slate-500">
-              Add payment services (eSewa, Khalti, bKash, JazzCash, UPI, etc.) with custom logos and localized restrictions.
-            </p>
+            <h3 className="text-sm font-extrabold text-slate-900">Payment methods</h3>
           </div>
           <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md self-start">
-            {methods.length} methods configured
+            {methods.length} methods
           </span>
         </div>
 
         {/* Add Payout Method Form */}
         <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
           <div className="text-xs font-extrabold text-slate-800 uppercase tracking-wide">
-            Add New Payout Gateway
+            Add method
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
             <div>
-              <label className="block text-[11px] font-bold text-slate-600 mb-1">Method Name *</label>
+              <label className="block text-[11px] font-bold text-slate-600 mb-1">Method name</label>
               <input
                 id="newMethodName"
                 type="text"
@@ -1616,7 +1280,7 @@ function SettingsTabView(props: { s: AdminStatsResponse }) {
               />
             </div>
             <div>
-              <label className="block text-[11px] font-bold text-slate-600 mb-1">Country Scope</label>
+              <label className="block text-[11px] font-bold text-slate-600 mb-1">Country</label>
               <select
                 id="newMethodCountry"
                 className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-bold focus:outline-none focus:border-[#16A34A]"
@@ -1628,7 +1292,7 @@ function SettingsTabView(props: { s: AdminStatsResponse }) {
               </select>
             </div>
             <div>
-              <label className="block text-[11px] font-bold text-slate-600 mb-1">Input Field Placeholder</label>
+              <label className="block text-[11px] font-bold text-slate-600 mb-1">Account label</label>
               <input
                 id="newMethodPlaceholder"
                 type="text"
@@ -1637,7 +1301,7 @@ function SettingsTabView(props: { s: AdminStatsResponse }) {
               />
             </div>
             <div>
-              <label className="block text-[11px] font-bold text-slate-600 mb-1">Logo URL or Upload</label>
+              <label className="block text-[11px] font-bold text-slate-600 mb-1">Logo</label>
               <div className="flex gap-2 items-center">
                 <input
                   id="newMethodLogoUrl"
@@ -1668,7 +1332,7 @@ function SettingsTabView(props: { s: AdminStatsResponse }) {
               onClick={() => addCustomMethod()}
               className="px-4 py-2 bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-bold rounded-lg transition"
             >
-              + Add Payout Gateway
+              + Add method
             </button>
           </div>
         </div>
@@ -1728,20 +1392,17 @@ function SettingsTabView(props: { s: AdminStatsResponse }) {
             ))
           ) : (
             <div className="col-span-full py-8 text-center text-xs text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-              No custom methods added yet. Add your first payment gateway above!
+              No payment methods yet.
             </div>
           )}
         </div>
       </div>
 
-      {/* Section 3: Allowed / Supported Countries */}
+      {/* Country access */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-slate-100 gap-2">
           <div>
-            <h3 className="text-sm font-extrabold text-slate-900">Allowed Countries Filter</h3>
-            <p className="text-xs text-slate-500">
-              Limit withdrawals to specific countries or leave empty to allow users from all countries worldwide.
-            </p>
+            <h3 className="text-sm font-extrabold text-slate-900">Allowed countries</h3>
           </div>
           <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md self-start">
             {countries.length ? `${countries.length} countries whitelisted` : 'Worldwide (All Countries)'}
@@ -1750,7 +1411,7 @@ function SettingsTabView(props: { s: AdminStatsResponse }) {
 
         {/* Current Active Whitelist */}
         <div>
-          <div className="text-xs font-bold text-slate-700 mb-2">Active Country Whitelist:</div>
+          <div className="text-xs font-bold text-slate-700 mb-2">Allowed countries</div>
           <div className="flex flex-wrap gap-2">
             {countries.length ? (
               countries.map((c) => (
@@ -1778,12 +1439,12 @@ function SettingsTabView(props: { s: AdminStatsResponse }) {
         {/* Add Countries via REST Countries API Search */}
         <div className="pt-3 border-t border-slate-100 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-700">Search &amp; Add Supported Countries:</span>
-            <span className="text-[11px] text-slate-400">Live REST Countries API</span>
+            <span className="text-xs font-bold text-slate-700">Add countries</span>
+
           </div>
           <input
             type="text"
-            placeholder="Type country name or code (e.g. Nepal, India, Bangladesh, Pakistan, United States)..."
+            placeholder="Search country"
             onInput={(e: Event) => filterCountryApiSearch((e.target as HTMLInputElement).value)}
             className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:border-[#16A34A]"
           />
@@ -1801,118 +1462,28 @@ function SettingsTabView(props: { s: AdminStatsResponse }) {
 
 function AdminApp() {
   return (
-    <div className="w-screen h-screen overflow-hidden flex flex-col bg-[#F8FAFC] text-[#0F172A] font-sans">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 lg:flex">
       <div id="adminToast" className="hidden" />
-
-      <header className="w-full bg-white border-b border-slate-200 shrink-0 z-20">
-        <div className="w-full px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[#16A34A] flex items-center justify-center text-white font-extrabold text-sm shadow-xs">
-              P
+      <AdminNavigation activeTab={activeTab} onSelect={switchAdminTab} />
+      <div className="min-w-0 flex-1 lg:pl-64">
+        <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
+          <div className="mx-auto flex min-h-[76px] max-w-[1600px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-700 text-sm font-black text-white lg:hidden">P</div>
+              <div><p className="hidden text-[10px] font-bold uppercase tracking-[.15em] text-slate-400 sm:block">Paiso workspace</p><h1 className="text-lg font-extrabold tracking-tight text-slate-950">{activeTab === 'dashboard' ? 'Overview' : activeTab === 'withdrawal' ? 'Payouts' : activeTab === 'transactions' ? 'Transactions' : activeTab === 'users' ? 'Users' : activeTab === 'tasks' ? 'Tasks' : activeTab === 'games' ? 'Games' : 'Settings'}</h1></div>
+              <span className="hidden items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-600 md:inline-flex"><span className={'h-2 w-2 rounded-full '+(data?.dbMode==='postgres'?'bg-emerald-500':'bg-slate-400')}/>{data?.dbMode==='postgres'?'Database connected':'Local data'}</span>
             </div>
-            <div className="flex items-center gap-2.5">
-              <span className="text-base font-extrabold tracking-tight text-slate-900">Paiso Admin</span>
-              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 border border-slate-200 text-slate-700">
-                <span className={`w-2 h-2 rounded-full ${data?.dbMode === 'postgres' ? 'bg-emerald-500 animate-pulse' : 'bg-emerald-500'}`} />
-                <span>{data?.dbMode === 'postgres' ? 'Neon DB' : 'DB Ready'}</span>
-              </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <button type="button" onClick={() => openAdminNotifModal('all')} className="inline-flex rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 sm:px-3.5 sm:text-xs">Notify</button>
+              <button id="adminRefreshButton" type="button" onClick={() => refreshAdmin()} className="rounded-xl bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60">Refresh</button>
+              <button type="button" onClick={() => adminLogout()} className="rounded-xl border border-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">Logout</button>
             </div>
           </div>
-
-          <div className="flex items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => openAdminNotifModal('all')}
-              className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-md flex items-center gap-1.5 transition"
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-              </svg>
-              <span>Send Notification</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => refreshAdmin()}
-              className="px-3.5 py-1.5 bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-bold rounded-md transition"
-            >
-              Refresh
-            </button>
-            <button
-              type="button"
-              onClick={() => adminLogout()}
-              className="px-3 py-1.5 border border-slate-200 hover:bg-slate-100 text-slate-600 text-xs font-semibold rounded-md transition"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-
-        <div className="w-full px-6 flex items-center gap-8 overflow-x-auto border-t border-slate-100">
-          <button
-            type="button"
-            data-admintab="dashboard"
-            onClick={() => switchAdminTab('dashboard')}
-            className="admin-tab-btn py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap border-b-2 border-[#16A34A] text-slate-900"
-          >
-            Dashboard
-          </button>
-          <button
-            type="button"
-            data-admintab="users"
-            onClick={() => switchAdminTab('users')}
-            className="admin-tab-btn py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap border-b-2 border-transparent text-slate-500 hover:text-slate-900"
-          >
-            User Management
-          </button>
-          <button
-            type="button"
-            data-admintab="withdrawal"
-            onClick={() => switchAdminTab('withdrawal')}
-            className="admin-tab-btn py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap border-b-2 border-transparent text-slate-500 hover:text-slate-900"
-          >
-            Withdrawal
-          </button>
-          <button
-            type="button"
-            data-admintab="tasks"
-            onClick={() => switchAdminTab('tasks')}
-            className="admin-tab-btn py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap border-b-2 border-transparent text-slate-500 hover:text-slate-900"
-          >
-            Task Management
-          </button>
-          <button
-            type="button"
-            data-admintab="transactions"
-            onClick={() => switchAdminTab('transactions')}
-            className="admin-tab-btn py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap border-b-2 border-transparent text-slate-500 hover:text-slate-900"
-          >
-            Transaction
-          </button>
-          <button
-            type="button"
-            data-admintab="settings"
-            onClick={() => switchAdminTab('settings')}
-            className="admin-tab-btn py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap border-b-2 border-transparent text-slate-500 hover:text-slate-900"
-          >
-            Settings
-          </button>
-        </div>
-      </header>
-
-      <div id="adminLoginSection" className="flex-1 flex items-center justify-center px-4 hidden">
-        <div className="w-full max-w-sm bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-          <h2 className="text-lg font-extrabold text-slate-900 mb-1">Admin Login</h2>
-          <p className="text-xs text-slate-500 mb-4">Enter your Admin ID to continue.</p>
+        </header>
+      <div id="adminLoginSection" className="hidden flex min-h-[calc(100dvh-76px)] items-center justify-center px-4 py-10">
+        <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-7 shadow-xl shadow-slate-900/[.04] sm:p-9">
+          <h2 className="text-2xl font-extrabold tracking-tight text-slate-950">Admin Login</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-500">Enter your Admin ID to continue.</p>
           <input
             id="adminKeyInput"
             type="password"
@@ -1921,12 +1492,12 @@ function AdminApp() {
             onKeyDown={(e: KeyboardEvent) => {
               if (e.key === 'Enter') adminLogin();
             }}
-            className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-[#16A34A] mb-3"
+            className="mt-6 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100"
           />
           <button
             type="button"
             onClick={() => adminLogin()}
-            className="w-full bg-[#16A34A] hover:bg-[#15803D] text-white font-bold text-xs uppercase py-2.5 rounded-lg transition"
+            className="mt-3 w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-800"
           >
             Login
           </button>
@@ -1934,10 +1505,10 @@ function AdminApp() {
         </div>
       </div>
 
-      <main id="adminMainWorkspace" className="flex-1 w-full overflow-y-auto px-6 py-5">
+      <main id="adminMainWorkspace" className="min-h-[calc(100dvh-76px)] px-4 py-6 pb-24 sm:px-6 lg:px-8 lg:py-8">
         <div id="adminTabView" className="w-full h-full" />
       </main>
-
+      </div>
       {/* Admin Send Notification & Activity Log Modal */}
       <div
         id="adminNotifModal"
@@ -2040,11 +1611,21 @@ function renderActiveTab(): void {
   const container = document.getElementById('adminTabView');
   if (!container || !data) return;
 
-  document.querySelectorAll<HTMLButtonElement>('.admin-tab-btn').forEach((btn) => {
-    const isAct = btn.dataset.admintab === activeTab;
-    btn.className = `admin-tab-btn py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap border-b-2 ${
-      isAct ? 'border-[#16A34A] text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-900'
-    }`;
+  document.querySelectorAll<HTMLButtonElement>('[data-admintab]').forEach((btn) => {
+    const isActive = btn.dataset.admintab === activeTab;
+    btn.setAttribute('aria-current', isActive ? 'page' : 'false');
+    btn.classList.toggle('bg-emerald-50', isActive && !!btn.closest('aside'));
+    btn.classList.toggle('text-emerald-800', isActive);
+    btn.classList.toggle('text-slate-500', !isActive);
+    const isDesktopNav = !!btn.closest('aside');
+    const icon = btn.querySelector('span');
+    if (icon) {
+      icon.classList.toggle('bg-emerald-100', isActive && isDesktopNav);
+      icon.classList.toggle('bg-slate-100', !isActive && isDesktopNav);
+      icon.classList.toggle('bg-emerald-50', isActive && !isDesktopNav);
+      icon.classList.toggle('text-emerald-800', isActive && isDesktopNav);
+      icon.classList.toggle('text-slate-500', !isActive && isDesktopNav);
+    }
   });
 
   let viewNode: Node;
@@ -2052,17 +1633,30 @@ function renderActiveTab(): void {
   else if (activeTab === 'users') viewNode = <UsersTabView s={data} />;
   else if (activeTab === 'withdrawal') viewNode = <WithdrawalTabView s={data} />;
   else if (activeTab === 'tasks') viewNode = <TasksTabView s={data} />;
+  else if (activeTab === 'games') viewNode = <GamesTabView s={data} />;
   else if (activeTab === 'settings') viewNode = <SettingsTabView s={data} />;
   else viewNode = <TransactionsTabView s={data} />;
 
+  const focused = document.activeElement as HTMLInputElement | null;
+  const focusId = focused?.id;
+  const selectionStart = focused && (focused.type === 'text' || focused.type === 'search') ? focused.selectionStart : null;
+  const selectionEnd = focused && (focused.type === 'text' || focused.type === 'search') ? focused.selectionEnd : null;
   container.replaceChildren(viewNode);
-}
+  if (focusId) {
+    const next = document.getElementById(focusId) as HTMLInputElement | null;
+    if (next && !next.disabled) {
+      next.focus({ preventScroll: true });
+      if (selectionStart !== null && selectionEnd !== null) next.setSelectionRange(selectionStart, selectionEnd);
+    }
+  }}
 
 async function refreshAdmin(): Promise<void> {
+  if (isRefreshing) return;
+  isRefreshing = true;
+  const refreshButton = document.getElementById('adminRefreshButton') as HTMLButtonElement | null;
+  if (refreshButton) { refreshButton.disabled = true; refreshButton.textContent = 'Refreshing…'; }
   try {
-    if (!apiCountries.length) {
-      loadCountriesFromApi();
-    }
+    if (!apiCountries.length) loadCountriesFromApi();
     const s = await adminApi<AdminStatsResponse>('/api/admin/stats');
     data = s;
     draftSettings = {
@@ -2082,9 +1676,11 @@ async function refreshAdmin(): Promise<void> {
     document.getElementById('adminLoginSection')?.classList.remove('hidden');
     const errEl = document.getElementById('adminLoginErr');
     if (errEl) errEl.textContent = (e as Error).message;
+  } finally {
+    isRefreshing = false;
+    if (refreshButton) { refreshButton.disabled = false; refreshButton.textContent = 'Refresh'; }
   }
 }
-
 async function adminLogin(): Promise<void> {
   const inp = document.getElementById('adminKeyInput') as HTMLInputElement | null;
   if (inp && inp.value.trim()) {
@@ -2100,16 +1696,71 @@ function adminLogout(): void {
   location.reload();
 }
 
-function switchAdminTab(tab: AdminTab): void {
-  activeTab = tab;
+function clearGameForm(): void {
+  editingGameId = null;
   renderActiveTab();
 }
 
-function toggleWithdrawSettingsModal(show?: boolean): void {
-  showWithdrawSettings = typeof show === 'boolean' ? show : !showWithdrawSettings;
-  if (showWithdrawSettings && !apiCountries.length) {
-    loadCountriesFromApi().then(() => renderActiveTab());
+function editGameForm(id: string): void {
+  editingGameId = id;
+  renderActiveTab();
+  document.getElementById('gameTitle')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function saveGameCrud(): Promise<void> {
+  const title = (document.getElementById('gameTitle') as HTMLInputElement | null)?.value.trim() || '';
+  const description = (document.getElementById('gameDescription') as HTMLTextAreaElement | null)?.value.trim() || '';
+  const url = (document.getElementById('gameUrl') as HTMLInputElement | null)?.value.trim() || '';
+  const priceCoins = Number((document.getElementById('gamePrice') as HTMLInputElement | null)?.value);
+  if (title.length < 2 || title.length > 60) return notify('Game title must be 2–60 characters', true);
+  if (description.length > 240) return notify('Description must be 240 characters or less', true);
+  if (!Number.isSafeInteger(priceCoins) || priceCoins < 0 || priceCoins > 100000) return notify('Price must be a whole number from 0 to 100,000', true);
+  try {
+    if (new URL(url).protocol !== 'https:') return notify('Game URL must use HTTPS', true);
+  } catch {
+    return notify('Enter a valid game iframe URL', true);
   }
+
+  const payload = { title, description, url, priceCoins };
+  try {
+    if (editingGameId) {
+      await adminApi(`/api/admin/games/${encodeURIComponent(editingGameId)}`, { method: 'PUT', body: JSON.stringify(payload) });
+      notify('Game updated');
+    } else {
+      await adminApi('/api/admin/games', { method: 'POST', body: JSON.stringify(payload) });
+      notify('Game published');
+    }
+    editingGameId = null;
+    await refreshAdmin();
+  } catch (e) {
+    notify((e as Error).message || 'Could not save game', true);
+  }
+}
+
+async function setGameEnabled(id: string, enabled: boolean): Promise<void> {
+  try {
+    await adminApi(`/api/admin/games/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({ enabled }) });
+    notify(enabled ? 'Game published' : 'Game paused');
+    await refreshAdmin();
+  } catch (e) {
+    notify((e as Error).message || 'Could not update game', true);
+  }
+}
+
+async function deleteGame(id: string, title: string): Promise<void> {
+  if (!confirm(`Remove “${title}” from the app? Past play totals will stay in reports.`)) return;
+  try {
+    await adminApi(`/api/admin/games/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (editingGameId === id) clearGameForm();
+    notify('Game deleted');
+    await refreshAdmin();
+  } catch (e) {
+    notify((e as Error).message || 'Could not delete game', true);
+  }
+}
+
+function switchAdminTab(tab: AdminTab): void {
+  activeTab = tab;
   renderActiveTab();
 }
 
@@ -2282,37 +1933,55 @@ function closeUserForm(): void {
 }
 
 async function saveUserCrud(): Promise<void> {
+  if (isSavingUser) return;
   const id = (document.getElementById('crudUserId') as HTMLInputElement | null)?.value.trim() || '';
-  const name = (document.getElementById('crudUserName') as HTMLInputElement | null)?.value.trim() || 'User';
+  const name = (document.getElementById('crudUserName') as HTMLInputElement | null)?.value.trim() || '';
   const username = (document.getElementById('crudUserHandle') as HTMLInputElement | null)?.value.trim() || '';
-  const coins = +((document.getElementById('crudUserCoins') as HTMLInputElement | null)?.value || 0);
+  const coins = Number((document.getElementById('crudUserCoins') as HTMLInputElement | null)?.value || 0);
   const email = (document.getElementById('crudUserEmail') as HTMLInputElement | null)?.value.trim() || '';
-  const adsDone = +((document.getElementById('crudUserAds') as HTMLInputElement | null)?.value || 0);
-  const dailyDone = +((document.getElementById('crudUserDaily') as HTMLInputElement | null)?.value || 0);
+  const adsDone = Number((document.getElementById('crudUserAds') as HTMLInputElement | null)?.value || 0);
+  const dailyDone = Number((document.getElementById('crudUserDaily') as HTMLInputElement | null)?.value || 0);
   const verified = Boolean((document.getElementById('crudUserVerified') as HTMLInputElement | null)?.checked);
 
-  if (editingUserId) {
-    await adminApi(`/api/admin/user/${editingUserId}`, {
-      method: 'PUT',
-      body: JSON.stringify({ name, username, coins, email, adsDone, dailyDone, verified })
-    });
-    notify(`Updated user #${editingUserId}`);
-  } else {
-    if (!id) {
-      notify('Enter a User ID', true);
-      return;
-    }
-    await adminApi('/api/admin/users', {
-      method: 'POST',
-      body: JSON.stringify({ id, name, username, coins, email, verified })
-    });
-    notify(`Created user #${id}`);
+  if (!editingUserId && !id) {
+    notify('Enter a User ID', true);
+    return;
   }
-  showUserEditor = false;
-  editingUserId = null;
-  await refreshAdmin();
-}
+  if (!name) {
+    notify('Enter the user name', true);
+    return;
+  }
+  if (![coins, adsDone, dailyDone].every((value) => Number.isFinite(value) && value >= 0)) {
+    notify('Balance and activity values must be zero or more', true);
+    return;
+  }
 
+  isSavingUser = true;
+  renderActiveTab();
+  try {
+    if (editingUserId) {
+      await adminApi('/api/admin/user/' + encodeURIComponent(editingUserId), {
+        method: 'PUT',
+        body: JSON.stringify({ name, username, coins, email, adsDone, dailyDone, verified })
+      });
+      notify('User updated');
+    } else {
+      await adminApi('/api/admin/users', {
+        method: 'POST',
+        body: JSON.stringify({ id, name, username, coins, email, verified })
+      });
+      notify('User created');
+    }
+    showUserEditor = false;
+    editingUserId = null;
+    await refreshAdmin();
+  } catch (e) {
+    notify((e as Error).message || 'Could not save user', true);
+  } finally {
+    isSavingUser = false;
+    if (showUserEditor) renderActiveTab();
+  }
+}
 async function toggleUserVerify(userId: string): Promise<void> {
   await adminApi(`/api/admin/user/${userId}/verify`, { method: 'POST' });
   notify(`Updated verification for #${userId}`);
@@ -2404,12 +2073,11 @@ async function deleteTask(id: string): Promise<void> {
   await refreshAdmin();
 }
 
-function openWithdrawForm(withdrawId?: string): void {
-  editingWithdrawId = withdrawId || null;
+function openWithdrawForm(withdrawId: string): void {
+  editingWithdrawId = withdrawId;
   showWithdrawEditor = true;
   renderActiveTab();
 }
-
 function closeWithdrawForm(): void {
   editingWithdrawId = null;
   showWithdrawEditor = false;
@@ -2417,34 +2085,28 @@ function closeWithdrawForm(): void {
 }
 
 async function saveWithdrawCrud(): Promise<void> {
-  const userId = (document.getElementById('crudWUserId') as HTMLInputElement | null)?.value.trim() || '';
+  if (!editingWithdrawId) return;
   const method = (document.getElementById('crudWMethod') as HTMLSelectElement | null)?.value || 'Custom';
   const account = (document.getElementById('crudWAccount') as HTMLInputElement | null)?.value.trim() || '';
-  const coins = +((document.getElementById('crudWCoins') as HTMLInputElement | null)?.value || 10000);
+  const coins = Number((document.getElementById('crudWCoins') as HTMLInputElement | null)?.value || 0);
   const status = (document.getElementById('crudWStatus') as HTMLSelectElement | null)?.value || 'pending';
-
-  if (editingWithdrawId) {
-    await adminApi(`/api/admin/withdraw/${editingWithdrawId}`, {
+  if (!account || !Number.isFinite(coins) || coins <= 0) {
+    notify('Enter a valid account and payout amount', true);
+    return;
+  }
+  try {
+    await adminApi('/api/admin/withdraw/' + encodeURIComponent(editingWithdrawId), {
       method: 'PUT',
       body: JSON.stringify({ method, account, coins, status })
     });
-    notify(`Updated ${editingWithdrawId}`);
-  } else {
-    if (!userId || !account) {
-      notify('Enter User ID and Account', true);
-      return;
-    }
-    await adminApi('/api/admin/withdrawals', {
-      method: 'POST',
-      body: JSON.stringify({ userId, method, account, coins, status })
-    });
-    notify('Withdrawal created');
+    notify('Payout updated');
+    showWithdrawEditor = false;
+    editingWithdrawId = null;
+    await refreshAdmin();
+  } catch (e) {
+    notify((e as Error).message || 'Could not update payout', true);
   }
-  showWithdrawEditor = false;
-  editingWithdrawId = null;
-  await refreshAdmin();
 }
-
 async function decideWithdraw(id: string, action: 'paid' | 'reject'): Promise<void> {
   await adminApi(`/api/admin/withdraw/${id}`, {
     method: 'POST',

@@ -116,6 +116,7 @@ function SvgSpriteDefs() {
 
 // --- src/client/components/HomeView.tsx ---
 
+
 function DayCheckBox(props) {
     return (h("div", { className: "day-box", id: `day-box-${props.day}`, "data-day": props.day },
         h("div", { className: "day-check" },
@@ -161,7 +162,7 @@ function HomeView() {
                 h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2", "stroke-linecap": "round", "stroke-linejoin": "round" },
                     h("circle", { cx: "11", cy: "11", r: "8" }),
                     h("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" })),
-                h("input", { type: "text", id: "searchInput", placeholder: "Search tasks, games...", onInput: (e) => window.filterExplore(e.target.value) }),
+                h("input", { type: "text", id: "searchInput", placeholder: "Search ways to earn...", "aria-label": "Search ways to earn", onInput: (e) => window.filterExplore(e.target.value) }),
                 h("button", { type: "button", className: "search-clear", id: "searchClearBtn", onClick: () => window.clearSearch() },
                     h("svg", { viewBox: "0 0 24 24", width: "12", height: "12", fill: "none", stroke: "currentColor", "stroke-width": "2.5" },
                         h("line", { x1: "18", y1: "6", x2: "6", y2: "18" }),
@@ -203,24 +204,25 @@ function HomeView() {
                     h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.5", "stroke-linecap": "round", "stroke-linejoin": "round" },
                         h("polyline", { points: "9 18 15 12 9 6" })))),
             h("div", { className: "explore-grid", id: "exploreGrid" },
-                h("div", { className: "explore-card card-ads", "data-title": "watch ads earn coins video", id: "adBtn", onClick: () => window.watchAd() },
+                h("button", { type: "button", className: "explore-card card-ads", "data-title": "watch ads earn coins video", id: "adBtn", onClick: () => window.watchAd() },
                     h("div", { className: "explore-icon-wrap" },
                         h("img", { src: "/assets/icon-ads.png", alt: "Watch Ads", className: "explore-icon" })),
                     h("div", { className: "explore-info" },
                         h("div", { className: "explore-title" }, "Watch Ads"),
                         h("div", { className: "explore-sub", id: "adCardSub" }, "Earn coins"))),
-                h("div", { className: "explore-card card-tasks", "data-title": "complete tasks easy fast", onClick: () => window.showTab('tasks', 'all') },
+                h("button", { type: "button", className: "explore-card card-tasks", "data-title": "complete tasks easy fast", onClick: () => window.showTab('tasks', 'all') },
                     h("div", { className: "explore-icon-wrap" },
                         h("img", { src: "/assets/icon-tasks.png", alt: "Complete Tasks", className: "explore-icon" })),
                     h("div", { className: "explore-info" },
                         h("div", { className: "explore-title" }, "Complete Tasks"),
                         h("div", { className: "explore-sub" }, "Easy & Fast"))),
-                h("div", { className: "explore-card card-games", "data-title": "play and earn games more fun coins", onClick: () => window.showTab('tasks', 'play_game') },
+                h("button", { type: "button", className: "explore-card card-games", "data-title": "play games arcade html fun", onClick: () => document.getElementById('exploreGames')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) },
                     h("div", { className: "explore-icon-wrap" },
-                        h("img", { src: "/assets/icon-games.png", alt: "Play & Earn", className: "explore-icon" })),
+                        h("img", { src: "/assets/icon-games.png", alt: "Games", className: "explore-icon" })),
                     h("div", { className: "explore-info" },
-                        h("div", { className: "explore-title" }, "Play & Earn"),
-                        h("div", { className: "explore-sub" }, "More Fun, Coins")))),
+                        h("div", { className: "explore-title" }, "Games"),
+                        h("div", { className: "explore-sub" }, "Play instantly")))),
+            h(GamesView, null),
             h("div", { style: { display: 'none' } },
                 h("span", { id: "adReward" }),
                 h("span", { id: "adCount" }, "0"),
@@ -238,13 +240,34 @@ function TasksView() {
                     h("use", { href: "#icon-p-coin" })),
                 h("span", { id: "headerCoins" }, "0"))),
         h("div", { className: "screen-content space-y-3.5" },
+            h("label", { className: "relative block" },
+                h("span", { className: "sr-only" }, "Search tasks"),
+                h("svg", { className: "absolute left-3 top-1/2 -translate-y-1/2 text-slate-400", width: "17", height: "17", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round" },
+                    h("circle", { cx: "11", cy: "11", r: "8" }),
+                    h("path", { d: "m21 21-4.35-4.35" })),
+                h("input", { id: "taskSearchInput", type: "search", placeholder: "Search tasks", onInput: (e) => window.filterTasks(e.target.value), className: "w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" })),
             h("div", { className: "flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar" },
                 h("button", { className: "filter-chip active", "data-filter": "all", onClick: () => window.setTaskFilter('all') }, "All Tasks"),
                 h("button", { className: "filter-chip", "data-filter": "app_task", onClick: () => window.setTaskFilter('app_task') }, "App Task"),
                 h("button", { className: "filter-chip", "data-filter": "play_game", onClick: () => window.setTaskFilter('play_game') }, "Play Game"),
                 h("button", { className: "filter-chip", "data-filter": "telegram_join", onClick: () => window.setTaskFilter('telegram_join') }, "Telegram"),
-                h("button", { className: "filter-chip", "data-filter": "social_visit", onClick: () => window.setTaskFilter('social_visit') }, "Social & Web")),
+                h("button", { className: "filter-chip", "data-filter": "social_visit", onClick: () => window.setTaskFilter('social_visit') }, "Social & Web"),
+                h("button", { className: "filter-chip", "data-filter": "done", onClick: () => window.setTaskFilter('done') }, "Completed")),
             h("div", { id: "taskList", className: "space-y-2.5 pb-4" }))));
+}
+
+// --- src/client/components/GamesView.tsx ---
+function GamesView() {
+    return (h("div", { id: "exploreGames", className: "mt-5 scroll-mt-4" },
+        h("div", { className: "mb-2.5" },
+            h("h3", { className: "text-sm font-extrabold text-slate-900" }, "Games"),
+            h("p", { className: "mt-0.5 text-[11px] text-slate-500" }, "Coin price is shown before you play.")),
+        h("div", { id: "gamesGrid", className: "grid grid-cols-1 gap-2.5 sm:grid-cols-2" }),
+        h("div", { id: "gameModal", className: "fixed inset-0 z-[120] hidden flex-col bg-slate-950" },
+            h("div", { className: "flex h-12 shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-slate-900 px-3 text-white" },
+                h("div", { id: "activeGameTitle", className: "truncate text-sm font-bold" }, "Game"),
+                h("button", { type: "button", onClick: () => window.closeGame(), "aria-label": "Close game", className: "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-lg hover:bg-white/20" }, "\u00D7")),
+            h("iframe", { id: "gameFrame", title: "Paiso game", sandbox: "allow-scripts", allow: "fullscreen; gamepad; autoplay", allowFullScreen: true, referrerPolicy: "no-referrer", className: "min-h-0 w-full flex-1 border-0 bg-white" }))));
 }
 
 // --- src/client/components/FriendsView.tsx ---
@@ -263,7 +286,9 @@ function FriendsView() {
                 h("img", { src: "/assets/icon-friends.png", alt: "Invite Friends", className: "w-14 h-14 object-contain shrink-0" }),
                 h("div", { className: "min-w-0" },
                     h("h3", { className: "flex items-center gap-1.5 flex-wrap" },
-                        h("span", null, "Earn +500"),
+                        h("span", null,
+                            "Earn ",
+                            h("span", { id: "refBonusValue" }, "+500")),
                         h("svg", { width: "18", height: "18", className: "inline-block shrink-0" },
                             h("use", { href: "#icon-p-coin" })),
                         h("span", null, "/ Friend")),
@@ -322,7 +347,7 @@ const FAQ_STEPS = [
 const FAQ_LIST = [
     {
         q: 'How are coins converted to cash?',
-        a: '100 Coins = NPR 1. The default minimum withdrawal is 10,000 Coins (NPR 100).'
+        a: 'Your current conversion rate and minimum are shown on the Withdrawal screen.'
     },
     {
         q: 'Why do completed tasks disappear?',
@@ -330,7 +355,7 @@ const FAQ_LIST = [
     },
     {
         q: 'How does the referral reward work?',
-        a: 'You receive +500 Coins when your invited friend completes 3 Ads, 2 Tasks, and 2 Check-ins, plus 10% of their task earnings.'
+        a: 'You receive the referral bonus when your invited friend meets the qualification targets, plus 10% of their task earnings.'
     },
     {
         q: 'How long do withdrawals take?',
@@ -396,7 +421,7 @@ function WithdrawSection() {
             h("div", { className: "flex items-center justify-between text-xs pt-2" },
                 h("span", { className: "text-slate-400 font-medium" }, "Receive"),
                 h("b", { className: "text-slate-900 font-extrabold", id: "wReceivePreview" }, "NPR 0.00"))),
-        h("button", { type: "button", className: "w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-lg transition", onClick: () => window.withdraw() }, "Withdraw"),
+        h("button", { type: "button", id: "withdrawBtn", className: "w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-lg transition", onClick: () => window.withdraw() }, "Withdraw"),
         h("div", { className: "hidden" },
             h("span", { id: "coins" }, "0"),
             h("span", { id: "total" }, "0"),
@@ -539,7 +564,7 @@ function SettingsView() {
                         h("svg", { width: "54", height: "54" },
                             h("use", { href: "#icon-blue-tick" }))),
                     h("h3", { className: "verify-done-title" }, "Verified Profile"),
-                    h("p", { className: "verify-done-sub" }, "Your identity & email are verified. Blue Tick is active on your profile."),
+                    h("p", { className: "verify-done-sub" }, "Your identity is verified. Blue Tick is active on your profile."),
                     h("div", { className: "verify-details-list" },
                         h("div", { className: "uid-detail-row" },
                             h("span", { className: "small" }, "Full Name"),
@@ -560,10 +585,10 @@ function SettingsView() {
                                 h("use", { href: "#icon-blue-tick" }))),
                         h("div", null,
                             h("div", { className: "verify-banner-title" }, "Get Verified Blue Tick"),
-                            h("div", { className: "verify-banner-sub" }, "Complete your profile details & confirm Email OTP"))),
+                            h("div", { className: "verify-banner-sub" }, "Complete your profile details & confirm Telegram OTP"))),
                     h("div", { className: "verify-field-label" }, "Full Name"),
                     h("input", { className: "form-input", id: "vFullName", type: "text", placeholder: "Enter your full name" }),
-                    h("div", { className: "verify-field-label" }, "Email Address"),
+                    h("div", { className: "verify-field-label" }, "Email Address (optional)"),
                     h("input", { className: "form-input", id: "vEmail", type: "email", placeholder: "you@example.com" }),
                     h("div", { className: "verify-field-label" }, "Date of Birth"),
                     h("input", { className: "form-input", id: "vDob", type: "date" }),
@@ -586,12 +611,12 @@ function SettingsView() {
                         h("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2", "stroke-linecap": "round", "stroke-linejoin": "round" },
                             h("path", { d: "M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" }),
                             h("polyline", { points: "22,6 12,13 2,6" })),
-                        h("span", { id: "sendOtpBtnText" }, "Send OTP to Email")),
+                        h("span", { id: "sendOtpBtnText" }, "Send OTP to Telegram")),
                     h("div", { className: "verify-otp-box", id: "verifyOtpBox", style: { display: 'none' } },
                         h("div", { className: "verify-otp-divider" }),
                         h("div", { className: "verify-otp-info" },
                             "Enter the 6-digit verification code sent to ",
-                            h("b", { id: "otpTargetEmail" }, "your email")),
+                            h("b", { id: "otpTargetEmail" }, "your Telegram chat")),
                         h("input", { className: "form-input otp-code-input", id: "vOtpInput", type: "text", maxLength: 6, placeholder: "Enter 6-digit OTP" }),
                         h("button", { type: "button", className: "primary-btn btn-with-icon verify-confirm-btn", id: "confirmOtpBtn", onClick: () => window.confirmVerifyOtp() },
                             h("svg", { width: "17", height: "17" },
@@ -706,6 +731,11 @@ tg?.expand();
 const initData = tg?.initData || '';
 let state = null;
 let currentTaskFilter = 'all';
+let taskSearchQuery = '';
+let isDailyClaiming = false;
+let isWithdrawing = false;
+let startingGameId = null;
+const claimingTaskIds = new Set();
 let AdController = null;
 let toastTimer;
 let dailyCountdownTimer;
@@ -850,7 +880,7 @@ function filterExplore(query) {
     const clearBtn = $('searchClearBtn');
     if (clearBtn)
         clearBtn.style.display = term ? 'inline-flex' : 'none';
-    document.querySelectorAll('#exploreGrid .explore-card').forEach((card) => {
+    document.querySelectorAll('#exploreGrid .explore-card, #exploreGames .explore-game-card').forEach((card) => {
         const titleData = (card.dataset.title || '').toLowerCase();
         card.style.display = !term || titleData.includes(term) ? 'flex' : 'none';
     });
@@ -868,6 +898,10 @@ function setTaskFilter(filter) {
     document.querySelectorAll('.filter-chip').forEach((btn) => {
         btn.classList.toggle('active', btn.dataset.filter === filter);
     });
+    renderTasks();
+}
+function filterTasks(query) {
+    taskSearchQuery = (query || '').trim().toLowerCase();
     renderTasks();
 }
 function selectMethod(method) {
@@ -985,13 +1019,13 @@ function renderDailyCheckin() {
     }
     if (canDaily) {
         if (btn) {
-            btn.disabled = false;
+            btn.disabled = isDailyClaiming;
             btn.classList.remove('claimed-state');
         }
         if (btnIcon)
             btnIcon.innerHTML = `<svg width="16" height="16"><use href="#icon-gift"/></svg>`;
         if (btnText)
-            btnText.textContent = `Claim Day ${targetDay} Bonus (+${nextReward})`;
+            btnText.textContent = isDailyClaiming ? 'Claiming...' : `Claim Day ${targetDay} Bonus (+${nextReward})`;
         if (btnCoin)
             btnCoin.style.display = 'inline-block';
         if (subText)
@@ -1143,24 +1177,33 @@ function renderTasks() {
             ? 'bg-violet-100/80 border-violet-500 ring-2 ring-violet-500/20'
             : 'bg-gradient-to-br from-violet-50/90 to-purple-50/60 border-violet-200/80'}`;
     }
-    const filtered = availableTasks.filter((t) => {
-        if (currentTaskFilter === 'telegram_join')
-            return t.type === 'telegram_join';
-        if (currentTaskFilter === 'social_visit')
-            return t.type === 'social_visit';
-        if (currentTaskFilter === 'app_task')
-            return t.type === 'app_task';
-        if (currentTaskFilter === 'play_game')
-            return t.type === 'play_game';
-        return true;
+    const sourceTasks = currentTaskFilter === 'done' ? allTasks.filter((t) => t.done) : availableTasks;
+    const filtered = sourceTasks.filter((t) => {
+        const matchesFilter = currentTaskFilter === 'all' || currentTaskFilter === 'done' || t.type === currentTaskFilter;
+        const searchable = `${t.title} ${t.description || ''} ${t.target || ''} ${t.type}`.toLowerCase();
+        return matchesFilter && (!taskSearchQuery || searchable.includes(taskSearchQuery));
     });
     if (!filtered.length) {
+        const emptyTitle = taskSearchQuery
+            ? 'No matching tasks'
+            : currentTaskFilter === 'done'
+                ? 'No completed tasks yet'
+                : availableTasks.length === 0
+                    ? 'All tasks completed!'
+                    : 'No tasks in this category';
+        const emptyMessage = taskSearchQuery
+            ? 'Try another title, category, or keyword.'
+            : currentTaskFilter === 'done'
+                ? 'Tasks you verify will appear here.'
+                : availableTasks.length === 0
+                    ? 'New or repeatable tasks will appear here when ready.'
+                    : 'Try another category or check back later.';
         listEl.replaceChildren(h("div", { className: "bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-2xs my-2" },
             h("div", { className: "w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto mb-3" },
                 h("svg", { width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.4" },
                     h("polyline", { points: "20 6 9 17 4 12" }))),
-            h("div", { className: "text-sm font-extrabold text-slate-900" }, "All Tasks Completed!"),
-            h("div", { className: "text-xs text-slate-500 mt-1 leading-relaxed" }, "You have completed all available tasks in this category. New or repeatable tasks will appear here when ready!")));
+            h("div", { className: "text-sm font-extrabold text-slate-900" }, emptyTitle),
+            h("div", { className: "text-xs text-slate-500 mt-1 leading-relaxed" }, emptyMessage)));
         return;
     }
     listEl.replaceChildren(...filtered.map((t) => {
@@ -1194,22 +1237,25 @@ function renderTasks() {
                 h("div", { className: "min-w-0" },
                     h("div", { className: "text-[13px] font-extrabold text-slate-900 truncate" }, t.title),
                     h("div", { className: "flex flex-wrap items-center gap-1.5 mt-1" },
-                        h("span", { className: "inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200/80 text-amber-800 text-[11px] font-extrabold" },
+                        t.done ? (h("span", { className: "inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-extrabold" },
+                            h("svg", { width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "3" },
+                                h("path", { d: "m5 12 4 4L19 6" })),
+                            "Completed")) : (h("span", { className: "inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200/80 text-amber-800 text-[11px] font-extrabold" },
                             h("svg", { width: "12", height: "12" },
                                 h("use", { href: "#icon-p-coin" })),
                             h("span", null,
                                 "+",
-                                t.reward)),
+                                t.reward))),
                         h("span", { className: "px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold" }, categoryLabel),
                         h("span", { className: "text-[10px] font-semibold text-slate-400" },
                             "\u2022 ",
                             timerHint),
                         repeatLabel ? (h("span", { className: "px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-extrabold uppercase" }, repeatLabel)) : null))),
-            h("div", { className: "flex items-center gap-1.5 shrink-0" },
+            t.done ? null : h("div", { className: "flex items-center gap-1.5 shrink-0" },
                 h("button", { type: "button", className: "px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-extrabold transition", onClick: () => doTask(t.id, t.url) }, openBtnLabel),
-                h("button", { type: "button", id: `verify-${t.id}`, disabled: waitRemaining > 0, onClick: () => claimTask(t.id), className: `px-3.5 py-2 rounded-xl text-xs font-extrabold text-white transition ${waitRemaining > 0
+                h("button", { type: "button", id: `verify-${t.id}`, disabled: waitRemaining > 0 || claimingTaskIds.has(t.id), onClick: () => claimTask(t.id), className: `px-3.5 py-2 rounded-xl text-xs font-extrabold text-white transition ${waitRemaining > 0 || claimingTaskIds.has(t.id)
                         ? 'bg-slate-400 cursor-not-allowed'
-                        : 'bg-blue-600 hover:bg-blue-700 shadow-xs'}` }, waitRemaining > 0 ? `${waitRemaining}s` : 'Verify'))));
+                        : 'bg-blue-600 hover:bg-blue-700 shadow-xs'}` }, claimingTaskIds.has(t.id) ? 'Checking...' : waitRemaining > 0 ? `${waitRemaining}s` : 'Verify'))));
     }));
 }
 function formatTimeAgo(iso) {
@@ -1409,6 +1455,7 @@ async function load() {
         }
     }
     setText('refCount', u.referrals);
+    setText('refBonusValue', `+${(state.referralBonusCoins || 500).toLocaleString()}`);
     const refInput = $('refLink');
     if (refInput)
         refInput.value = state.refLink;
@@ -1416,11 +1463,12 @@ async function load() {
     renderReferralsAndQualification();
     renderWithdrawMethodsAndCountries();
     renderTasks();
+    renderGames();
     renderNotifications();
     try {
         const hData = await api('/api/my-withdrawals');
         const withdrawals = hData.withdrawals || [];
-        const coinNotifs = (state.notifications || []).filter((n) => (n.coins || 0) > 0 && n.type !== 'withdraw');
+        const coinNotifs = (state.notifications || []).filter((n) => Boolean(n.coins) && n.type !== 'withdraw');
         const renderWithdrawNodes = () => {
             if (!withdrawals.length) {
                 return [
@@ -1462,13 +1510,13 @@ async function load() {
                             " \u2022 ",
                             n.type.toUpperCase())),
                     h("div", { className: "text-right shrink-0" },
-                        h("div", { className: "text-xs font-extrabold text-emerald-600 flex items-center justify-end gap-1" },
+                        h("div", { className: `text-xs font-extrabold flex items-center justify-end gap-1 ${n.coins < 0 ? 'text-amber-600' : 'text-emerald-600'}` },
                             h("span", null,
-                                "+",
-                                (n.coins || 0).toLocaleString()),
+                                n.coins < 0 ? '−' : '+',
+                                Math.abs(n.coins || 0).toLocaleString()),
                             h("svg", { width: "13", height: "13", className: "inline-block" },
                                 h("use", { href: "#icon-p-coin" }))),
-                        h("span", { className: "status-badge status-paid" }, "CREDITED"))));
+                        h("span", { className: `status-badge ${n.coins < 0 ? 'status-pending' : 'status-paid'}` }, n.coins < 0 ? 'SPENT' : 'CREDITED'))));
             });
             if (!items.length) {
                 return [
@@ -1498,20 +1546,115 @@ function doTask(id, url) {
     claimTask(id);
 }
 async function claimTask(id) {
-    const r = await api('/api/task/claim', {
-        method: 'POST',
-        body: JSON.stringify({ taskId: id })
-    });
-    if (r.ok) {
-        toast(`+${r.reward} coins credited!`, 'success');
-        await load();
+    if (claimingTaskIds.has(id))
+        return;
+    claimingTaskIds.add(id);
+    renderTasks();
+    try {
+        const r = await api('/api/task/claim', {
+            method: 'POST',
+            body: JSON.stringify({ taskId: id })
+        });
+        if (r.ok) {
+            toast(`+${r.reward} coins credited!`, 'success');
+            await load();
+        }
+        else if (r.started && r.waitSeconds) {
+            toast(r.error || `Wait ${r.waitSeconds}s before verifying`, 'warning');
+            startTaskCountdown(id, r.waitSeconds);
+        }
+        else {
+            toast(r.error || 'Could not verify task', 'warning');
+        }
     }
-    else if (r.started && r.waitSeconds) {
-        toast(r.error || `Wait ${r.waitSeconds}s before verifying`, 'warning');
-        startTaskCountdown(id, r.waitSeconds);
+    catch {
+        toast('Network error. Please try again.', 'error');
     }
-    else {
-        toast(r.error || 'Could not verify task', 'warning');
+    finally {
+        claimingTaskIds.delete(id);
+        renderTasks();
+    }
+}
+function renderGames() {
+    const grid = $('gamesGrid');
+    if (!grid || !state)
+        return;
+    const games = state.games || [];
+    if (!games.length) {
+        grid.replaceChildren(h("div", { className: "col-span-full rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center" },
+            h("div", { className: "mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50" },
+                h("img", { src: "/assets/icon-games.png", alt: "", className: "h-7 w-7 object-contain" })),
+            h("div", { className: "text-sm font-extrabold text-slate-900" }, "No games yet"),
+            h("div", { className: "mt-1 text-xs text-slate-500" }, "New games will show up here when they are published.")));
+        return;
+    }
+    grid.replaceChildren(...games.map((game) => (h("article", { className: "explore-game-card flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm", "data-title": `${game.title} ${game.description || ''} game play online` },
+        h("div", { className: "flex items-start gap-3 p-4" },
+            h("div", { className: "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-50" },
+                h("img", { src: "/assets/icon-games.png", alt: "", className: "h-6 w-6 object-contain" })),
+            h("div", { className: "min-w-0 flex-1" },
+                h("h3", { className: "truncate text-sm font-extrabold text-slate-900" }, game.title),
+                h("p", { className: "mt-1 line-clamp-2 min-h-8 text-xs leading-4 text-slate-500" }, game.description || 'Ready to play.'))),
+        h("div", { className: "flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/70 p-3.5" },
+            h("div", { className: "flex items-center gap-1.5 text-xs font-bold text-slate-700" },
+                h("svg", { width: "15", height: "15" },
+                    h("use", { href: "#icon-p-coin" })),
+                game.priceCoins > 0 ? `${game.priceCoins.toLocaleString()} coins / play` : 'Free to play'),
+            h("button", { type: "button", disabled: startingGameId === game.id, onClick: () => window.playGame(game.id), className: "shrink-0 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-extrabold text-white transition hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-60" }, startingGameId === game.id ? 'Starting...' : 'Play'))))));
+}
+async function playGame(id) {
+    if (startingGameId)
+        return;
+    const game = state?.games?.find((item) => item.id === id);
+    if (!game || !state)
+        return;
+    if (state.user.coins < game.priceCoins) {
+        toast(`You need ${game.priceCoins.toLocaleString()} coins to play this game.`, 'warning');
+        return;
+    }
+    startingGameId = id;
+    renderGames();
+    try {
+        const result = await api(`/api/games/${encodeURIComponent(id)}/play`, {
+            method: 'POST',
+            body: '{}'
+        });
+        if (!result.ok || !result.playUrl) {
+            toast(result.error || 'Could not start this game.', 'warning');
+            return;
+        }
+        state.user.coins = result.coins ?? state.user.coins;
+        setText('headerCoins', state.user.coins.toLocaleString());
+        setText('wCoins', state.user.coins.toLocaleString());
+        setText('npr', (state.user.coins / state.coinPerNpr).toFixed(2));
+        const gameTitle = $('activeGameTitle');
+        if (gameTitle)
+            gameTitle.textContent = game.title;
+        const frame = $('gameFrame');
+        const modal = $('gameModal');
+        if (frame && modal) {
+            frame.src = result.playUrl;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+        toast(game.priceCoins ? `${game.priceCoins.toLocaleString()} coins used. Have fun!` : 'Game started. Have fun!', 'success');
+    }
+    catch {
+        toast('Network error. Your balance was not charged.', 'error');
+    }
+    finally {
+        startingGameId = null;
+        renderGames();
+    }
+}
+function closeGame() {
+    const frame = $('gameFrame');
+    if (frame)
+        frame.src = 'about:blank';
+    const modal = $('gameModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
     }
 }
 async function watchAd() {
@@ -1549,18 +1692,33 @@ async function watchAd() {
     }
 }
 async function claimDaily() {
-    const r = await api('/api/daily', {
-        method: 'POST',
-        body: '{}'
-    });
-    if (r.ok) {
-        const claimedDay = r.dailyStreak || 1;
-        const reward = r.reward || 100;
-        triggerClaimAnimation(claimedDay, reward);
-        toast(`Day ${claimedDay} Check-in: +${reward} coins milyo!`, 'success');
+    if (isDailyClaiming || !state?.canDaily)
+        return;
+    isDailyClaiming = true;
+    const btn = $('dailyBtn');
+    if (btn)
+        btn.disabled = true;
+    try {
+        const r = await api('/api/daily', {
+            method: 'POST',
+            body: '{}'
+        });
+        if (r.ok) {
+            const claimedDay = r.dailyStreak || 1;
+            const reward = r.reward || 100;
+            triggerClaimAnimation(claimedDay, reward);
+            toast(`Day ${claimedDay} Check-in: +${reward} coins milyo!`, 'success');
+        }
+        else {
+            toast(r.error || 'Aaja ko bonus liyi sakyo', 'warning');
+        }
     }
-    else {
-        toast(r.error || 'Aaja ko bonus liyi sakyo', 'warning');
+    catch {
+        toast('Network error. Please try again.', 'error');
+    }
+    finally {
+        isDailyClaiming = false;
+        await load();
     }
     await load();
 }
@@ -1606,7 +1764,7 @@ function renderVerificationState(u) {
     if (menuSub) {
         menuSub.textContent = isVerified
             ? `${u.verification?.email || 'Verified'} • Blue Tick Active`
-            : 'Verify email & details for Blue Tick';
+            : 'Verify your details for Blue Tick';
     }
     const doneCard = $('verifyDoneCard');
     const formCard = $('verifyFormCard');
@@ -1616,7 +1774,7 @@ function renderVerificationState(u) {
     }
     if (isVerified && u.verification) {
         setText('verifiedNameText', u.verification.fullName);
-        setText('verifiedEmailText', u.verification.email);
+        setText('verifiedEmailText', u.verification.email || 'Not provided');
         setText('verifiedDobText', u.verification.dob);
         setText('verifiedGenderText', u.verification.gender);
     }
@@ -1644,7 +1802,7 @@ async function sendVerifyOtp() {
         toast('Full Name halnuहोस्', 'warning');
         return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         toast('Valid Email Address halnuहोस्', 'warning');
         return;
     }
@@ -1665,17 +1823,17 @@ async function sendVerifyOtp() {
             toast(r.error || 'Failed to send OTP', 'error');
             return;
         }
-        setText('otpTargetEmail', email);
+        setText('otpTargetEmail', 'your Telegram chat');
         const otpBox = $('verifyOtpBox');
         if (otpBox)
             otpBox.style.display = 'block';
         await load();
-        toast(r.message || `Verification OTP sent to ${email}!`, 'success');
+        toast(r.message || 'Verification OTP sent to your Telegram chat!', 'success');
     }
     finally {
         if (btn)
             btn.disabled = false;
-        setText('sendOtpBtnText', 'Resend OTP to Email');
+        setText('sendOtpBtnText', 'Resend OTP to Telegram');
     }
 }
 async function confirmVerifyOtp() {
@@ -1705,31 +1863,61 @@ async function confirmVerifyOtp() {
     }
 }
 async function withdraw() {
+    if (isWithdrawing)
+        return;
     const methodEl = $('wMethod');
     const accEl = $('wAccount');
     const amtEl = $('wAmount');
     if (!methodEl || !accEl || !amtEl)
         return;
-    const r = await api('/api/withdraw', {
-        method: 'POST',
-        body: JSON.stringify({
-            method: methodEl.value,
-            account: accEl.value.trim(),
-            amountCoins: amtEl.value
-        })
-    });
-    if (r.ok) {
-        toast('Withdraw request gayo! Admin le 1-2 din ma approve garcha', 'success');
-        accEl.value = '';
-        amtEl.value = '';
+    const amount = Math.floor(Number(amtEl.value));
+    if (!methodEl.value)
+        return toast('Choose a payout method first', 'warning');
+    if (accEl.value.trim().length < 5)
+        return toast('Enter a valid payout account or ID (at least 5 characters)', 'warning');
+    if (!Number.isFinite(amount) || amount <= 0)
+        return toast('Enter a valid coin amount', 'warning');
+    if (amount < (state?.minWithdrawCoins || 0))
+        return toast(`Minimum withdrawal is ${state?.minWithdrawCoins.toLocaleString()} coins`, 'warning');
+    if (amount > (state?.user.coins || 0))
+        return toast('Amount is higher than your balance', 'warning');
+    isWithdrawing = true;
+    const btn = $('withdrawBtn');
+    const originalText = btn?.textContent || 'Submit Withdrawal';
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Submitting...';
     }
-    else {
-        toast(r.error || 'Withdraw request failed', 'error');
+    try {
+        const r = await api('/api/withdraw', {
+            method: 'POST',
+            body: JSON.stringify({ method: methodEl.value, account: accEl.value.trim(), amountCoins: amount })
+        });
+        if (r.ok) {
+            toast('Withdraw request gayo! Admin le 1-2 din ma approve garcha', 'success');
+            accEl.value = '';
+            amtEl.value = '';
+            updateWithdrawPreview();
+        }
+        else {
+            toast(r.error || 'Withdraw request failed', 'error');
+        }
     }
-    await load();
+    catch {
+        toast('Network error. Please try again.', 'error');
+    }
+    finally {
+        isWithdrawing = false;
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+        await load();
+    }
 }
 window.showTab = showTab;
 window.filterExplore = filterExplore;
+window.filterTasks = filterTasks;
 window.clearSearch = clearSearch;
 window.setTaskFilter = setTaskFilter;
 window.selectMethod = selectMethod;
@@ -1745,6 +1933,8 @@ window.sendVerifyOtp = sendVerifyOtp;
 window.confirmVerifyOtp = confirmVerifyOtp;
 window.doTask = doTask;
 window.claimTask = claimTask;
+window.playGame = playGame;
+window.closeGame = closeGame;
 window.watchAd = watchAd;
 window.claimDaily = claimDaily;
 window.copyRef = copyRef;

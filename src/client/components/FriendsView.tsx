@@ -28,7 +28,7 @@ export function FriendsView() {
           <img src="/assets/icon-friends.png" alt="Invite Friends" className="w-14 h-14 object-contain shrink-0" />
           <div className="min-w-0">
             <h3 className="flex items-center gap-1.5 flex-wrap">
-              <span>Earn +500</span>
+              <span>Earn <span id="refBonusValue">+500</span></span>
               <svg width="18" height="18" className="inline-block shrink-0">
                 <use href="#icon-p-coin" />
               </svg>

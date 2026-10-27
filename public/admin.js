@@ -85,9 +85,130 @@ function h(tag, props, ...children) {
     return el;
 }
 
+// --- src/client/admin/AdminNavigation.tsx ---
+
+const items = [
+    { id: 'dashboard', label: 'Overview', icon: '⌂' },
+    { id: 'users', label: 'Users', icon: '◉' },
+    { id: 'withdrawal', label: 'Payouts', icon: '↗' },
+    { id: 'tasks', label: 'Tasks', icon: '▤' },
+    { id: 'games', label: 'Games', icon: 'games' },
+    { id: 'transactions', label: 'Transactions', icon: '⇄' },
+    { id: 'settings', label: 'Settings', icon: '⚙' }
+];
+function AdminGameIcon() {
+    return (h("svg", { width: "17", height: "17", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" },
+        h("path", { d: "M7 8h10a4 4 0 0 1 3.8 2.8l1.1 3.4a3 3 0 0 1-4.6 3.3l-2.1-1.4H8.8l-2.1 1.4a3 3 0 0 1-4.6-3.3l1.1-3.4A4 4 0 0 1 7 8Z" }),
+        h("path", { d: "M7 11v4m-2-2h4m7-.5h.01M18 14.5h.01" })));
+}
+function NavIcon(props) {
+    return props.item.id === 'games' ? h(AdminGameIcon, null) : h("span", null, props.item.icon);
+}
+function AdminNavigation(props) {
+    return (h(Fragment, null,
+        h("aside", { className: "fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-200 bg-white px-4 py-6 lg:flex" },
+            h("div", { className: "flex items-center gap-3 px-2 pb-8" },
+                h("div", { className: "flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-700 text-lg font-black text-white" }, "P"),
+                h("div", null,
+                    h("div", { className: "text-sm font-extrabold tracking-tight text-slate-900" }, "Paiso"),
+                    h("div", { className: "mt-0.5 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400" }, "Admin workspace"))),
+            h("div", { className: "px-3 pb-2 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400" }, "Workspace"),
+            h("nav", { className: "flex flex-col gap-1.5" }, items.map((item) => {
+                const active = props.activeTab === item.id;
+                return (h("button", { type: "button", "data-admintab": item.id, "aria-current": active ? 'page' : undefined, onClick: () => props.onSelect(item.id), className: 'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ' + (active ? 'bg-emerald-50 text-emerald-800' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900') },
+                    h("span", { className: 'flex h-8 w-8 items-center justify-center rounded-lg text-base ' + (active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500') },
+                        h(NavIcon, { item: item })),
+                    item.label));
+            })),
+            h("div", { className: "mt-auto rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4" },
+                h("div", { className: "text-xs font-bold text-emerald-900" }, "Paiso Control Center"),
+                h("p", { className: "mt-1 text-[11px] leading-5 text-emerald-800/70" }, "Members, tasks, games and payouts."))),
+        h("nav", { className: "fixed inset-x-0 bottom-0 z-30 flex gap-1 overflow-x-auto border-t border-slate-200 bg-white/95 px-2 pb-[max(8px,env(safe-area-inset-bottom))] pt-2 shadow-[0_-4px_20px_rgba(15,23,42,.06)] backdrop-blur lg:hidden" }, items.map((item) => {
+            const active = props.activeTab === item.id;
+            return (h("button", { type: "button", "data-admintab": item.id, "aria-current": active ? 'page' : undefined, onClick: () => props.onSelect(item.id), className: 'flex min-w-[64px] flex-1 flex-col items-center gap-1 rounded-xl px-1 py-1.5 text-[10px] font-semibold ' + (active ? 'text-emerald-800' : 'text-slate-500') },
+                h("span", { className: 'flex h-7 w-8 items-center justify-center rounded-lg text-base ' + (active ? 'bg-emerald-50' : '') },
+                    h(NavIcon, { item: item })),
+                h("span", null, item.label)));
+        }))));
+}
+
+// --- src/client/admin/AdminStatCard.tsx ---
+
+const valueTone = { slate: 'text-slate-950', blue: 'text-blue-700', amber: 'text-amber-700', green: 'text-emerald-700' };
+const dotTone = { slate: 'bg-slate-400', blue: 'bg-blue-500', amber: 'bg-amber-500', green: 'bg-emerald-500' };
+function AdminStatCard(props) {
+    const tone = props.tone || 'slate';
+    return h("article", { className: "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/[.02] sm:p-5" },
+        h("div", { className: "flex items-center justify-between gap-2" },
+            h("p", { className: "text-xs font-semibold text-slate-500" }, props.label),
+            h("span", { className: 'h-2.5 w-2.5 rounded-full ring-4 ring-slate-100 ' + dotTone[tone] })),
+        h("p", { className: 'mt-3 break-words text-2xl font-extrabold tracking-tight sm:text-[28px] ' + valueTone[tone] }, props.value),
+        h("p", { className: "mt-1 text-[11px] text-slate-400" }, props.detail));
+}
+
+// --- src/client/admin/AdminUserEditor.tsx ---
+function AdminUserEditor(props) {
+    const user = props.user;
+    return (h("div", { className: "mx-auto max-w-4xl space-y-5" },
+        h("button", { type: "button", onClick: props.onBack, className: "inline-flex items-center gap-2 rounded-lg py-2 text-sm font-semibold text-slate-500 transition hover:text-slate-900" },
+            h("span", { "aria-hidden": "true" }, "\u2190"),
+            " Back to users"),
+        h("div", { className: "flex flex-wrap items-end justify-between gap-3" },
+            h("div", null,
+                h("p", { className: "text-xs font-bold uppercase tracking-[.14em] text-emerald-700" }, "User management"),
+                h("h2", { className: "mt-1 text-2xl font-extrabold tracking-tight text-slate-950" }, user ? 'Edit user' : 'Add user'),
+                h("p", { className: "mt-1 text-sm text-slate-500" }, user ? 'Update account details and status.' : 'Create an account and set its starting balance.')),
+            user ? h("span", { className: "rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600" },
+                "ID #",
+                user.id) : null),
+        h("section", { className: "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7" },
+            h("h3", { className: "text-sm font-bold text-slate-900" }, "Account details"),
+            h("p", { className: "mt-1 text-xs text-slate-500" }, "Keep the account information accurate and easy to identify."),
+            h("div", { className: "mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2" },
+                h("label", { className: "text-xs font-semibold text-slate-600" },
+                    "User ID",
+                    h("input", { id: "crudUserId", type: "text", value: user?.id || '', disabled: Boolean(user), placeholder: "e.g. 9812345", className: "mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm disabled:bg-slate-100 disabled:text-slate-500" })),
+                h("label", { className: "text-xs font-semibold text-slate-600" },
+                    "Full name",
+                    h("input", { id: "crudUserName", type: "text", value: user?.name || '', placeholder: "Full name", className: "mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm" })),
+                h("label", { className: "text-xs font-semibold text-slate-600" },
+                    "Username",
+                    h("input", { id: "crudUserHandle", type: "text", value: user?.username || '', placeholder: "username", className: "mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm" })),
+                h("label", { className: "text-xs font-semibold text-slate-600" },
+                    "Email",
+                    h("input", { id: "crudUserEmail", type: "email", value: user?.email || '', placeholder: "name@example.com", className: "mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm" })))),
+        h("section", { className: "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7" },
+            h("h3", { className: "text-sm font-bold text-slate-900" }, "Balance and activity"),
+            h("p", { className: "mt-1 text-xs text-slate-500" }, "Adjust the balance and keep the account status up to date."),
+            h("div", { className: "mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2" },
+                h("label", { className: "text-xs font-semibold text-slate-600" },
+                    "Coin balance",
+                    h("input", { id: "crudUserCoins", type: "number", min: "0", value: user?.coins ?? 0, className: "mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-bold" })),
+                h("div", { className: "grid grid-cols-2 gap-3" },
+                    h("label", { className: "text-xs font-semibold text-slate-600" },
+                        "Ads completed",
+                        h("input", { id: "crudUserAds", type: "number", min: "0", value: user?.adsDone ?? 0, className: "mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm" })),
+                    h("label", { className: "text-xs font-semibold text-slate-600" },
+                        "Daily check-ins",
+                        h("input", { id: "crudUserDaily", type: "number", min: "0", value: user?.dailyDone ?? 0, className: "mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm" }))),
+                h("label", { className: "flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 sm:col-span-2" },
+                    h("input", { id: "crudUserVerified", type: "checkbox", checked: Boolean(user?.verified), className: "h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600" }),
+                    h("span", null,
+                        h("span", { className: "block text-sm font-semibold text-slate-800" }, "Verified account"),
+                        h("span", { className: "mt-0.5 block text-xs text-slate-500" }, "Show the verification badge on this user."))))),
+        h("div", { className: "flex flex-col-reverse justify-end gap-2 sm:flex-row" },
+            h("button", { type: "button", onClick: props.onBack, className: "rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50" }, "Cancel"),
+            h("button", { id: "userSaveButton", type: "button", disabled: props.saving, onClick: props.onSave, className: "rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60" }, props.saving ? 'Saving...' : user ? 'Save changes' : 'Create user'))));
+}
+
 // --- src/client/admin.tsx ---
 
-let adminKey = sessionStorage.getItem('paiso_admin_key') || '8990374489';
+
+
+
+let adminKey = sessionStorage.getItem('paiso_admin_key') || '';
+let isRefreshing = false;
+let isSavingUser = false;
 let activeTab = 'dashboard';
 let data = null;
 let apiCountries = [];
@@ -98,6 +219,7 @@ let userSearchQuery = '';
 let showUserEditor = false;
 let editingUserId = null;
 let editingTaskId = null;
+let editingGameId = null;
 let taskCategoryFilter = 'all';
 let showWithdrawEditor = false;
 let editingWithdrawId = null;
@@ -131,10 +253,12 @@ async function adminApi(path, opts = {}) {
             ...(opts.headers || {})
         }
     });
-    if (r.status === 403) {
-        throw new Error('Invalid Admin Key');
-    }
-    return r.json();
+    const body = await r.json().catch(() => ({}));
+    if (r.status === 403)
+        throw new Error('Invalid admin ID');
+    if (!r.ok)
+        throw new Error(body?.error || body?.message || 'Request failed (' + r.status + ')');
+    return body;
 }
 async function loadCountriesFromApi() {
     try {
@@ -152,31 +276,16 @@ function DashboardTabView(props) {
     const activeMethods = (s.settings.methods || []).filter((m) => m.enabled !== false);
     const countries = s.settings.countries || [];
     return (h("div", { className: "space-y-6" },
-        h("div", { className: "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4" },
-            h("div", { className: "bg-white border border-slate-200 rounded-xl p-4" },
-                h("div", { className: "text-[11px] font-bold text-slate-400 uppercase" }, "Total Users"),
-                h("div", { className: "text-2xl font-extrabold text-slate-900 mt-1" }, s.totalUsers)),
-            h("div", { className: "bg-white border border-slate-200 rounded-xl p-4" },
-                h("div", { className: "text-[11px] font-bold text-slate-400 uppercase" }, "Verified Users"),
-                h("div", { className: "text-2xl font-extrabold text-sky-600 mt-1" }, s.verifiedUsers)),
-            h("div", { className: "bg-white border border-slate-200 rounded-xl p-4" },
-                h("div", { className: "text-[11px] font-bold text-slate-400 uppercase" }, "Pending Withdraw"),
-                h("div", { className: "text-2xl font-extrabold text-amber-600 mt-1" }, s.pendingWithdrawals)),
-            h("div", { className: "bg-white border border-slate-200 rounded-xl p-4" },
-                h("div", { className: "text-[11px] font-bold text-slate-400 uppercase" }, "Pending NPR"),
-                h("div", { className: "text-2xl font-extrabold text-slate-900 mt-1" },
-                    "Rs ",
-                    s.pendingNpr)),
-            h("div", { className: "bg-white border border-slate-200 rounded-xl p-4" },
-                h("div", { className: "text-[11px] font-bold text-slate-400 uppercase" }, "Total Paid"),
-                h("div", { className: "text-2xl font-extrabold text-[#16A34A] mt-1" },
-                    "Rs ",
-                    s.paidNpr)),
-            h("div", { className: "bg-white border border-slate-200 rounded-xl p-4" },
-                h("div", { className: "text-[11px] font-bold text-slate-400 uppercase" }, "Active Tasks"),
-                h("div", { className: "text-2xl font-extrabold text-slate-900 mt-1" }, s.tasks.length))),
+        h("div", { className: "grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-7" },
+            h(AdminStatCard, { label: "Total users", value: s.totalUsers.toLocaleString(), detail: "Registered members" }),
+            h(AdminStatCard, { label: "Verified", value: s.verifiedUsers.toLocaleString(), detail: "Verified members", tone: "blue" }),
+            h(AdminStatCard, { label: "Pending payouts", value: s.pendingWithdrawals.toLocaleString(), detail: "Needs review", tone: "amber" }),
+            h(AdminStatCard, { label: "Pending value", value: 'Rs ' + s.pendingNpr.toLocaleString(), detail: "Awaiting approval", tone: "amber" }),
+            h(AdminStatCard, { label: "Paid out", value: 'Rs ' + s.paidNpr.toLocaleString(), detail: "Completed payouts", tone: "green" }),
+            h(AdminStatCard, { label: "Active tasks", value: s.tasks.length.toLocaleString(), detail: "Available in app" }),
+            h(AdminStatCard, { label: "Game coins", value: (s.gameCoinsCollected || 0).toLocaleString(), detail: `${(s.gameStarts || 0).toLocaleString()} starts`, tone: "green" })),
         h("div", { className: "grid grid-cols-1 lg:grid-cols-2 gap-5" },
-            h("div", { className: "bg-white border border-slate-200 rounded-xl p-5" },
+            h("div", { className: "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6" },
                 h("div", { className: "flex items-center justify-between mb-3" },
                     h("h3", { className: "text-sm font-extrabold text-slate-900" }, "Pending Withdrawals"),
                     h("button", { type: "button", onClick: () => switchAdminTab('withdrawal'), className: "text-xs font-bold text-[#16A34A] hover:underline" }, "Manage All")),
@@ -196,13 +305,10 @@ function DashboardTabView(props) {
                             "NPR ",
                             w.npr),
                         h("button", { type: "button", onClick: () => decideWithdraw(w.id, 'paid'), className: "px-2 py-0.5 bg-[#16A34A] text-white font-bold rounded text-[11px]" }, "Approve")))))) : (h("div", { className: "py-8 text-center text-slate-400" }, "No pending withdrawals")))),
-            h("div", { className: "bg-white border border-slate-200 rounded-xl p-5" },
+            h("div", { className: "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6" },
                 h("div", { className: "flex items-center justify-between mb-3" },
                     h("h3", { className: "text-sm font-extrabold text-slate-900" }, "Withdrawal Configuration"),
-                    h("button", { type: "button", onClick: () => {
-                            switchAdminTab('withdrawal');
-                            toggleWithdrawSettingsModal(true);
-                        }, className: "text-xs font-bold text-[#16A34A] hover:underline" }, "Configure")),
+                    h("button", { type: "button", onClick: () => switchAdminTab('settings'), className: "text-xs font-bold text-[#16A34A] hover:underline" }, "Settings")),
                 h("div", { className: "space-y-2.5 text-xs" },
                     h("div", { className: "flex justify-between py-2 border-b border-slate-100" },
                         h("span", { className: "text-slate-500" }, "Custom Methods"),
@@ -232,47 +338,19 @@ function UsersTabView(props) {
         u.id.toLowerCase().includes(q) ||
         u.email.toLowerCase().includes(q));
     const editUser = editingUserId ? s.users.find((u) => u.id === editingUserId) : null;
-    return (h("div", { className: "bg-white border border-slate-200 rounded-xl p-5" },
+    if (showUserEditor)
+        return h(AdminUserEditor, { user: editUser || null, saving: isSavingUser, onBack: closeUserForm, onSave: saveUserCrud });
+    return (h("div", { className: "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6" },
         h("div", { className: "flex flex-wrap items-center justify-between gap-3 mb-4" },
             h("h2", { className: "text-base font-extrabold text-slate-900" },
                 "User Management (",
                 filtered.length,
                 ")"),
             h("div", { className: "flex items-center gap-2.5" },
-                h("input", { type: "text", value: userSearchQuery, onInput: (e) => filterAdminUsers(e.target.value), placeholder: "Search user, ID, email...", className: "w-60 px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#16A34A]" }),
+                h("input", { type: "text", value: userSearchQuery, onInput: (e) => filterAdminUsers(e.target.value), placeholder: "Search name, username, ID or email...", className: "w-60 px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#16A34A]" }),
                 h("button", { type: "button", onClick: () => openUserForm(), className: "px-3.5 py-2 bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-bold rounded-lg transition" }, "+ Add User"))),
-        showUserEditor ? (h("div", { className: "mb-5 p-4 bg-slate-50 border border-slate-200 rounded-xl" },
-            h("div", { className: "flex items-center justify-between mb-3" },
-                h("h3", { className: "text-xs font-extrabold uppercase text-slate-700" }, editUser ? `Edit User #${editUser.id}` : 'Create New User'),
-                h("button", { type: "button", onClick: () => closeUserForm(), className: "text-xs font-bold text-slate-400 hover:text-slate-700" }, "\u2715 Close")),
-            h("div", { className: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 text-xs" },
-                h("div", null,
-                    h("label", { className: "block text-[11px] text-slate-500 font-semibold mb-1" }, "User ID"),
-                    h("input", { id: "crudUserId", type: "text", value: editUser ? editUser.id : '', disabled: Boolean(editUser), placeholder: "e.g. 9812345", className: "w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg" })),
-                h("div", null,
-                    h("label", { className: "block text-[11px] text-slate-500 font-semibold mb-1" }, "Full Name"),
-                    h("input", { id: "crudUserName", type: "text", value: editUser ? editUser.name : '', placeholder: "Full Name", className: "w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg" })),
-                h("div", null,
-                    h("label", { className: "block text-[11px] text-slate-500 font-semibold mb-1" }, "Username"),
-                    h("input", { id: "crudUserHandle", type: "text", value: editUser ? editUser.username : '', placeholder: "username", className: "w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg" })),
-                h("div", null,
-                    h("label", { className: "block text-[11px] text-slate-500 font-semibold mb-1" }, "Coins Balance"),
-                    h("input", { id: "crudUserCoins", type: "number", value: editUser ? editUser.coins : 0, className: "w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg font-bold" })),
-                h("div", null,
-                    h("label", { className: "block text-[11px] text-slate-500 font-semibold mb-1" }, "Email"),
-                    h("input", { id: "crudUserEmail", type: "email", value: editUser ? editUser.email : '', placeholder: "user@mail.com", className: "w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg" })),
-                h("div", null,
-                    h("label", { className: "block text-[11px] text-slate-500 font-semibold mb-1" }, "Ads / Check-ins"),
-                    h("div", { className: "grid grid-cols-2 gap-1.5" },
-                        h("input", { id: "crudUserAds", type: "number", value: editUser ? editUser.adsDone : 0, title: "Ads Done", className: "w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg" }),
-                        h("input", { id: "crudUserDaily", type: "number", value: editUser ? editUser.dailyDone : 0, title: "Daily Check-ins", className: "w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg" }))),
-                h("div", { className: "flex flex-col justify-end" },
-                    h("label", { className: "inline-flex items-center gap-2 text-xs font-bold text-slate-700 mb-2 cursor-pointer" },
-                        h("input", { id: "crudUserVerified", type: "checkbox", checked: Boolean(editUser?.verified), className: "rounded" }),
-                        h("span", null, "Blue Tick Verified")),
-                    h("button", { type: "button", onClick: () => saveUserCrud(), className: "w-full py-1.5 bg-[#16A34A] hover:bg-[#15803D] text-white font-bold rounded-lg" }, editUser ? 'Update User' : 'Create User'))))) : null,
         h("div", { className: "overflow-x-auto" },
-            h("table", { className: "w-full text-left border-collapse text-xs" },
+            h("table", { className: "w-full min-w-[760px] border-collapse text-left text-xs" },
                 h("thead", null,
                     h("tr", { className: "border-b border-slate-200 text-slate-400 uppercase font-bold text-[11px]" },
                         h("th", { className: "py-2.5 px-3" }, "User"),
@@ -280,7 +358,7 @@ function UsersTabView(props) {
                         h("th", { className: "py-2.5 px-3" }, "Qualification"),
                         h("th", { className: "py-2.5 px-3" }, "Coins"),
                         h("th", { className: "py-2.5 px-3" }, "Referrals"),
-                        h("th", { className: "py-2.5 px-3 text-right" }, "CRUD Actions"))),
+                        h("th", { className: "py-2.5 px-3 text-right" }, "Actions"))),
                 h("tbody", { className: "divide-y divide-slate-100" }, filtered.length ? (filtered.map((u) => (h("tr", { className: "hover:bg-slate-50" },
                     h("td", { className: "py-3 px-3" },
                         h("div", { className: "font-bold text-slate-900 flex items-center gap-1" },
@@ -334,51 +412,22 @@ function WithdrawalTabView(props) {
     const activeMethods = (s.settings.methods || []).filter((m) => m.enabled !== false);
     const activeCountries = s.settings.countries || [];
     return (h("div", { className: "space-y-4" },
-        h("div", { className: "bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4" },
-            h("div", { className: "flex flex-wrap items-center gap-6" },
-                h("div", null,
-                    h("div", { className: "text-[11px] font-bold uppercase text-slate-400" },
-                        "Active Methods (",
-                        activeMethods.length,
-                        ")"),
-                    h("div", { className: "flex flex-wrap items-center gap-1.5 mt-1" }, activeMethods.length ? (activeMethods.map((m) => (h("span", { className: "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 text-xs font-bold" },
-                        m.logo ? (h("img", { src: m.logo, className: "w-4 h-4 rounded object-contain bg-white" })) : (h("span", { className: "w-4 h-4 rounded bg-slate-300 text-[10px] flex items-center justify-center font-extrabold" }, m.name.slice(0, 1).toUpperCase())),
-                        h("span", null, m.name))))) : (h("span", { className: "text-xs font-bold text-amber-600" }, "No methods added")))),
-                h("div", { className: "h-8 w-px bg-slate-200 hidden sm:block" }),
-                h("div", null,
-                    h("div", { className: "text-[11px] font-bold uppercase text-slate-400" }, "Minimum Payout"),
-                    h("div", { className: "text-sm font-extrabold text-slate-900 mt-0.5" },
-                        s.settings.minWithdrawCoins.toLocaleString(),
-                        " Coins",
-                        ' ',
-                        h("span", { className: "text-xs font-semibold text-slate-500" },
-                            "(NPR ",
-                            (s.settings.minWithdrawCoins / (s.settings.coinPerNpr || 100)).toFixed(0),
-                            ")"))),
-                h("div", { className: "h-8 w-px bg-slate-200 hidden sm:block" }),
-                h("div", null,
-                    h("div", { className: "text-[11px] font-bold uppercase text-slate-400" },
-                        "Allowed Countries (",
-                        activeCountries.length,
-                        ")"),
-                    h("div", { className: "flex flex-wrap items-center gap-1.5 mt-1" }, activeCountries.length ? (activeCountries.map((c) => (h("span", { className: "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold" },
-                        c.flag ? h("img", { src: c.flag, className: "w-4 h-3 object-cover rounded-sm" }) : null,
-                        h("span", null, c.name))))) : (h("span", { className: "text-xs font-bold text-slate-400" }, "All Countries"))))),
-            h("div", { className: "flex items-center gap-2" },
-                h("button", { type: "button", onClick: () => openWithdrawForm(), className: "px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition" }, "+ Manual Withdrawal"),
-                h("button", { type: "button", onClick: () => switchAdminTab('settings'), className: "px-4 py-2 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-[#16A34A] text-emerald-800 hover:text-white text-xs font-extrabold flex items-center gap-2 transition shadow-xs" },
-                    h("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2", "stroke-linecap": "round", "stroke-linejoin": "round" },
-                        h("circle", { cx: "12", cy: "12", r: "3" }),
-                        h("path", { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" })),
-                    h("span", null, "Withdrawal Settings")))),
+        h("div", { className: "grid grid-cols-2 gap-3 lg:grid-cols-4" },
+            h(AdminStatCard, { label: "Pending requests", value: s.pendingWithdrawals.toLocaleString(), detail: "Waiting for review", tone: "amber" }),
+            h(AdminStatCard, { label: "Pending value", value: 'Rs ' + s.pendingNpr.toLocaleString(), detail: "Ready to process", tone: "amber" }),
+            h(AdminStatCard, { label: "Paid requests", value: s.paidWithdrawals.toLocaleString(), detail: "Completed payouts", tone: "green" }),
+            h(AdminStatCard, { label: "Total paid", value: 'Rs ' + s.paidNpr.toLocaleString(), detail: "Successfully sent", tone: "green" })),
+        h("div", null,
+            h("h2", { className: "text-lg font-extrabold tracking-tight text-slate-950" }, "Payout requests"),
+            h("p", { className: "mt-1 text-sm text-slate-500" }, "Review and process pending requests.")),
         showWithdrawEditor ? (h("div", { className: "p-4 bg-white border border-slate-200 rounded-xl" },
             h("div", { className: "flex items-center justify-between mb-3" },
-                h("h3", { className: "text-xs font-extrabold uppercase text-slate-700" }, editW ? `Edit Withdrawal ${editW.id}` : 'Create Manual Withdrawal'),
+                h("h3", { className: "text-sm font-bold text-slate-900" }, "Edit payout"),
                 h("button", { type: "button", onClick: () => closeWithdrawForm(), className: "text-xs font-bold text-slate-400 hover:text-slate-700" }, "\u2715 Close")),
             h("div", { className: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 text-xs" },
                 h("div", null,
                     h("label", { className: "block text-[11px] text-slate-500 font-semibold mb-1" }, "User ID"),
-                    h("input", { id: "crudWUserId", type: "text", value: editW ? editW.userId : '', disabled: Boolean(editW), placeholder: "User ID", className: "w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg" })),
+                    h("input", { id: "crudWUserId", type: "text", value: editW ? editW.userId : '', disabled: true, placeholder: "User ID", className: "w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg" })),
                 h("div", null,
                     h("label", { className: "block text-[11px] text-slate-500 font-semibold mb-1" }, "Method"),
                     h("select", { id: "crudWMethod", value: editW?.method || methodOptions[0], className: "w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold" }, methodOptions.map((m) => (h("option", { value: m, selected: editW?.method === m }, m))))),
@@ -396,13 +445,13 @@ function WithdrawalTabView(props) {
                             h("option", { value: "paid" }, "paid"),
                             h("option", { value: "rejected" }, "rejected"))),
                     h("button", { type: "button", onClick: () => saveWithdrawCrud(), className: "px-4 py-1.5 bg-[#16A34A] text-white font-bold rounded-lg" }, "Save"))))) : null,
-        h("div", { className: "bg-white border border-slate-200 rounded-xl p-5" },
+        h("div", { className: "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6" },
             h("h2", { className: "text-base font-extrabold text-slate-900 mb-3" },
                 "Pending Withdrawal Requests (",
                 pending.length,
                 ")"),
             h("div", { className: "overflow-x-auto" },
-                h("table", { className: "w-full text-left border-collapse text-xs" },
+                h("table", { className: "w-full min-w-[760px] border-collapse text-left text-xs" },
                     h("thead", null,
                         h("tr", { className: "border-b border-slate-200 text-slate-400 uppercase font-bold text-[11px]" },
                             h("th", { className: "py-2.5 px-3" }, "ID"),
@@ -449,69 +498,33 @@ function TasksTabView(props) {
     const repeatableCount = s.tasks.filter((t) => (t.resetHours || 0) > 0).length;
     const totalActiveClaims = s.tasks.reduce((sum, t) => sum + (t.claimsCount || 0), 0);
     return (h("div", { className: "space-y-4" },
-        h("div", { className: "bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4" },
-            h("div", { className: "flex flex-wrap items-center gap-6" },
-                h("div", null,
-                    h("div", { className: "text-[11px] font-bold uppercase text-slate-400" }, "Total Tasks"),
-                    h("div", { className: "text-base font-extrabold text-slate-900 mt-0.5" },
-                        s.tasks.length,
-                        " Tasks")),
-                h("div", { className: "h-8 w-px bg-slate-200 hidden sm:block" }),
-                h("div", null,
-                    h("div", { className: "text-[11px] font-bold uppercase text-slate-400" }, "Categories"),
-                    h("div", { className: "flex flex-wrap items-center gap-1.5 mt-1 text-xs font-bold" },
-                        h("span", { className: "px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200" },
-                            "App Task: ",
-                            appTasksCount),
-                        h("span", { className: "px-2 py-0.5 rounded-md bg-violet-50 text-violet-700 border border-violet-200" },
-                            "Play Game: ",
-                            gameTasksCount),
-                        h("span", { className: "px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200" },
-                            "Telegram: ",
-                            tgTasksCount),
-                        h("span", { className: "px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200" },
-                            "Social/Web: ",
-                            socialTasksCount))),
-                h("div", { className: "h-8 w-px bg-slate-200 hidden sm:block" }),
-                h("div", null,
-                    h("div", { className: "text-[11px] font-bold uppercase text-slate-400" }, "Auto-Resetting"),
-                    h("div", { className: "text-sm font-extrabold text-emerald-700 mt-0.5" },
-                        repeatableCount,
-                        " Repeatable")),
-                h("div", { className: "h-8 w-px bg-slate-200 hidden sm:block" }),
-                h("div", null,
-                    h("div", { className: "text-[11px] font-bold uppercase text-slate-400" }, "Active Completions"),
-                    h("div", { className: "text-sm font-extrabold text-slate-900 mt-0.5" },
-                        totalActiveClaims,
-                        " Claims"))),
-            h("div", { className: "flex items-center gap-2" },
-                h("button", { type: "button", onClick: () => resetAllTasksClaims(), className: "px-3.5 py-2 rounded-lg bg-amber-50 hover:bg-amber-500 text-amber-800 hover:text-white border border-amber-300 text-xs font-extrabold flex items-center gap-1.5 transition" },
-                    h("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.3", "stroke-linecap": "round", "stroke-linejoin": "round" },
-                        h("polyline", { points: "23 4 23 10 17 10" }),
-                        h("polyline", { points: "1 20 1 14 7 14" }),
-                        h("path", { d: "M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" })),
-                    h("span", null, "Reset All Tasks Claims")))),
+        h("div", { className: "grid grid-cols-2 gap-3 sm:grid-cols-3" },
+            h(AdminStatCard, { label: "Tasks", value: s.tasks.length.toLocaleString(), detail: "Published" }),
+            h(AdminStatCard, { label: "Repeatable", value: repeatableCount.toLocaleString(), detail: "Scheduled reset", tone: "blue" }),
+            h(AdminStatCard, { label: "Completions", value: totalActiveClaims.toLocaleString(), detail: "Current total", tone: "green" })),
+        h("div", { className: "flex justify-end" },
+            h("button", { type: "button", onClick: () => resetAllTasksClaims(), className: "rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-bold text-amber-800 transition hover:bg-amber-100" }, "Reset all completions")),
         h("div", { className: "grid grid-cols-1 lg:grid-cols-3 gap-5" },
-            h("div", { className: "bg-white border border-slate-200 rounded-xl p-5 h-fit" },
+            h("div", { className: "h-fit rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6" },
                 h("div", { className: "flex items-center justify-between pb-3 mb-4 border-b border-slate-100" },
                     h("div", null,
-                        h("h2", { className: "text-sm font-extrabold text-slate-900" }, editTask ? `Edit Task` : 'Create New Task'),
-                        h("p", { className: "text-[11px] text-slate-500" }, editTask ? `Editing ID: ${editTask.id}` : 'Add a one-time or repeatable task')),
+                        h("h2", { className: "text-sm font-extrabold text-slate-900" }, editTask ? `Edit Task` : 'New task'),
+                        h("p", { className: "text-[11px] text-slate-500" }, editTask ? `Editing ID: ${editTask.id}` : 'Create task')),
                     h("button", { type: "button", onClick: () => clearTaskFormInputs(), className: "px-2.5 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-[11px] font-bold text-slate-600" }, editTask ? 'Cancel Edit' : 'Reset Form')),
                 h("div", { className: "space-y-3.5 text-xs" },
                     h("div", null,
-                        h("label", { className: "block text-[11px] text-slate-600 font-bold mb-1" }, "Task Title"),
+                        h("label", { className: "block text-[11px] text-slate-600 font-bold mb-1" }, "Title"),
                         h("input", { id: "newTaskTitle", type: "text", value: editTask ? editTask.title : '', placeholder: "e.g. Join Official Telegram Channel", className: "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-semibold focus:outline-none focus:border-[#16A34A]" })),
                     h("div", { className: "grid grid-cols-2 gap-2.5" },
                         h("div", null,
-                            h("label", { className: "block text-[11px] text-slate-600 font-bold mb-1" }, "Task Type"),
+                            h("label", { className: "block text-[11px] text-slate-600 font-bold mb-1" }, "Type"),
                             h("select", { id: "newTaskType", value: editTask?.type || 'app_task', className: "w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold focus:outline-none focus:border-[#16A34A]" },
                                 h("option", { value: "app_task" }, "App Task"),
                                 h("option", { value: "play_game" }, "Play Game"),
                                 h("option", { value: "social_visit" }, "Social / Web Visit"),
                                 h("option", { value: "telegram_join" }, "Telegram Join"))),
                         h("div", null,
-                            h("label", { className: "block text-[11px] text-slate-600 font-bold mb-1" }, "Reset Frequency"),
+                            h("label", { className: "block text-[11px] text-slate-600 font-bold mb-1" }, "Reset"),
                             h("select", { id: "newTaskResetHours", value: String(editTask?.resetHours || 0), className: "w-full px-2.5 py-2 bg-emerald-50/60 border border-emerald-200 text-emerald-950 rounded-lg font-bold focus:outline-none focus:border-[#16A34A]" },
                                 h("option", { value: "0" }, "One-Time Only"),
                                 h("option", { value: "24" }, "Daily (Every 24h)"),
@@ -520,26 +533,25 @@ function TasksTabView(props) {
                                 h("option", { value: "1" }, "Every 1 Hour")))),
                     h("div", { className: "grid grid-cols-2 gap-2.5" },
                         h("div", null,
-                            h("label", { className: "block text-[11px] text-slate-600 font-bold mb-1" }, "Reward (Coins)"),
+                            h("label", { className: "block text-[11px] text-slate-600 font-bold mb-1" }, "Reward"),
                             h("input", { id: "newTaskReward", type: "number", value: editTask ? editTask.reward : 200, className: "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-extrabold text-[#16A34A] focus:outline-none focus:border-[#16A34A]" })),
                         h("div", null,
-                            h("label", { className: "block text-[11px] text-slate-600 font-bold mb-1" }, "Verify Timer (Sec)"),
+                            h("label", { className: "block text-[11px] text-slate-600 font-bold mb-1" }, "Wait (sec)"),
                             h("input", { id: "newTaskWait", type: "number", value: editTask ? editTask.waitSeconds || 15 : 15, className: "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold focus:outline-none focus:border-[#16A34A]" }))),
                     h("div", null,
-                        h("label", { className: "block text-[11px] text-slate-600 font-bold mb-1" }, "Task Destination URL"),
+                        h("label", { className: "block text-[11px] text-slate-600 font-bold mb-1" }, "Destination URL"),
                         h("input", { id: "newTaskUrl", type: "text", value: editTask ? editTask.url : '', placeholder: "https://t.me/... or https://youtube.com/...", className: "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#16A34A]" })),
                     h("div", null,
-                        h("label", { className: "block text-[11px] text-slate-600 font-bold mb-1" }, "Telegram @Channel (For Telegram Join)"),
+                        h("label", { className: "block text-[11px] text-slate-600 font-bold mb-1" }, "Telegram target"),
                         h("input", { id: "newTaskTarget", type: "text", value: editTask ? editTask.target : '', placeholder: "@yourchannel (optional for web tasks)", className: "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#16A34A]" })),
-                    h("button", { type: "button", onClick: () => saveTaskCrud(), className: "w-full bg-[#16A34A] hover:bg-[#15803D] text-white font-extrabold py-2.5 rounded-lg transition" }, editTask ? 'Save Task Changes' : '+ Create Task'))),
-            h("div", { className: "lg:col-span-2 bg-white border border-slate-200 rounded-xl p-5" },
+                    h("button", { type: "button", onClick: () => saveTaskCrud(), className: "w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-800" }, editTask ? 'Save changes' : '+ Create Task'))),
+            h("div", { className: "lg:col-span-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6" },
                 h("div", { className: "flex flex-wrap items-center justify-between pb-3 mb-3 border-b border-slate-100 gap-2" },
                     h("div", null,
                         h("h2", { className: "text-sm font-extrabold text-slate-900" },
-                            "Active Tasks (",
+                            "Tasks (",
                             s.tasks.length,
-                            ")"),
-                        h("p", { className: "text-[11px] text-slate-500" }, "Click \"Reset\" on any task to clear user completions so everyone can do it again.")),
+                            ")")),
                     h("div", { className: "flex flex-wrap items-center gap-1.5" },
                         h("button", { type: "button", onClick: () => setTaskCategoryFilter('all'), className: `px-2.5 py-1 rounded-md text-xs font-bold transition ${taskCategoryFilter === 'all'
                                 ? 'bg-[#16A34A] text-white shadow-xs'
@@ -550,13 +562,13 @@ function TasksTabView(props) {
                         h("button", { type: "button", onClick: () => setTaskCategoryFilter('app_task'), className: `px-2.5 py-1 rounded-md text-xs font-bold transition ${taskCategoryFilter === 'app_task'
                                 ? 'bg-indigo-600 text-white shadow-xs'
                                 : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'}` },
-                            "App Task (",
+                            "App (",
                             appTasksCount,
                             ")"),
                         h("button", { type: "button", onClick: () => setTaskCategoryFilter('play_game'), className: `px-2.5 py-1 rounded-md text-xs font-bold transition ${taskCategoryFilter === 'play_game'
                                 ? 'bg-violet-600 text-white shadow-xs'
                                 : 'bg-violet-50 text-violet-700 hover:bg-violet-100'}` },
-                            "Play Game (",
+                            "Games (",
                             gameTasksCount,
                             ")"),
                         h("button", { type: "button", onClick: () => setTaskCategoryFilter('telegram_join'), className: `px-2.5 py-1 rounded-md text-xs font-bold transition ${taskCategoryFilter === 'telegram_join'
@@ -572,7 +584,7 @@ function TasksTabView(props) {
                             socialTasksCount,
                             ")"))),
                 h("div", { className: "overflow-x-auto" },
-                    h("table", { className: "w-full text-left border-collapse text-xs" },
+                    h("table", { className: "w-full min-w-[760px] border-collapse text-left text-xs" },
                         h("thead", null,
                             h("tr", { className: "border-b border-slate-200 text-slate-400 uppercase font-bold text-[11px]" },
                                 h("th", { className: "py-2.5 px-3" }, "Task Details"),
@@ -628,6 +640,72 @@ function TasksTabView(props) {
                         })) : (h("tr", null,
                             h("td", { colSpan: "6", className: "py-8 text-center text-slate-400" }, "No tasks created yet"))))))))));
 }
+function GamesTabView(props) {
+    const games = props.s.games || [];
+    const editGame = editingGameId ? games.find((game) => game.id === editingGameId) : null;
+    return (h("div", { className: "space-y-5" },
+        h("div", { className: "grid grid-cols-1 gap-3 sm:grid-cols-3" },
+            h(AdminStatCard, { label: "Published games", value: games.filter((g) => g.enabled).length.toLocaleString(), detail: `${games.length} total` }),
+            h(AdminStatCard, { label: "Game starts", value: (props.s.gameStarts || 0).toLocaleString(), detail: "Paid and free starts", tone: "blue" }),
+            h(AdminStatCard, { label: "Coins collected", value: (props.s.gameCoinsCollected || 0).toLocaleString(), detail: "Spent to start games", tone: "green" })),
+        h("div", { className: "grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(300px,380px)_1fr]" },
+            h("section", { className: "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" },
+                h("div", { className: "mb-4 flex items-center justify-between gap-3" },
+                    h("div", null,
+                        h("h2", { className: "text-sm font-extrabold text-slate-900" }, editGame ? 'Edit game' : 'Add a game'),
+                        h("p", { className: "mt-1 text-xs text-slate-500" }, "Add a secure iframe game URL.")),
+                    editGame ? h("button", { type: "button", onClick: () => clearGameForm(), className: "rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-bold text-slate-600" }, "Cancel") : null),
+                h("div", { className: "space-y-3.5" },
+                    h("label", { className: "block text-xs font-bold text-slate-700" },
+                        "Game title",
+                        h("input", { id: "gameTitle", maxLength: 60, value: editGame?.title || '', placeholder: "e.g. Gem Runner", className: "mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-medium outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" })),
+                    h("label", { className: "block text-xs font-bold text-slate-700" },
+                        "Short description ",
+                        h("span", { className: "font-medium text-slate-400" }, "(optional)"),
+                        h("textarea", { id: "gameDescription", maxLength: 240, rows: 3, value: editGame?.description || '', placeholder: "Tell players what to expect", className: "mt-1.5 w-full resize-y rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-medium outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" })),
+                    h("label", { className: "block text-xs font-bold text-slate-700" },
+                        "Coins per start",
+                        h("input", { id: "gamePrice", type: "number", min: "0", max: "100000", step: "1", value: editGame ? editGame.priceCoins : 10, className: "mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-medium outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" }),
+                        h("span", { className: "mt-1 block text-[11px] font-medium text-slate-400" }, "Set 0 for a free game. Coins are charged on each start.")),
+                    h("label", { className: "block text-xs font-bold text-slate-700" },
+                        "Game iframe URL",
+                        h("input", { id: "gameUrl", type: "url", value: editGame?.url || '', maxLength: 2000, placeholder: "https://games.example.com/embed/...", className: "mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-medium outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" }),
+                        h("span", { className: "mt-1 block text-[11px] font-medium text-slate-400" }, "Use an HTTPS embed URL. Paste the iframe source URL, not HTML code.")),
+                    h("div", { className: "rounded-xl bg-amber-50 px-3 py-2.5 text-[11px] leading-4 text-amber-800" }, "Game providers must allow iframe embedding. The game opens in a sandboxed player."),
+                    h("button", { type: "button", onClick: () => saveGameCrud(), className: "w-full rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-extrabold text-white transition hover:bg-emerald-800" }, editGame ? 'Save game' : 'Publish game'))),
+            h("section", { className: "space-y-3" },
+                h("div", { className: "flex items-end justify-between gap-3" },
+                    h("div", null,
+                        h("h2", { className: "text-sm font-extrabold text-slate-900" }, "Game library"),
+                        h("p", { className: "mt-1 text-xs text-slate-500" }, "Iframe games and coin usage.")),
+                    h("span", { className: "text-xs font-bold text-slate-500" },
+                        games.length,
+                        " games")),
+                games.length ? games.map((game) => (h("article", { className: "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" },
+                    h("div", { className: "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" },
+                        h("div", { className: "flex min-w-0 items-start gap-3" },
+                            h("div", { className: "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50" },
+                                h("img", { src: "/assets/icon-games.png", alt: "", className: "h-6 w-6 object-contain" })),
+                            h("div", { className: "min-w-0" },
+                                h("div", { className: "flex flex-wrap items-center gap-2" },
+                                    h("h3", { className: "truncate text-sm font-extrabold text-slate-900" }, game.title),
+                                    h("span", { className: 'rounded-full px-2 py-0.5 text-[10px] font-bold ' + (game.enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500') }, game.enabled ? 'Live' : 'Paused')),
+                                h("p", { className: "mt-1 line-clamp-2 text-xs text-slate-500" }, game.description || 'No description'),
+                                h("div", { className: "mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-semibold text-slate-600" },
+                                    h("span", null, game.priceCoins ? `${game.priceCoins.toLocaleString()} coins / start` : 'Free'),
+                                    h("span", null,
+                                        game.plays.toLocaleString(),
+                                        " plays"),
+                                    h("span", null,
+                                        game.coinsCollected.toLocaleString(),
+                                        " coins collected")))),
+                        h("div", { className: "flex shrink-0 flex-wrap gap-1.5" },
+                            h("button", { type: "button", onClick: () => editGameForm(game.id), className: "rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-slate-50" }, "Edit"),
+                            h("button", { type: "button", onClick: () => setGameEnabled(game.id, !game.enabled), className: "rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] font-bold text-amber-800 hover:bg-amber-100" }, game.enabled ? 'Pause' : 'Publish'),
+                            h("button", { type: "button", onClick: () => deleteGame(game.id, game.title), className: "rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-bold text-rose-700 hover:bg-rose-100" }, "Delete")))))) : h("div", { className: "rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center" },
+                    h("div", { className: "text-sm font-bold text-slate-800" }, "No games published"),
+                    h("p", { className: "mt-1 text-xs text-slate-500" }, "Add an iframe game URL to make it available in Explore."))))));
+}
 function TransactionsTabView(props) {
     const { s } = props;
     const q = txSearchQuery.trim().toLowerCase();
@@ -636,82 +714,90 @@ function TransactionsTabView(props) {
             return false;
         if (!q)
             return true;
-        return (w.id.toLowerCase().includes(q) ||
+        return w.id.toLowerCase().includes(q) ||
             (w.username || '').toLowerCase().includes(q) ||
             w.userId.toLowerCase().includes(q) ||
             w.account.toLowerCase().includes(q) ||
-            w.method.toLowerCase().includes(q));
+            w.method.toLowerCase().includes(q);
     });
     const editW = editingWithdrawId ? s.recentWithdrawals.find((w) => w.id === editingWithdrawId) : null;
-    const methodOptions = draftSettings.methods.length
-        ? draftSettings.methods.map((m) => m.name)
-        : ['Custom'];
-    return (h("div", { className: "bg-white border border-slate-200 rounded-xl p-5" },
-        h("div", { className: "flex flex-wrap items-center justify-between gap-3 mb-4" },
-            h("h2", { className: "text-base font-extrabold text-slate-900" },
-                "Transactions (",
-                list.length,
-                ")"),
-            h("div", { className: "flex flex-wrap items-center gap-2" },
-                ['all', 'pending', 'paid', 'rejected'].map((st) => (h("button", { type: "button", onClick: () => setTxFilter(st), className: `px-2.5 py-1 rounded-md text-xs font-bold uppercase ${txStatusFilter === st ? 'bg-[#16A34A] text-white' : 'bg-slate-100 text-slate-600'}` }, st))),
-                h("input", { type: "text", value: txSearchQuery, onInput: (e) => filterTxSearch(e.target.value), placeholder: "Search TX, user, account...", className: "px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg" }),
-                h("button", { type: "button", onClick: () => openWithdrawForm(), className: "px-3 py-1.5 bg-[#16A34A] text-white text-xs font-bold rounded-lg" }, "+ Add TX"))),
-        showWithdrawEditor ? (h("div", { className: "mb-4 p-4 bg-slate-50 border border-slate-200 rounded-xl" },
-            h("div", { className: "flex items-center justify-between mb-3" },
-                h("h3", { className: "text-xs font-extrabold uppercase text-slate-700" }, editW ? `Edit Transaction ${editW.id}` : 'Create Transaction'),
-                h("button", { type: "button", onClick: () => closeWithdrawForm(), className: "text-xs font-bold text-slate-400 hover:text-slate-700" }, "\u2715 Close")),
-            h("div", { className: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 text-xs" },
-                h("input", { id: "crudWUserId", type: "text", value: editW ? editW.userId : '', disabled: Boolean(editW), placeholder: "User ID", className: "px-3 py-1.5 bg-white border border-slate-200 rounded-lg" }),
-                h("select", { id: "crudWMethod", value: editW?.method || methodOptions[0], className: "px-3 py-1.5 bg-white border border-slate-200 rounded-lg font-bold" }, methodOptions.map((m) => (h("option", { value: m, selected: editW?.method === m }, m)))),
-                h("input", { id: "crudWAccount", type: "text", value: editW ? editW.account : '', placeholder: "Account ID", className: "px-3 py-1.5 bg-white border border-slate-200 rounded-lg" }),
-                h("input", { id: "crudWCoins", type: "number", value: editW ? editW.coins : 10000, className: "px-3 py-1.5 bg-white border border-slate-200 rounded-lg font-bold" }),
-                h("div", { className: "flex gap-2" },
-                    h("select", { id: "crudWStatus", value: editW?.status || 'pending', className: "flex-1 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg font-bold" },
-                        h("option", { value: "pending" }, "pending"),
-                        h("option", { value: "paid" }, "paid"),
-                        h("option", { value: "rejected" }, "rejected")),
-                    h("button", { type: "button", onClick: () => saveWithdrawCrud(), className: "px-4 py-1.5 bg-[#16A34A] text-white font-bold rounded-lg" }, "Save"))))) : null,
-        h("div", { className: "overflow-x-auto" },
-            h("table", { className: "w-full text-left border-collapse text-xs" },
-                h("thead", null,
-                    h("tr", { className: "border-b border-slate-200 text-slate-400 uppercase font-bold text-[11px]" },
-                        h("th", { className: "py-2.5 px-3" }, "TX ID"),
-                        h("th", { className: "py-2.5 px-3" }, "User"),
-                        h("th", { className: "py-2.5 px-3" }, "Method / Account"),
-                        h("th", { className: "py-2.5 px-3" }, "Amount"),
-                        h("th", { className: "py-2.5 px-3" }, "Status"),
-                        h("th", { className: "py-2.5 px-3 text-right" }, "CRUD Actions"))),
-                h("tbody", { className: "divide-y divide-slate-100" }, list.length ? (list.map((w) => (h("tr", { className: "hover:bg-slate-50" },
-                    h("td", { className: "py-3 px-3" },
-                        h("div", { className: "font-bold text-slate-900" }, w.id),
-                        h("div", { className: "text-[11px] text-slate-400" }, new Date(w.at).toLocaleString())),
-                    h("td", { className: "py-3 px-3" },
-                        "@",
-                        w.username || w.userId,
-                        " ",
-                        h("span", { className: "text-slate-400" },
-                            "(#",
-                            w.userId,
-                            ")")),
-                    h("td", { className: "py-3 px-3" },
-                        h("b", null, w.method),
-                        ": ",
-                        h("span", { className: "font-mono" }, w.account)),
-                    h("td", { className: "py-3 px-3 font-extrabold text-slate-900" },
-                        w.coins.toLocaleString(),
-                        " (NPR ",
-                        w.npr,
-                        ")"),
-                    h("td", { className: "py-3 px-3" },
-                        h("span", { className: `px-2 py-0.5 rounded text-[10px] font-bold uppercase ${w.status === 'paid'
-                                ? 'bg-emerald-50 text-emerald-700'
-                                : w.status === 'rejected'
-                                    ? 'bg-red-50 text-red-600'
-                                    : 'bg-amber-50 text-amber-700'}` }, w.status)),
-                    h("td", { className: "py-3 px-3 text-right space-x-1.5 whitespace-nowrap" },
-                        h("button", { type: "button", onClick: () => openWithdrawForm(w.id), className: "px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded text-[11px]" }, "Edit"),
-                        h("button", { type: "button", onClick: () => deleteWithdrawCrud(w.id), className: "px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded text-[11px]" }, "Delete")))))) : (h("tr", null,
-                    h("td", { colSpan: "6", className: "py-8 text-center text-slate-400" }, "No transactions found"))))))));
+    const methodOptions = draftSettings.methods.length ? draftSettings.methods.map((m) => m.name) : ['Custom'];
+    return (h("div", { className: "space-y-4" },
+        h("div", { className: "grid grid-cols-2 gap-3 sm:grid-cols-4" },
+            h(AdminStatCard, { label: "Pending", value: s.pendingWithdrawals.toLocaleString(), detail: "Requests", tone: "amber" }),
+            h(AdminStatCard, { label: "Paid", value: s.paidWithdrawals.toLocaleString(), detail: "Requests", tone: "green" }),
+            h(AdminStatCard, { label: "Rejected", value: s.rejectedWithdrawals.toLocaleString(), detail: "Requests" }),
+            h(AdminStatCard, { label: "Paid total", value: 'Rs ' + s.paidNpr.toLocaleString(), detail: "NPR", tone: "green" })),
+        h("section", { className: "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6" },
+            h("div", { className: "flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between" },
+                h("h2", { className: "text-sm font-extrabold text-slate-900" },
+                    "Recent transactions ",
+                    h("span", { className: "font-medium text-slate-400" },
+                        "(",
+                        list.length,
+                        ")")),
+                h("div", { className: "flex flex-col gap-2 sm:flex-row" },
+                    h("div", { className: "flex flex-wrap gap-1.5" }, ['all', 'pending', 'paid', 'rejected'].map((st) => (h("button", { type: "button", onClick: () => setTxFilter(st), className: 'rounded-lg px-3 py-2 text-xs font-semibold capitalize transition ' + (txStatusFilter === st ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200') }, st)))),
+                    h("input", { type: "search", id: "txSearchInput", value: txSearchQuery, onInput: (e) => filterTxSearch(e.target.value), placeholder: "Search transactions", className: "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs sm:w-52" }))),
+            showWithdrawEditor ? (h("div", { className: "my-4 rounded-xl border border-slate-200 bg-slate-50 p-4" },
+                h("div", { className: "mb-3 flex items-center justify-between" },
+                    h("h3", { className: "text-sm font-bold text-slate-900" }, "Edit payout"),
+                    h("button", { type: "button", onClick: () => closeWithdrawForm(), className: "rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-200" }, "Cancel")),
+                h("div", { className: "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5" },
+                    h("label", { className: "text-xs font-semibold text-slate-600" },
+                        "User ID",
+                        h("input", { id: "crudWUserId", type: "text", value: editW?.userId || '', disabled: true, className: "mt-1 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm" })),
+                    h("label", { className: "text-xs font-semibold text-slate-600" },
+                        "Method",
+                        h("select", { id: "crudWMethod", value: editW?.method || methodOptions[0], className: "mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" }, methodOptions.map((m) => h("option", { value: m }, m)))),
+                    h("label", { className: "text-xs font-semibold text-slate-600" },
+                        "Account",
+                        h("input", { id: "crudWAccount", type: "text", value: editW?.account || '', className: "mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" })),
+                    h("label", { className: "text-xs font-semibold text-slate-600" },
+                        "Coins",
+                        h("input", { id: "crudWCoins", type: "number", value: editW?.coins || 0, className: "mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" })),
+                    h("div", { className: "flex items-end gap-2" },
+                        h("select", { id: "crudWStatus", value: editW?.status || 'pending', className: "min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" },
+                            h("option", { value: "pending" }, "Pending"),
+                            h("option", { value: "paid" }, "Paid"),
+                            h("option", { value: "rejected" }, "Rejected")),
+                        h("button", { type: "button", onClick: () => saveWithdrawCrud(), className: "rounded-lg bg-emerald-700 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-800" }, "Save"))))) : null,
+            h("div", { className: "overflow-x-auto pt-3" },
+                h("table", { className: "w-full min-w-[760px] border-collapse text-left text-xs" },
+                    h("thead", null,
+                        h("tr", { className: "border-b border-slate-200 text-[10px] font-bold uppercase tracking-wide text-slate-400" },
+                            h("th", { className: "px-3 py-2.5" }, "Transaction"),
+                            h("th", { className: "px-3 py-2.5" }, "User"),
+                            h("th", { className: "px-3 py-2.5" }, "Method / account"),
+                            h("th", { className: "px-3 py-2.5" }, "Amount"),
+                            h("th", { className: "px-3 py-2.5" }, "Status"),
+                            h("th", { className: "px-3 py-2.5 text-right" }, "Actions"))),
+                    h("tbody", { className: "divide-y divide-slate-100" }, list.length ? list.map((w) => (h("tr", { className: "transition hover:bg-slate-50" },
+                        h("td", { className: "px-3 py-3" },
+                            h("div", { className: "font-bold text-slate-900" }, w.id),
+                            h("div", { className: "mt-1 text-[10px] text-slate-400" }, new Date(w.at).toLocaleString())),
+                        h("td", { className: "px-3 py-3" },
+                            h("div", { className: "font-semibold text-slate-800" },
+                                "@",
+                                w.username || w.userId),
+                            h("div", { className: "mt-1 text-[10px] text-slate-400" },
+                                "ID ",
+                                w.userId)),
+                        h("td", { className: "px-3 py-3" },
+                            h("div", { className: "font-semibold text-slate-800" }, w.method),
+                            h("div", { className: "mt-1 max-w-48 truncate font-mono text-[10px] text-slate-500" }, w.account)),
+                        h("td", { className: "px-3 py-3 font-bold text-slate-900" },
+                            w.coins.toLocaleString(),
+                            " coins",
+                            h("div", { className: "mt-1 text-[10px] font-medium text-slate-400" },
+                                "NPR ",
+                                w.npr.toLocaleString())),
+                        h("td", { className: "px-3 py-3" },
+                            h("span", { className: 'rounded-full px-2.5 py-1 text-[10px] font-bold capitalize ' + (w.status === 'paid' ? 'bg-emerald-50 text-emerald-700' : w.status === 'rejected' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700') }, w.status)),
+                        h("td", { className: "space-x-1.5 whitespace-nowrap px-3 py-3 text-right" },
+                            h("button", { type: "button", onClick: () => openWithdrawForm(w.id), className: "rounded-lg bg-slate-100 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-200" }, "Edit"),
+                            h("button", { type: "button", onClick: () => deleteWithdrawCrud(w.id), className: "rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-rose-600 hover:bg-rose-50" }, "Delete"))))) : h("tr", null,
+                        h("td", { colSpan: "6", className: "px-3 py-12 text-center text-sm text-slate-400" }, "No transactions found"))))))));
 }
 function SettingsTabView(props) {
     const reqQual = draftSettings.requireQualification !== false;
@@ -720,79 +806,53 @@ function SettingsTabView(props) {
     return (h("div", { className: "space-y-6 max-w-6xl mx-auto pb-12" },
         h("div", { className: "flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" },
             h("div", null,
-                h("h2", { className: "text-xl font-extrabold text-slate-900 tracking-tight" }, "System & Payout Settings"),
-                h("p", { className: "text-xs text-slate-500 mt-0.5" }, "Configure withdrawal currency rates, qualification prerequisites, custom payment gateways, and country availability.")),
+                h("h2", { className: "text-xl font-extrabold text-slate-900 tracking-tight" }, "Settings"),
+                h("p", { className: "text-xs text-slate-500 mt-0.5" }, "Payout rules, methods and country access.")),
             h("div", { className: "flex items-center gap-2" },
-                h("button", { type: "button", onClick: () => saveWithdrawSettings(), className: "px-4 py-2 bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-extrabold rounded-lg shadow-sm transition" }, "Save All Settings"))),
-        h("div", { className: "grid grid-cols-1 lg:grid-cols-3 gap-6" },
+                h("button", { type: "button", onClick: () => saveWithdrawSettings(), className: "px-4 py-2 bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-extrabold rounded-lg shadow-sm transition" }, "Save Changes"))),
+        h("div", { className: "grid grid-cols-1 lg:grid-cols-2 gap-4" },
             h("div", { className: "bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4" },
                 h("div", { className: "flex items-center gap-2" },
                     h("span", { className: "w-7 h-7 rounded-lg bg-emerald-50 text-[#16A34A] flex items-center justify-center font-extrabold text-sm" }, "\u20B9"),
                     h("div", null,
                         h("h3", { className: "text-sm font-extrabold text-slate-900" }, "Exchange & Minimums"),
-                        h("p", { className: "text-[11px] text-slate-400" }, "Set coins required for 1 unit of fiat currency"))),
+                        h("p", { className: "text-[11px] text-slate-400" }, "Payout limits and coin conversion"))),
                 h("div", { className: "space-y-3 text-xs" },
                     h("div", null,
-                        h("label", { className: "block text-[11px] font-bold text-slate-600 mb-1" }, "Minimum Withdrawal (Coins)"),
-                        h("input", { id: "setMinCoins", type: "number", defaultValue: String(draftSettings.minWithdrawCoins), placeholder: "10000", className: "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-900 focus:outline-none focus:border-[#16A34A]" }),
-                        h("span", { className: "text-[10px] text-slate-400 mt-1 block" }, "Users must reach this coin balance to request payout.")),
+                        h("label", { className: "block text-[11px] font-bold text-slate-600 mb-1" }, "Minimum payout (coins)"),
+                        h("input", { id: "setMinCoins", type: "number", defaultValue: String(draftSettings.minWithdrawCoins), placeholder: "10000", className: "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-900 focus:outline-none focus:border-[#16A34A]" })),
                     h("div", null,
-                        h("label", { className: "block text-[11px] font-bold text-slate-600 mb-1" }, "Coin Conversion Rate (Coins per 1 NPR/INR)"),
-                        h("input", { id: "setCoinRate", type: "number", defaultValue: String(draftSettings.coinPerNpr), placeholder: "100", className: "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-900 focus:outline-none focus:border-[#16A34A]" }),
-                        h("span", { className: "text-[10px] text-slate-400 mt-1 block" }, "e.g. 100 means 10,000 Coins = 100 NPR.")),
-                    h("button", { type: "button", onClick: () => saveWithdrawSettings(), className: "w-full py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg transition" }, "Update Exchange Rules"))),
+                        h("label", { className: "block text-[11px] font-bold text-slate-600 mb-1" }, "Coin rate (coins per NPR)"),
+                        h("input", { id: "setCoinRate", type: "number", defaultValue: String(draftSettings.coinPerNpr), placeholder: "100", className: "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-900 focus:outline-none focus:border-[#16A34A]" })))),
             h("div", { className: "bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4" },
                 h("div", { className: "flex items-center gap-2" },
                     h("span", { className: "w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-extrabold text-sm" }, "\uD83D\uDEE1\uFE0F"),
                     h("div", null,
-                        h("h3", { className: "text-sm font-extrabold text-slate-900" }, "Anti-Fraud & Qualification"),
-                        h("p", { className: "text-[11px] text-slate-400" }, "Withdrawal qualification prerequisites"))),
+                        h("h3", { className: "text-sm font-extrabold text-slate-900" }, "Payout eligibility"))),
                 h("div", { className: "p-4 rounded-xl border border-slate-100 bg-slate-50/50 space-y-3" },
                     h("div", { className: "flex items-start justify-between gap-3" },
                         h("div", null,
-                            h("div", { className: "text-xs font-extrabold text-slate-900" }, "Require 15 Ads + 1 Referral"),
-                            h("p", { className: "text-[11px] text-slate-500 mt-1 leading-relaxed" }, "When enabled, users must have watched at least 15 verified ads and referred at least 1 active friend before unlocking payouts.")),
+                            h("div", { className: "text-xs font-extrabold text-slate-900" }, "Require 15 ads + 1 referral")),
                         h("button", { type: "button", onClick: () => toggleQualificationReq(), className: `relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${reqQual ? 'bg-[#16A34A]' : 'bg-slate-300'}`, title: "Toggle qualification requirement" },
                             h("span", { className: `pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${reqQual ? 'translate-x-5' : 'translate-x-0'}` }))),
                     h("div", { className: "pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px]" },
                         h("span", { className: "font-semibold text-slate-500" }, "Qualification Status:"),
-                        h("span", { className: `font-extrabold uppercase px-2 py-0.5 rounded text-[10px] ${reqQual ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}` }, reqQual ? 'Enforced (Active)' : 'Bypassed (Instant)')))),
-            h("div", { className: "bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4" },
-                h("div", { className: "flex items-center gap-2" },
-                    h("span", { className: "w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-extrabold text-sm" }, "\uD83D\uDDC4\uFE0F"),
-                    h("div", null,
-                        h("h3", { className: "text-sm font-extrabold text-slate-900" }, "Database & Engine"),
-                        h("p", { className: "text-[11px] text-slate-400" }, "Current storage and runtime state"))),
-                h("div", { className: "space-y-2.5 text-xs" },
-                    h("div", { className: "flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-100" },
-                        h("span", { className: "text-slate-600 font-semibold" }, "Active Database:"),
-                        h("span", { className: "font-extrabold text-slate-900 flex items-center gap-1.5" },
-                            h("span", { className: `w-2 h-2 rounded-full ${props.s.dbMode === 'postgres' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}` }),
-                            props.s.dbMode === 'postgres' ? 'Neon PostgreSQL (Cloud)' : 'Local File JSON')),
-                    h("div", { className: "flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-100" },
-                        h("span", { className: "text-slate-600 font-semibold" }, "Registered Users:"),
-                        h("span", { className: "font-extrabold text-slate-900" }, props.s.totalUsers.toLocaleString())),
-                    h("div", { className: "flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-100" },
-                        h("span", { className: "text-slate-600 font-semibold" }, "Total Payouts:"),
-                        h("span", { className: "font-extrabold text-slate-900" },
-                            "NPR ",
-                            props.s.paidNpr.toLocaleString()))))),
+                        h("span", { className: `font-extrabold uppercase px-2 py-0.5 rounded text-[10px] ${reqQual ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}` }, reqQual ? 'Enabled' : 'Disabled'))))),
         h("div", { className: "bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-5" },
             h("div", { className: "flex flex-col sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-slate-100 gap-2" },
                 h("div", null,
-                    h("h3", { className: "text-sm font-extrabold text-slate-900" }, "Custom Payout Methods"),
-                    h("p", { className: "text-xs text-slate-500" }, "Add payment services (eSewa, Khalti, bKash, JazzCash, UPI, etc.) with custom logos and localized restrictions.")),
+                    h("h3", { className: "text-sm font-extrabold text-slate-900" }, "Payment methods")),
                 h("span", { className: "text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md self-start" },
                     methods.length,
-                    " methods configured")),
+                    " methods")),
             h("div", { className: "p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3" },
-                h("div", { className: "text-xs font-extrabold text-slate-800 uppercase tracking-wide" }, "Add New Payout Gateway"),
+                h("div", { className: "text-xs font-extrabold text-slate-800 uppercase tracking-wide" }, "Add method"),
                 h("div", { className: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs" },
                     h("div", null,
-                        h("label", { className: "block text-[11px] font-bold text-slate-600 mb-1" }, "Method Name *"),
+                        h("label", { className: "block text-[11px] font-bold text-slate-600 mb-1" }, "Method name"),
                         h("input", { id: "newMethodName", type: "text", placeholder: "e.g. eSewa, Khalti, UPI", className: "w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-bold focus:outline-none focus:border-[#16A34A]" })),
                     h("div", null,
-                        h("label", { className: "block text-[11px] font-bold text-slate-600 mb-1" }, "Country Scope"),
+                        h("label", { className: "block text-[11px] font-bold text-slate-600 mb-1" }, "Country"),
                         h("select", { id: "newMethodCountry", className: "w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-bold focus:outline-none focus:border-[#16A34A]" },
                             h("option", { value: "All" }, "All Countries"),
                             countries.map((c) => (h("option", { value: c.name },
@@ -801,10 +861,10 @@ function SettingsTabView(props) {
                                 c.code,
                                 ")"))))),
                     h("div", null,
-                        h("label", { className: "block text-[11px] font-bold text-slate-600 mb-1" }, "Input Field Placeholder"),
+                        h("label", { className: "block text-[11px] font-bold text-slate-600 mb-1" }, "Account label"),
                         h("input", { id: "newMethodPlaceholder", type: "text", placeholder: "e.g. Enter Phone / Account ID", className: "w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-medium focus:outline-none focus:border-[#16A34A]" })),
                     h("div", null,
-                        h("label", { className: "block text-[11px] font-bold text-slate-600 mb-1" }, "Logo URL or Upload"),
+                        h("label", { className: "block text-[11px] font-bold text-slate-600 mb-1" }, "Logo"),
                         h("div", { className: "flex gap-2 items-center" },
                             h("input", { id: "newMethodLogoUrl", type: "text", placeholder: "https://... or upload", onInput: (e) => previewMethodLogoUrl(e.target.value), className: "flex-1 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-[#16A34A]" }),
                             h("label", { className: "cursor-pointer px-2.5 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold shrink-0" },
@@ -814,7 +874,7 @@ function SettingsTabView(props) {
                                 h("img", { id: "newMethodLogoPreview", className: "w-full h-full object-contain hidden" }),
                                 h("span", { id: "newMethodLogoPlaceholder", className: "text-[10px] text-slate-400 font-bold" }, "Logo"))))),
                 h("div", { className: "flex justify-end pt-1" },
-                    h("button", { type: "button", onClick: () => addCustomMethod(), className: "px-4 py-2 bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-bold rounded-lg transition" }, "+ Add Payout Gateway"))),
+                    h("button", { type: "button", onClick: () => addCustomMethod(), className: "px-4 py-2 bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-bold rounded-lg transition" }, "+ Add method"))),
             h("div", { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" }, methods.length ? (methods.map((m) => (h("div", { className: `p-3.5 rounded-xl border transition flex items-center justify-between gap-3 ${m.enabled !== false
                     ? 'bg-white border-slate-200 hover:border-slate-300'
                     : 'bg-slate-50 border-slate-200 opacity-60'}` },
@@ -829,15 +889,14 @@ function SettingsTabView(props) {
                     h("button", { type: "button", onClick: () => toggleCustomMethod(m.id), className: `px-2 py-1 rounded text-[11px] font-bold ${m.enabled !== false
                             ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                             : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}` }, m.enabled !== false ? 'Active' : 'Disabled'),
-                    h("button", { type: "button", onClick: () => removeCustomMethod(m.id), className: "p-1 rounded text-red-500 hover:bg-red-50", title: "Remove method" }, "\u2715")))))) : (h("div", { className: "col-span-full py-8 text-center text-xs text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200" }, "No custom methods added yet. Add your first payment gateway above!")))),
+                    h("button", { type: "button", onClick: () => removeCustomMethod(m.id), className: "p-1 rounded text-red-500 hover:bg-red-50", title: "Remove method" }, "\u2715")))))) : (h("div", { className: "col-span-full py-8 text-center text-xs text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200" }, "No payment methods yet.")))),
         h("div", { className: "bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4" },
             h("div", { className: "flex flex-col sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-slate-100 gap-2" },
                 h("div", null,
-                    h("h3", { className: "text-sm font-extrabold text-slate-900" }, "Allowed Countries Filter"),
-                    h("p", { className: "text-xs text-slate-500" }, "Limit withdrawals to specific countries or leave empty to allow users from all countries worldwide.")),
+                    h("h3", { className: "text-sm font-extrabold text-slate-900" }, "Allowed countries")),
                 h("span", { className: "text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md self-start" }, countries.length ? `${countries.length} countries whitelisted` : 'Worldwide (All Countries)')),
             h("div", null,
-                h("div", { className: "text-xs font-bold text-slate-700 mb-2" }, "Active Country Whitelist:"),
+                h("div", { className: "text-xs font-bold text-slate-700 mb-2" }, "Allowed countries"),
                 h("div", { className: "flex flex-wrap gap-2" }, countries.length ? (countries.map((c) => (h("span", { className: "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs font-bold text-slate-800" },
                     c.flag ? h("img", { src: c.flag, className: "w-4 h-3 object-cover rounded-sm" }) : null,
                     h("span", null, c.name),
@@ -848,50 +907,41 @@ function SettingsTabView(props) {
                     h("button", { type: "button", onClick: () => removeAllowedCountry(c.code), className: "ml-1 text-slate-400 hover:text-red-600 font-bold" }, "\u2715"))))) : (h("span", { className: "text-xs font-semibold text-slate-400 italic" }, "No country restriction active \u2014 users from any country can withdraw.")))),
             h("div", { className: "pt-3 border-t border-slate-100 space-y-3" },
                 h("div", { className: "flex items-center justify-between" },
-                    h("span", { className: "text-xs font-bold text-slate-700" }, "Search & Add Supported Countries:"),
-                    h("span", { className: "text-[11px] text-slate-400" }, "Live REST Countries API")),
-                h("input", { type: "text", placeholder: "Type country name or code (e.g. Nepal, India, Bangladesh, Pakistan, United States)...", onInput: (e) => filterCountryApiSearch(e.target.value), className: "w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:border-[#16A34A]" }),
+                    h("span", { className: "text-xs font-bold text-slate-700" }, "Add countries")),
+                h("input", { type: "text", placeholder: "Search country", onInput: (e) => filterCountryApiSearch(e.target.value), className: "w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:border-[#16A34A]" }),
                 h("div", { id: "countryApiResultsList", className: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-56 overflow-y-auto pr-1" }, renderCountryApiListNodes(countryApiQuery))))));
 }
 function AdminApp() {
-    return (h("div", { className: "w-screen h-screen overflow-hidden flex flex-col bg-[#F8FAFC] text-[#0F172A] font-sans" },
+    return (h("div", { className: "min-h-screen bg-slate-50 font-sans text-slate-900 lg:flex" },
         h("div", { id: "adminToast", className: "hidden" }),
-        h("header", { className: "w-full bg-white border-b border-slate-200 shrink-0 z-20" },
-            h("div", { className: "w-full px-6 h-14 flex items-center justify-between" },
-                h("div", { className: "flex items-center gap-3" },
-                    h("div", { className: "w-8 h-8 rounded-lg bg-[#16A34A] flex items-center justify-center text-white font-extrabold text-sm shadow-xs" }, "P"),
-                    h("div", { className: "flex items-center gap-2.5" },
-                        h("span", { className: "text-base font-extrabold tracking-tight text-slate-900" }, "Paiso Admin"),
-                        h("div", { className: "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 border border-slate-200 text-slate-700" },
-                            h("span", { className: `w-2 h-2 rounded-full ${data?.dbMode === 'postgres' ? 'bg-emerald-500 animate-pulse' : 'bg-emerald-500'}` }),
-                            h("span", null, data?.dbMode === 'postgres' ? 'Neon DB' : 'DB Ready')))),
-                h("div", { className: "flex items-center gap-2.5" },
-                    h("button", { type: "button", onClick: () => openAdminNotifModal('all'), className: "px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-md flex items-center gap-1.5 transition" },
-                        h("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2", "stroke-linecap": "round", "stroke-linejoin": "round" },
-                            h("path", { d: "M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" }),
-                            h("path", { d: "M13.73 21a2 2 0 0 1-3.46 0" })),
-                        h("span", null, "Send Notification")),
-                    h("button", { type: "button", onClick: () => refreshAdmin(), className: "px-3.5 py-1.5 bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-bold rounded-md transition" }, "Refresh"),
-                    h("button", { type: "button", onClick: () => adminLogout(), className: "px-3 py-1.5 border border-slate-200 hover:bg-slate-100 text-slate-600 text-xs font-semibold rounded-md transition" }, "Logout"))),
-            h("div", { className: "w-full px-6 flex items-center gap-8 overflow-x-auto border-t border-slate-100" },
-                h("button", { type: "button", "data-admintab": "dashboard", onClick: () => switchAdminTab('dashboard'), className: "admin-tab-btn py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap border-b-2 border-[#16A34A] text-slate-900" }, "Dashboard"),
-                h("button", { type: "button", "data-admintab": "users", onClick: () => switchAdminTab('users'), className: "admin-tab-btn py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap border-b-2 border-transparent text-slate-500 hover:text-slate-900" }, "User Management"),
-                h("button", { type: "button", "data-admintab": "withdrawal", onClick: () => switchAdminTab('withdrawal'), className: "admin-tab-btn py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap border-b-2 border-transparent text-slate-500 hover:text-slate-900" }, "Withdrawal"),
-                h("button", { type: "button", "data-admintab": "tasks", onClick: () => switchAdminTab('tasks'), className: "admin-tab-btn py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap border-b-2 border-transparent text-slate-500 hover:text-slate-900" }, "Task Management"),
-                h("button", { type: "button", "data-admintab": "transactions", onClick: () => switchAdminTab('transactions'), className: "admin-tab-btn py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap border-b-2 border-transparent text-slate-500 hover:text-slate-900" }, "Transaction"),
-                h("button", { type: "button", "data-admintab": "settings", onClick: () => switchAdminTab('settings'), className: "admin-tab-btn py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap border-b-2 border-transparent text-slate-500 hover:text-slate-900" }, "Settings"))),
-        h("div", { id: "adminLoginSection", className: "flex-1 flex items-center justify-center px-4 hidden" },
-            h("div", { className: "w-full max-w-sm bg-white border border-slate-200 rounded-xl p-6 shadow-sm" },
-                h("h2", { className: "text-lg font-extrabold text-slate-900 mb-1" }, "Admin Login"),
-                h("p", { className: "text-xs text-slate-500 mb-4" }, "Enter your Admin ID to continue."),
-                h("input", { id: "adminKeyInput", type: "password", defaultValue: adminKey, placeholder: "Admin ID", onKeyDown: (e) => {
-                        if (e.key === 'Enter')
-                            adminLogin();
-                    }, className: "w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-[#16A34A] mb-3" }),
-                h("button", { type: "button", onClick: () => adminLogin(), className: "w-full bg-[#16A34A] hover:bg-[#15803D] text-white font-bold text-xs uppercase py-2.5 rounded-lg transition" }, "Login"),
-                h("div", { id: "adminLoginErr", className: "text-xs text-red-600 font-semibold mt-2" }))),
-        h("main", { id: "adminMainWorkspace", className: "flex-1 w-full overflow-y-auto px-6 py-5" },
-            h("div", { id: "adminTabView", className: "w-full h-full" })),
+        h(AdminNavigation, { activeTab: activeTab, onSelect: switchAdminTab }),
+        h("div", { className: "min-w-0 flex-1 lg:pl-64" },
+            h("header", { className: "sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur" },
+                h("div", { className: "mx-auto flex min-h-[76px] max-w-[1600px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8" },
+                    h("div", { className: "flex min-w-0 items-center gap-3" },
+                        h("div", { className: "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-700 text-sm font-black text-white lg:hidden" }, "P"),
+                        h("div", null,
+                            h("p", { className: "hidden text-[10px] font-bold uppercase tracking-[.15em] text-slate-400 sm:block" }, "Paiso workspace"),
+                            h("h1", { className: "text-lg font-extrabold tracking-tight text-slate-950" }, activeTab === 'dashboard' ? 'Overview' : activeTab === 'withdrawal' ? 'Payouts' : activeTab === 'transactions' ? 'Transactions' : activeTab === 'users' ? 'Users' : activeTab === 'tasks' ? 'Tasks' : activeTab === 'games' ? 'Games' : 'Settings')),
+                        h("span", { className: "hidden items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-600 md:inline-flex" },
+                            h("span", { className: 'h-2 w-2 rounded-full ' + (data?.dbMode === 'postgres' ? 'bg-emerald-500' : 'bg-slate-400') }),
+                            data?.dbMode === 'postgres' ? 'Database connected' : 'Local data')),
+                    h("div", { className: "flex shrink-0 items-center gap-2" },
+                        h("button", { type: "button", onClick: () => openAdminNotifModal('all'), className: "inline-flex rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 sm:px-3.5 sm:text-xs" }, "Notify"),
+                        h("button", { id: "adminRefreshButton", type: "button", onClick: () => refreshAdmin(), className: "rounded-xl bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60" }, "Refresh"),
+                        h("button", { type: "button", onClick: () => adminLogout(), className: "rounded-xl border border-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50" }, "Logout")))),
+            h("div", { id: "adminLoginSection", className: "hidden flex min-h-[calc(100dvh-76px)] items-center justify-center px-4 py-10" },
+                h("div", { className: "w-full max-w-md rounded-3xl border border-slate-200 bg-white p-7 shadow-xl shadow-slate-900/[.04] sm:p-9" },
+                    h("h2", { className: "text-2xl font-extrabold tracking-tight text-slate-950" }, "Admin Login"),
+                    h("p", { className: "mt-2 text-sm leading-6 text-slate-500" }, "Enter your Admin ID to continue."),
+                    h("input", { id: "adminKeyInput", type: "password", defaultValue: adminKey, placeholder: "Admin ID", onKeyDown: (e) => {
+                            if (e.key === 'Enter')
+                                adminLogin();
+                        }, className: "mt-6 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100" }),
+                    h("button", { type: "button", onClick: () => adminLogin(), className: "mt-3 w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-800" }, "Login"),
+                    h("div", { id: "adminLoginErr", className: "text-xs text-red-600 font-semibold mt-2" }))),
+            h("main", { id: "adminMainWorkspace", className: "min-h-[calc(100dvh-76px)] px-4 py-6 pb-24 sm:px-6 lg:px-8 lg:py-8" },
+                h("div", { id: "adminTabView", className: "w-full h-full" }))),
         h("div", { id: "adminNotifModal", className: "fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-[2px] hidden items-center justify-center p-4", onClick: (e) => {
                 if (e.target.id === 'adminNotifModal')
                     closeAdminNotifModal();
@@ -926,9 +976,21 @@ function renderActiveTab() {
     const container = document.getElementById('adminTabView');
     if (!container || !data)
         return;
-    document.querySelectorAll('.admin-tab-btn').forEach((btn) => {
-        const isAct = btn.dataset.admintab === activeTab;
-        btn.className = `admin-tab-btn py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap border-b-2 ${isAct ? 'border-[#16A34A] text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-900'}`;
+    document.querySelectorAll('[data-admintab]').forEach((btn) => {
+        const isActive = btn.dataset.admintab === activeTab;
+        btn.setAttribute('aria-current', isActive ? 'page' : 'false');
+        btn.classList.toggle('bg-emerald-50', isActive && !!btn.closest('aside'));
+        btn.classList.toggle('text-emerald-800', isActive);
+        btn.classList.toggle('text-slate-500', !isActive);
+        const isDesktopNav = !!btn.closest('aside');
+        const icon = btn.querySelector('span');
+        if (icon) {
+            icon.classList.toggle('bg-emerald-100', isActive && isDesktopNav);
+            icon.classList.toggle('bg-slate-100', !isActive && isDesktopNav);
+            icon.classList.toggle('bg-emerald-50', isActive && !isDesktopNav);
+            icon.classList.toggle('text-emerald-800', isActive && isDesktopNav);
+            icon.classList.toggle('text-slate-500', !isActive && isDesktopNav);
+        }
     });
     let viewNode;
     if (activeTab === 'dashboard')
@@ -939,17 +1001,38 @@ function renderActiveTab() {
         viewNode = h(WithdrawalTabView, { s: data });
     else if (activeTab === 'tasks')
         viewNode = h(TasksTabView, { s: data });
+    else if (activeTab === 'games')
+        viewNode = h(GamesTabView, { s: data });
     else if (activeTab === 'settings')
         viewNode = h(SettingsTabView, { s: data });
     else
         viewNode = h(TransactionsTabView, { s: data });
+    const focused = document.activeElement;
+    const focusId = focused?.id;
+    const selectionStart = focused && (focused.type === 'text' || focused.type === 'search') ? focused.selectionStart : null;
+    const selectionEnd = focused && (focused.type === 'text' || focused.type === 'search') ? focused.selectionEnd : null;
     container.replaceChildren(viewNode);
+    if (focusId) {
+        const next = document.getElementById(focusId);
+        if (next && !next.disabled) {
+            next.focus({ preventScroll: true });
+            if (selectionStart !== null && selectionEnd !== null)
+                next.setSelectionRange(selectionStart, selectionEnd);
+        }
+    }
 }
 async function refreshAdmin() {
+    if (isRefreshing)
+        return;
+    isRefreshing = true;
+    const refreshButton = document.getElementById('adminRefreshButton');
+    if (refreshButton) {
+        refreshButton.disabled = true;
+        refreshButton.textContent = 'Refreshing…';
+    }
     try {
-        if (!apiCountries.length) {
+        if (!apiCountries.length)
             loadCountriesFromApi();
-        }
         const s = await adminApi('/api/admin/stats');
         data = s;
         draftSettings = {
@@ -972,6 +1055,13 @@ async function refreshAdmin() {
         if (errEl)
             errEl.textContent = e.message;
     }
+    finally {
+        isRefreshing = false;
+        if (refreshButton) {
+            refreshButton.disabled = false;
+            refreshButton.textContent = 'Refresh';
+        }
+    }
 }
 async function adminLogin() {
     const inp = document.getElementById('adminKeyInput');
@@ -986,15 +1076,76 @@ function adminLogout() {
     adminKey = '';
     location.reload();
 }
-function switchAdminTab(tab) {
-    activeTab = tab;
+function clearGameForm() {
+    editingGameId = null;
     renderActiveTab();
 }
-function toggleWithdrawSettingsModal(show) {
-    showWithdrawSettings = typeof show === 'boolean' ? show : !showWithdrawSettings;
-    if (showWithdrawSettings && !apiCountries.length) {
-        loadCountriesFromApi().then(() => renderActiveTab());
+function editGameForm(id) {
+    editingGameId = id;
+    renderActiveTab();
+    document.getElementById('gameTitle')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+async function saveGameCrud() {
+    const title = document.getElementById('gameTitle')?.value.trim() || '';
+    const description = document.getElementById('gameDescription')?.value.trim() || '';
+    const url = document.getElementById('gameUrl')?.value.trim() || '';
+    const priceCoins = Number(document.getElementById('gamePrice')?.value);
+    if (title.length < 2 || title.length > 60)
+        return notify('Game title must be 2–60 characters', true);
+    if (description.length > 240)
+        return notify('Description must be 240 characters or less', true);
+    if (!Number.isSafeInteger(priceCoins) || priceCoins < 0 || priceCoins > 100000)
+        return notify('Price must be a whole number from 0 to 100,000', true);
+    try {
+        if (new URL(url).protocol !== 'https:')
+            return notify('Game URL must use HTTPS', true);
     }
+    catch {
+        return notify('Enter a valid game iframe URL', true);
+    }
+    const payload = { title, description, url, priceCoins };
+    try {
+        if (editingGameId) {
+            await adminApi(`/api/admin/games/${encodeURIComponent(editingGameId)}`, { method: 'PUT', body: JSON.stringify(payload) });
+            notify('Game updated');
+        }
+        else {
+            await adminApi('/api/admin/games', { method: 'POST', body: JSON.stringify(payload) });
+            notify('Game published');
+        }
+        editingGameId = null;
+        await refreshAdmin();
+    }
+    catch (e) {
+        notify(e.message || 'Could not save game', true);
+    }
+}
+async function setGameEnabled(id, enabled) {
+    try {
+        await adminApi(`/api/admin/games/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({ enabled }) });
+        notify(enabled ? 'Game published' : 'Game paused');
+        await refreshAdmin();
+    }
+    catch (e) {
+        notify(e.message || 'Could not update game', true);
+    }
+}
+async function deleteGame(id, title) {
+    if (!confirm(`Remove “${title}” from the app? Past play totals will stay in reports.`))
+        return;
+    try {
+        await adminApi(`/api/admin/games/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        if (editingGameId === id)
+            clearGameForm();
+        notify('Game deleted');
+        await refreshAdmin();
+    }
+    catch (e) {
+        notify(e.message || 'Could not delete game', true);
+    }
+}
+function switchAdminTab(tab) {
+    activeTab = tab;
     renderActiveTab();
 }
 function previewMethodLogoUrl(url) {
@@ -1150,35 +1301,57 @@ function closeUserForm() {
     renderActiveTab();
 }
 async function saveUserCrud() {
+    if (isSavingUser)
+        return;
     const id = document.getElementById('crudUserId')?.value.trim() || '';
-    const name = document.getElementById('crudUserName')?.value.trim() || 'User';
+    const name = document.getElementById('crudUserName')?.value.trim() || '';
     const username = document.getElementById('crudUserHandle')?.value.trim() || '';
-    const coins = +(document.getElementById('crudUserCoins')?.value || 0);
+    const coins = Number(document.getElementById('crudUserCoins')?.value || 0);
     const email = document.getElementById('crudUserEmail')?.value.trim() || '';
-    const adsDone = +(document.getElementById('crudUserAds')?.value || 0);
-    const dailyDone = +(document.getElementById('crudUserDaily')?.value || 0);
+    const adsDone = Number(document.getElementById('crudUserAds')?.value || 0);
+    const dailyDone = Number(document.getElementById('crudUserDaily')?.value || 0);
     const verified = Boolean(document.getElementById('crudUserVerified')?.checked);
-    if (editingUserId) {
-        await adminApi(`/api/admin/user/${editingUserId}`, {
-            method: 'PUT',
-            body: JSON.stringify({ name, username, coins, email, adsDone, dailyDone, verified })
-        });
-        notify(`Updated user #${editingUserId}`);
+    if (!editingUserId && !id) {
+        notify('Enter a User ID', true);
+        return;
     }
-    else {
-        if (!id) {
-            notify('Enter a User ID', true);
-            return;
+    if (!name) {
+        notify('Enter the user name', true);
+        return;
+    }
+    if (![coins, adsDone, dailyDone].every((value) => Number.isFinite(value) && value >= 0)) {
+        notify('Balance and activity values must be zero or more', true);
+        return;
+    }
+    isSavingUser = true;
+    renderActiveTab();
+    try {
+        if (editingUserId) {
+            await adminApi('/api/admin/user/' + encodeURIComponent(editingUserId), {
+                method: 'PUT',
+                body: JSON.stringify({ name, username, coins, email, adsDone, dailyDone, verified })
+            });
+            notify('User updated');
         }
-        await adminApi('/api/admin/users', {
-            method: 'POST',
-            body: JSON.stringify({ id, name, username, coins, email, verified })
-        });
-        notify(`Created user #${id}`);
+        else {
+            await adminApi('/api/admin/users', {
+                method: 'POST',
+                body: JSON.stringify({ id, name, username, coins, email, verified })
+            });
+            notify('User created');
+        }
+        showUserEditor = false;
+        editingUserId = null;
+        await refreshAdmin();
     }
-    showUserEditor = false;
-    editingUserId = null;
-    await refreshAdmin();
+    catch (e) {
+        notify(e.message || 'Could not save user', true);
+    }
+    finally {
+        isSavingUser = false;
+        if (showUserEditor)
+            renderActiveTab();
+    }
 }
 async function toggleUserVerify(userId) {
     await adminApi(`/api/admin/user/${userId}/verify`, { method: 'POST' });
@@ -1271,7 +1444,7 @@ async function deleteTask(id) {
     await refreshAdmin();
 }
 function openWithdrawForm(withdrawId) {
-    editingWithdrawId = withdrawId || null;
+    editingWithdrawId = withdrawId;
     showWithdrawEditor = true;
     renderActiveTab();
 }
@@ -1281,32 +1454,29 @@ function closeWithdrawForm() {
     renderActiveTab();
 }
 async function saveWithdrawCrud() {
-    const userId = document.getElementById('crudWUserId')?.value.trim() || '';
+    if (!editingWithdrawId)
+        return;
     const method = document.getElementById('crudWMethod')?.value || 'Custom';
     const account = document.getElementById('crudWAccount')?.value.trim() || '';
-    const coins = +(document.getElementById('crudWCoins')?.value || 10000);
+    const coins = Number(document.getElementById('crudWCoins')?.value || 0);
     const status = document.getElementById('crudWStatus')?.value || 'pending';
-    if (editingWithdrawId) {
-        await adminApi(`/api/admin/withdraw/${editingWithdrawId}`, {
+    if (!account || !Number.isFinite(coins) || coins <= 0) {
+        notify('Enter a valid account and payout amount', true);
+        return;
+    }
+    try {
+        await adminApi('/api/admin/withdraw/' + encodeURIComponent(editingWithdrawId), {
             method: 'PUT',
             body: JSON.stringify({ method, account, coins, status })
         });
-        notify(`Updated ${editingWithdrawId}`);
+        notify('Payout updated');
+        showWithdrawEditor = false;
+        editingWithdrawId = null;
+        await refreshAdmin();
     }
-    else {
-        if (!userId || !account) {
-            notify('Enter User ID and Account', true);
-            return;
-        }
-        await adminApi('/api/admin/withdrawals', {
-            method: 'POST',
-            body: JSON.stringify({ userId, method, account, coins, status })
-        });
-        notify('Withdrawal created');
+    catch (e) {
+        notify(e.message || 'Could not update payout', true);
     }
-    showWithdrawEditor = false;
-    editingWithdrawId = null;
-    await refreshAdmin();
 }
 async function decideWithdraw(id, action) {
     await adminApi(`/api/admin/withdraw/${id}`, {

@@ -89,6 +89,26 @@ export interface Task {
   done?: boolean;
 }
 
+export interface HostedGame {
+  id: string;
+  title: string;
+  description: string;
+  url: string;
+  priceCoins: number;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GamePlay {
+  id: string;
+  gameId: string;
+  gameTitle: string;
+  userId: string;
+  coins: number;
+  at: string;
+}
+
 export type WithdrawMethod = string;
 export type WithdrawStatus = 'pending' | 'paid' | 'rejected';
 
@@ -129,7 +149,7 @@ export interface WithdrawSettings {
   requireQualification: boolean;
 }
 
-export type NotificationType = 'task' | 'reward' | 'withdraw' | 'referral' | 'admin' | 'system';
+export type NotificationType = 'task' | 'reward' | 'withdraw' | 'referral' | 'admin' | 'system' | 'game';
 
 export interface AppNotification {
   id: string;
@@ -147,6 +167,8 @@ export interface DatabaseSchema {
   withdrawals: Withdrawal[];
   claims: Record<string, number>;
   tasks?: Task[];
+  games?: HostedGame[];
+  gamePlays?: GamePlay[];
   settings?: WithdrawSettings;
   notifications?: AppNotification[];
 }
@@ -161,6 +183,7 @@ export interface AdsInfo {
 export interface MeResponse {
   user: User;
   tasks: Task[];
+  games: Array<HostedGame & { plays: number; coinsCollected: number }>;
   coinPerNpr: number;
   minWithdrawCoins: number;
   dailyBonus: number;

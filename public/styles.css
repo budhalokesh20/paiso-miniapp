@@ -700,6 +700,14 @@ input, select, textarea {
   position: relative;
   overflow: hidden;
 }
+
+button.explore-card {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  appearance: none;
+}
 .explore-card:active {
   transform: scale(0.96);
 }
