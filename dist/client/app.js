@@ -1,10 +1,15 @@
 import { h } from './jsx';
 import { SvgSpriteDefs } from './components/Icons';
 import { HomeView } from './components/HomeView';
-import { TasksView } from './components/TasksView';
+import { AppHeader } from './components/shared/AppHeader';
+import { EarnIcon } from './components/shared/EarnIcon';
+import { GameCard } from './components/shared/GameCard';
+import { updateFeaturedGames, showFeaturedGamesError } from './components/home/FeaturedGames';
+import { TasksView, OffersView } from './components/TasksView';
 import { FriendsView } from './components/FriendsView';
 import { SettingsView } from './components/SettingsView';
 import { BottomNav } from './components/BottomNav';
+import { GamesView, GameModal } from './components/GamesView';
 function NotificationModal() {
     return (h("div", { id: "notifModal", className: "fixed inset-0 z-[9999] bg-slate-900/50 backdrop-blur-[2px] hidden items-end sm:items-center justify-center p-0 sm:p-4", onClick: (e) => {
             if (e.target.id === 'notifModal')
@@ -30,9 +35,15 @@ function PaisoApp() {
         h(SvgSpriteDefs, null),
         h("div", { className: "toast", id: "toast" }),
         h(NotificationModal, null),
+        h(GameModal, null),
+        h(AppHeader, null),
         h("main", { className: "app-viewport" },
             h(HomeView, null),
             h(TasksView, null),
+            h(OffersView, null),
+            h("section", { id: "tab-games", className: "app-screen" },
+                h("div", { className: "screen-content" },
+                    h(GamesView, null))),
             h(FriendsView, null),
             h(SettingsView, null)),
         h(BottomNav, null)));
@@ -47,6 +58,7 @@ let taskSearchQuery = '';
 let isDailyClaiming = false;
 let isWithdrawing = false;
 let startingGameId = null;
+let renderedGamesKey = '';
 const claimingTaskIds = new Set();
 let AdController = null;
 let toastTimer;
@@ -55,6 +67,7 @@ let lastTopNotifId = null;
 const activeTimers = {};
 const COIN_SVG = `<svg width="14" height="14" style="vertical-align:-2px"><use href="#icon-p-coin"/></svg>`;
 const DUMMY_AVATARS = [
+    `<img src="/assets/paiso-avatar-v2.webp" alt="Cat avatar" width="64" height="64" />`,
     `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="av1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#2563EB"/><stop offset="100%" stop-color="#1D4ED8"/></linearGradient></defs><rect width="64" height="64" rx="32" fill="url(#av1)"/><path d="M14 58c2-11 10-16 18-16s16 5 18 16" fill="#60A5FA"/><circle cx="32" cy="27" r="11" fill="#FDE68A"/><path d="M21 25c0-7 5-12 11-12s11 5 11 12v3H21v-3z" fill="#1E293B"/><path d="M18 27a14 14 0 0 1 28 0" fill="none" stroke="#38BDF8" stroke-width="3.5" stroke-linecap="round"/><rect x="15" y="23" width="5" height="10" rx="2.5" fill="#0284C7"/><rect x="44" y="23" width="5" height="10" rx="2.5" fill="#0284C7"/><circle cx="28" cy="28" r="1.6" fill="#0F172A"/><circle cx="36" cy="28" r="1.6" fill="#0F172A"/><path d="M28.5 33c2 1.8 5 1.8 7 0" fill="none" stroke="#0F172A" stroke-width="1.8" stroke-linecap="round"/></svg>`,
     `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="av2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#8B5CF6"/><stop offset="100%" stop-color="#6D28D9"/></linearGradient></defs><rect width="64" height="64" rx="32" fill="url(#av2)"/><path d="M13 58c3-12 10-17 19-17s16 5 19 17" fill="#F43F5E"/><circle cx="32" cy="27" r="11" fill="#FED7AA"/><path d="M20 22c2-6 7-9 12-9s10 3 12 9c-4-2-8-2-12-2s-8 0-12 2z" fill="#311042"/><rect x="22" y="24" width="9" height="5.5" rx="2" fill="#0F172A"/><rect x="33" y="24" width="9" height="5.5" rx="2" fill="#0F172A"/><line x1="31" y1="26.5" x2="33" y2="26.5" stroke="#0F172A" stroke-width="2"/><path d="M29 33.5c2 1.4 4.5 1.4 6 0" fill="none" stroke="#0F172A" stroke-width="1.8" stroke-linecap="round"/></svg>`,
     `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="av3" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#10B981"/><stop offset="100%" stop-color="#047857"/></linearGradient></defs><rect width="64" height="64" rx="32" fill="url(#av3)"/><path d="M14 58c2-11 10-16 18-16s16 5 18 16" fill="#064E3B"/><circle cx="32" cy="29" r="10.5" fill="#FDE68A"/><polygon points="21,20 25,12 32,17 39,12 43,20" fill="#FBBF24" stroke="#F59E0B" stroke-width="1"/><circle cx="28.5" cy="28.5" r="1.6" fill="#0F172A"/><circle cx="35.5" cy="28.5" r="1.6" fill="#0F172A"/><path d="M29 34c2 1.6 4.5 1.6 6 0" fill="none" stroke="#0F172A" stroke-width="1.8" stroke-linecap="round"/></svg>`,
@@ -62,48 +75,20 @@ const DUMMY_AVATARS = [
     `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="av5" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#06B6D4"/><stop offset="100%" stop-color="#0E7490"/></linearGradient></defs><rect width="64" height="64" rx="32" fill="url(#av5)"/><path d="M14 58c2-11 10-16 18-16s16 5 18 16" fill="#0F172A"/><circle cx="32" cy="27" r="11" fill="#1E293B"/><rect x="22" y="23" width="20" height="7" rx="3.5" fill="#FDE68A"/><circle cx="28" cy="26.5" r="1.7" fill="#0F172A"/><circle cx="36" cy="26.5" r="1.7" fill="#0F172A"/><path d="M21 20h22" stroke="#EF4444" stroke-width="3" stroke-linecap="round"/></svg>`,
     `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="av6" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#EC4899"/><stop offset="100%" stop-color="#BE185D"/></linearGradient></defs><rect width="64" height="64" rx="32" fill="url(#av6)"/><path d="M14 58c2-11 10-16 18-16s16 5 18 16" fill="#FBCFE8"/><path d="M19 30c0-9 6-15 13-15s13 6 13 15c0 4-1 8-3 10H22c-2-2-3-6-3-10z" fill="#4C1D95"/><circle cx="32" cy="28" r="10" fill="#FDE68A"/><circle cx="28.5" cy="27.5" r="1.6" fill="#0F172A"/><circle cx="35.5" cy="27.5" r="1.6" fill="#0F172A"/><path d="M29 32.5c2 1.6 4.5 1.6 6 0" fill="none" stroke="#E11D48" stroke-width="1.8" stroke-linecap="round"/></svg>`
 ];
-let currentAvatarIndex = Math.floor(Math.random() * DUMMY_AVATARS.length);
+let currentAvatarIndex = 0;
 function renderDummyAvatar(idx = currentAvatarIndex) {
     const box = $('settingsAvatarBox');
     if (box) {
         box.innerHTML = DUMMY_AVATARS[idx % DUMMY_AVATARS.length];
+    }
+    for (const avatar of document.querySelectorAll('.profile-avatar-art')) {
+        avatar.innerHTML = DUMMY_AVATARS[idx % DUMMY_AVATARS.length];
     }
 }
 function randomizeAvatar() {
     tg?.HapticFeedback?.impactOccurred?.('light');
     currentAvatarIndex = (currentAvatarIndex + 1 + Math.floor(Math.random() * (DUMMY_AVATARS.length - 1))) % DUMMY_AVATARS.length;
     renderDummyAvatar(currentAvatarIndex);
-}
-function TaskSvgIcon({ task }) {
-    if (task.type === 'app_task') {
-        return (h("svg", { width: "21", height: "21", viewBox: "0 0 24 24", fill: "none", stroke: "#4F46E5", "stroke-width": "2.1", "stroke-linecap": "round", "stroke-linejoin": "round" },
-            h("rect", { x: "3", y: "3", width: "7", height: "7", rx: "1.5" }),
-            h("rect", { x: "14", y: "3", width: "7", height: "7", rx: "1.5" }),
-            h("rect", { x: "14", y: "14", width: "7", height: "7", rx: "1.5" }),
-            h("rect", { x: "3", y: "14", width: "7", height: "7", rx: "1.5" })));
-    }
-    if (task.type === 'play_game') {
-        return (h("svg", { width: "22", height: "22", viewBox: "0 0 24 24", fill: "none", stroke: "#7C3AED", "stroke-width": "2.1", "stroke-linecap": "round", "stroke-linejoin": "round" },
-            h("line", { x1: "6", y1: "12", x2: "10", y2: "12" }),
-            h("line", { x1: "8", y1: "10", x2: "8", y2: "14" }),
-            h("line", { x1: "15", y1: "13", x2: "15.01", y2: "13" }),
-            h("line", { x1: "18", y1: "11", x2: "18.01", y2: "11" }),
-            h("rect", { x: "2", y: "6", width: "20", height: "12", rx: "4" })));
-    }
-    if (task.type === 'telegram_join') {
-        return (h("svg", { width: "21", height: "21", viewBox: "0 0 24 24", fill: "none", stroke: "#0284C7", "stroke-width": "2.1", "stroke-linecap": "round", "stroke-linejoin": "round" },
-            h("line", { x1: "22", y1: "2", x2: "11", y2: "13" }),
-            h("polygon", { points: "22 2 15 22 11 13 2 9 22 2" })));
-    }
-    if (task.url.includes('youtube.com') || task.url.includes('youtu.be')) {
-        return (h("svg", { width: "21", height: "21", viewBox: "0 0 24 24", fill: "none", stroke: "#DC2626", "stroke-width": "2.1", "stroke-linecap": "round", "stroke-linejoin": "round" },
-            h("rect", { x: "2", y: "4", width: "20", height: "16", rx: "4" }),
-            h("polygon", { points: "10 9 15 12 10 15 10 9", fill: "#DC2626" })));
-    }
-    return (h("svg", { width: "21", height: "21", viewBox: "0 0 24 24", fill: "none", stroke: "#2563EB", "stroke-width": "2.1", "stroke-linecap": "round", "stroke-linejoin": "round" },
-        h("circle", { cx: "12", cy: "12", r: "10" }),
-        h("line", { x1: "2", y1: "12", x2: "22", y2: "12" }),
-        h("path", { d: "M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" })));
 }
 function $(id) {
     return document.getElementById(id);
@@ -137,7 +122,7 @@ async function api(path, opts = {}) {
 }
 function showTab(name, taskFilter) {
     tg?.HapticFeedback?.impactOccurred?.('light');
-    const tabs = ['home', 'tasks', 'refer', 'wallet'];
+    const tabs = ['home', 'tasks', 'refer', 'wallet', 'games', 'offers'];
     tabs.forEach((t) => {
         const sec = $(`tab-${t}`);
         if (sec) {
@@ -145,9 +130,19 @@ function showTab(name, taskFilter) {
         }
     });
     document.querySelectorAll('nav.bottom-nav button').forEach((btn) => {
-        btn.classList.toggle('active', btn.dataset.tab === name);
+        const active = btn.dataset.tab === name || (name === 'offers' && btn.dataset.tab === 'tasks') || (name === 'games' && btn.dataset.tab === 'home');
+        btn.classList.toggle('active', active);
+        if (active)
+            btn.setAttribute('aria-current', 'page');
+        else
+            btn.removeAttribute('aria-current');
     });
+    closeSettingPage();
     if (name === 'tasks' && taskFilter) {
+        taskSearchQuery = '';
+        const search = $('taskSearchInput');
+        if (search)
+            search.value = '';
         setTaskFilter(taskFilter);
     }
     if (name === 'wallet') {
@@ -337,11 +332,11 @@ function renderDailyCheckin() {
         if (btnIcon)
             btnIcon.innerHTML = `<svg width="16" height="16"><use href="#icon-gift"/></svg>`;
         if (btnText)
-            btnText.textContent = isDailyClaiming ? 'Claiming...' : `Claim Day ${targetDay} Bonus (+${nextReward})`;
+            btnText.textContent = isDailyClaiming ? 'Claiming...' : `Claim Today (+${nextReward})`;
         if (btnCoin)
             btnCoin.style.display = 'inline-block';
         if (subText)
-            subText.textContent = `7 day streak! Keep it going!`;
+            subText.textContent = `Check in daily to keep your streak!`;
     }
     else {
         if (btn) {
@@ -428,6 +423,8 @@ function renderReferralsAndQualification() {
         }
     }
     const hist = state.referralHistory || [];
+    setText('refActive', hist.filter(r => r.qualified).length);
+    setText('refEarned', hist.reduce((sum, r) => sum + (r.qualified ? r.bonusCoins : 0), 0).toLocaleString());
     const refHistEl = $('refHistory');
     if (refHistEl) {
         if (!hist.length) {
@@ -451,124 +448,67 @@ function renderReferralsAndQualification() {
         }
     }
 }
-function getTaskIconBoxClass(task) {
-    if (task.type === 'app_task')
-        return 'bg-indigo-50 border-indigo-200/80 text-indigo-600';
-    if (task.type === 'play_game')
-        return 'bg-violet-50 border-violet-200/80 text-violet-600';
-    if (task.type === 'telegram_join')
-        return 'bg-sky-50 border-sky-200/80 text-sky-600';
-    if (task.url.includes('youtube.com') || task.url.includes('youtu.be'))
-        return 'bg-red-50 border-red-200/80 text-red-600';
-    return 'bg-blue-50 border-blue-200/80 text-blue-600';
+function TaskCard({ task, prefix = 'verify' }) {
+    const wait = activeTimers[task.id] || 0;
+    const started = startedTasks.has(task.id);
+    const index = task.type === 'app_task' ? 1 : task.type === 'play_game' ? 2 : /survey/i.test(task.title) ? 4 : 5;
+    const category = task.type === 'app_task' ? 'Apps' : task.type === 'play_game' ? 'Games' : task.type === 'telegram_join' ? 'Social' : 'Web';
+    return h("article", { className: "task-card" },
+        h("div", { className: `task-art task-art-${task.type}` }, task.type === 'telegram_join' ? h("img", { src: "/assets/icon-channels.png", alt: "" }) : h(EarnIcon, { index: index })),
+        h("div", { className: "task-copy" },
+            h("h2", null, task.title),
+            h("p", null, task.description || 'Complete this task to earn coins'),
+            h("div", { className: "task-tags" },
+                h("span", null, category),
+                h("span", null, task.done ? 'Completed' : task.type === 'play_game' ? 'Play' : 'Easy'),
+                h("span", null, task.type === 'telegram_join' ? 'Join' : (task.waitSeconds || 15) + ' sec'))),
+        h("div", { className: "task-actions" },
+            h("span", { className: "reward-pill" },
+                h("svg", { width: "14", height: "14" },
+                    h("use", { href: "#icon-p-coin" })),
+                "+",
+                task.reward.toLocaleString()),
+            h("button", { id: `${prefix}-${task.id}`, disabled: !!task.done || wait > 0 || claimingTaskIds.has(task.id), onClick: () => { if (started)
+                    claimTask(task.id);
+                else {
+                    startedTasks.add(task.id);
+                    doTask(task.id, task.url);
+                } }, className: "task-start" }, task.done ? 'Done' : claimingTaskIds.has(task.id) ? 'Checking' : wait > 0 ? wait + 's' : started ? 'Verify' : 'Start')));
 }
+const startedTasks = new Set();
 function renderTasks() {
-    const listEl = $('taskList');
-    if (!listEl || !state)
+    if (!state)
         return;
-    const allTasks = state.tasks || [];
-    const availableTasks = allTasks.filter((t) => !t.done);
-    const completedCount = allTasks.filter((t) => Boolean(t.done)).length;
-    const totalAvailableReward = availableTasks.reduce((sum, t) => sum + (t.reward || 0), 0);
-    const availAppCount = availableTasks.filter((t) => t.type === 'app_task').length;
-    const availGameCount = availableTasks.filter((t) => t.type === 'play_game').length;
-    setText('tasksAvailableBadge', `${availableTasks.length} Left`);
-    setText('tasksTotalRewardText', `+${totalAvailableReward.toLocaleString()}`);
-    setText('tasksDoneCountText', `${completedCount}/${allTasks.length}`);
-    setText('appTaskCountText', availAppCount > 0 ? `${availAppCount} Available` : 'Try apps & earn');
-    setText('playGameCountText', availGameCount > 0 ? `${availGameCount} Available` : 'Play & win coins');
-    const appQuickCard = $('quickCardAppTask');
-    const gameQuickCard = $('quickCardPlayGame');
-    if (appQuickCard) {
-        appQuickCard.className = `flex items-center gap-3 p-3 rounded-2xl border text-left transition active:scale-[0.98] ${currentTaskFilter === 'app_task'
-            ? 'bg-indigo-100/80 border-indigo-500 ring-2 ring-indigo-500/20'
-            : 'bg-gradient-to-br from-indigo-50/90 to-blue-50/60 border-indigo-200/80'}`;
+    const all = state.tasks || [];
+    const source = all.filter(t => currentTaskFilter === 'done' ? t.done : !t.done);
+    const tasks = source.filter(t => (currentTaskFilter === 'all' || currentTaskFilter === 'done' || t.type === currentTaskFilter) && (!taskSearchQuery || (t.title + ' ' + t.description + ' ' + t.type).toLowerCase().includes(taskSearchQuery)));
+    const nodes = tasks.map(task => h(TaskCard, { task: task }));
+    if ((currentTaskFilter === 'all' || currentTaskFilter === 'video') && (!taskSearchQuery || 'watch video ads'.includes(taskSearchQuery)) && state.ads) {
+        nodes.unshift(h("article", { className: "task-card" },
+            h("div", { className: "task-art" },
+                h(EarnIcon, { index: 0 })),
+            h("div", { className: "task-copy" },
+                h("h2", null, "Watch Video Ads"),
+                h("p", null, "Watch short videos and earn coins"),
+                h("div", { className: "task-tags" },
+                    h("span", null, "Video"),
+                    h("span", null, "Easy"),
+                    h("span", null, "1\u20132 min"))),
+            h("div", { className: "task-actions" },
+                h("span", { className: "reward-pill" },
+                    h("svg", { width: "14", height: "14" },
+                        h("use", { href: "#icon-p-coin" })),
+                    "+",
+                    state.ads.reward),
+                h("button", { className: "task-start", disabled: state.ads.watchedToday >= state.ads.dailyCap, onClick: () => watchAd() }, state.ads.watchedToday >= state.ads.dailyCap ? 'Done' : 'Start'))));
     }
-    if (gameQuickCard) {
-        gameQuickCard.className = `flex items-center gap-3 p-3 rounded-2xl border text-left transition active:scale-[0.98] ${currentTaskFilter === 'play_game'
-            ? 'bg-violet-100/80 border-violet-500 ring-2 ring-violet-500/20'
-            : 'bg-gradient-to-br from-violet-50/90 to-purple-50/60 border-violet-200/80'}`;
-    }
-    const sourceTasks = currentTaskFilter === 'done' ? allTasks.filter((t) => t.done) : availableTasks;
-    const filtered = sourceTasks.filter((t) => {
-        const matchesFilter = currentTaskFilter === 'all' || currentTaskFilter === 'done' || t.type === currentTaskFilter;
-        const searchable = `${t.title} ${t.description || ''} ${t.target || ''} ${t.type}`.toLowerCase();
-        return matchesFilter && (!taskSearchQuery || searchable.includes(taskSearchQuery));
-    });
-    if (!filtered.length) {
-        const emptyTitle = taskSearchQuery
-            ? 'No matching tasks'
-            : currentTaskFilter === 'done'
-                ? 'No completed tasks yet'
-                : availableTasks.length === 0
-                    ? 'All tasks completed!'
-                    : 'No tasks in this category';
-        const emptyMessage = taskSearchQuery
-            ? 'Try another title, category, or keyword.'
-            : currentTaskFilter === 'done'
-                ? 'Tasks you verify will appear here.'
-                : availableTasks.length === 0
-                    ? 'New or repeatable tasks will appear here when ready.'
-                    : 'Try another category or check back later.';
-        listEl.replaceChildren(h("div", { className: "bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-2xs my-2" },
-            h("div", { className: "w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto mb-3" },
-                h("svg", { width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.4" },
-                    h("polyline", { points: "20 6 9 17 4 12" }))),
-            h("div", { className: "text-sm font-extrabold text-slate-900" }, emptyTitle),
-            h("div", { className: "text-xs text-slate-500 mt-1 leading-relaxed" }, emptyMessage)));
-        return;
-    }
-    listEl.replaceChildren(...filtered.map((t) => {
-        const waitRemaining = activeTimers[t.id] || 0;
-        const iconBoxClass = getTaskIconBoxClass(t);
-        const resetHours = +(t.resetHours || 0);
-        const repeatLabel = resetHours === 24 ? 'Daily' : resetHours > 0 ? `${resetHours}h` : '';
-        const categoryLabel = t.type === 'app_task'
-            ? 'App Task'
-            : t.type === 'play_game'
-                ? 'Play Game'
-                : t.type === 'telegram_join'
-                    ? 'Telegram'
-                    : 'Social';
-        const timerHint = t.type === 'telegram_join'
-            ? 'Join to verify'
-            : t.type === 'play_game'
-                ? `Play ${t.waitSeconds || 30}s`
-                : `${t.waitSeconds || 15}s visit`;
-        const openBtnLabel = t.type === 'play_game'
-            ? 'Play'
-            : t.type === 'app_task'
-                ? 'Open App'
-                : t.type === 'telegram_join'
-                    ? 'Join'
-                    : 'Open';
-        return (h("div", { className: "bg-white border border-slate-200/90 hover:border-blue-300 rounded-2xl p-3.5 shadow-2xs flex items-center justify-between gap-3 transition" },
-            h("div", { className: "flex items-center gap-3 min-w-0" },
-                h("div", { className: `w-11 h-11 rounded-xl border flex items-center justify-center shrink-0 ${iconBoxClass}` },
-                    h(TaskSvgIcon, { task: t })),
-                h("div", { className: "min-w-0" },
-                    h("div", { className: "text-[13px] font-extrabold text-slate-900 truncate" }, t.title),
-                    h("div", { className: "flex flex-wrap items-center gap-1.5 mt-1" },
-                        t.done ? (h("span", { className: "inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-extrabold" },
-                            h("svg", { width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "3" },
-                                h("path", { d: "m5 12 4 4L19 6" })),
-                            "Completed")) : (h("span", { className: "inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200/80 text-amber-800 text-[11px] font-extrabold" },
-                            h("svg", { width: "12", height: "12" },
-                                h("use", { href: "#icon-p-coin" })),
-                            h("span", null,
-                                "+",
-                                t.reward))),
-                        h("span", { className: "px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold" }, categoryLabel),
-                        h("span", { className: "text-[10px] font-semibold text-slate-400" },
-                            "\u2022 ",
-                            timerHint),
-                        repeatLabel ? (h("span", { className: "px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-extrabold uppercase" }, repeatLabel)) : null))),
-            t.done ? null : h("div", { className: "flex items-center gap-1.5 shrink-0" },
-                h("button", { type: "button", className: "px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-extrabold transition", onClick: () => doTask(t.id, t.url) }, openBtnLabel),
-                h("button", { type: "button", id: `verify-${t.id}`, disabled: waitRemaining > 0 || claimingTaskIds.has(t.id), onClick: () => claimTask(t.id), className: `px-3.5 py-2 rounded-xl text-xs font-extrabold text-white transition ${waitRemaining > 0 || claimingTaskIds.has(t.id)
-                        ? 'bg-slate-400 cursor-not-allowed'
-                        : 'bg-blue-600 hover:bg-blue-700 shadow-xs'}` }, claimingTaskIds.has(t.id) ? 'Checking...' : waitRemaining > 0 ? `${waitRemaining}s` : 'Verify'))));
-    }));
+    const empty = (title) => h("div", { className: "empty-state" },
+        h(EarnIcon, { index: 1 }),
+        h("h2", null, title),
+        h("p", null, "Try another category or check back for new rewards."));
+    $('taskList')?.replaceChildren(...(nodes.length ? nodes : [empty(taskSearchQuery ? 'No matching tasks' : 'No tasks here yet')]));
+    const offers = all.filter(t => t.type === 'app_task' && !t.done);
+    $('offerList')?.replaceChildren(...(offers.length ? offers.map(task => h(TaskCard, { task: task, prefix: "offer-verify" })) : [empty('New offers are on the way')]));
 }
 function formatTimeAgo(iso) {
     const diffSec = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
@@ -709,6 +649,11 @@ function startTaskCountdown(taskId, seconds) {
     renderTasks();
     const interval = window.setInterval(() => {
         activeTimers[taskId] -= 1;
+        const offerButton = $(`offer-verify-${taskId}`);
+        if (offerButton) {
+            offerButton.disabled = activeTimers[taskId] > 0;
+            offerButton.textContent = activeTimers[taskId] > 0 ? `${activeTimers[taskId]}s` : 'Verify';
+        }
         const btn = $(`verify-${taskId}`);
         if (activeTimers[taskId] <= 0) {
             delete activeTimers[taskId];
@@ -730,9 +675,13 @@ async function load() {
         state = await api('/api/me');
     }
     catch {
+        if (!renderedGamesKey)
+            showFeaturedGamesError();
         return;
     }
     if (!state || state.error) {
+        if (!renderedGamesKey)
+            showFeaturedGamesError();
         if (state?.error)
             toast(state.error, 'error');
         return;
@@ -888,31 +837,19 @@ async function claimTask(id) {
     }
 }
 function renderGames() {
-    const grid = $('gamesGrid');
-    if (!grid || !state)
+    if (!state)
         return;
     const games = state.games || [];
-    if (!games.length) {
-        grid.replaceChildren(h("div", { className: "col-span-full rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center" },
-            h("div", { className: "mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50" },
-                h("img", { src: "/assets/icon-games.png", alt: "", className: "h-7 w-7 object-contain" })),
-            h("div", { className: "text-sm font-extrabold text-slate-900" }, "No games yet"),
-            h("div", { className: "mt-1 text-xs text-slate-500" }, "New games will show up here when they are published.")));
+    const key = JSON.stringify([startingGameId, games.map(({ id, title, priceCoins }) => [id, title, priceCoins])]);
+    if (key === renderedGamesKey)
         return;
-    }
-    grid.replaceChildren(...games.map((game) => (h("article", { className: "explore-game-card flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm", "data-title": `${game.title} ${game.description || ''} game play online` },
-        h("div", { className: "flex items-start gap-3 p-4" },
-            h("div", { className: "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-50" },
-                h("img", { src: "/assets/icon-games.png", alt: "", className: "h-6 w-6 object-contain" })),
-            h("div", { className: "min-w-0 flex-1" },
-                h("h3", { className: "truncate text-sm font-extrabold text-slate-900" }, game.title),
-                h("p", { className: "mt-1 line-clamp-2 min-h-8 text-xs leading-4 text-slate-500" }, game.description || 'Ready to play.'))),
-        h("div", { className: "flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/70 p-3.5" },
-            h("div", { className: "flex items-center gap-1.5 text-xs font-bold text-slate-700" },
-                h("svg", { width: "15", height: "15" },
-                    h("use", { href: "#icon-p-coin" })),
-                game.priceCoins > 0 ? `${game.priceCoins.toLocaleString()} coins / play` : 'Free to play'),
-            h("button", { type: "button", disabled: startingGameId === game.id, onClick: () => window.playGame(game.id), className: "shrink-0 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-extrabold text-white transition hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-60" }, startingGameId === game.id ? 'Starting...' : 'Play'))))));
+    renderedGamesKey = key;
+    const empty = h("div", { className: "empty-state" },
+        h(EarnIcon, { index: 2 }),
+        h("h2", null, "Games coming soon"),
+        h("p", null, "New games will appear here when published."));
+    $('gamesGrid')?.replaceChildren(...(games.length ? games.map(game => h(GameCard, { game: game, pending: startingGameId === game.id })) : [empty]));
+    updateFeaturedGames(games, startingGameId);
 }
 async function playGame(id) {
     if (startingGameId)

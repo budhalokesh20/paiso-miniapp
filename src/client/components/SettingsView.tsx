@@ -1,4 +1,5 @@
 import { h } from '../jsx';
+import { UiIcon } from './shared/UiIcon';
 
 const FAQ_STEPS = [
   {
@@ -71,11 +72,11 @@ const TERMS_SECTIONS = [
 
 function WithdrawSection() {
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
+    <div className="withdraw-form bg-white border border-slate-200 rounded-xl p-4 space-y-4">
       {/* 1. Simple Balance & Min Withdraw Row */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+      <div className="withdraw-balance flex items-center justify-between pb-3 border-b border-slate-100">
         <div>
-          <span className="text-[11px] font-semibold text-slate-400 block">Balance</span>
+          <span className="text-[11px] font-semibold text-slate-400 block">Available Balance</span>
           <div className="flex items-center gap-1.5 mt-0.5">
             <svg width="18" height="18" className="shrink-0">
               <use href="#icon-p-coin" />
@@ -193,251 +194,39 @@ function SubpageTopBar(props: { title: string }) {
   );
 }
 
+function SettingRow({icon, title, action, detail}: {icon: string; title: string; action: () => void; detail?: any}) {
+  return <button className="settings-row" onClick={action}><span className="settings-item-left"><UiIcon name={icon} size={18} /><span className="settings-item-title">{title}</span></span><span className="settings-row-right"><span className="settings-detail">{detail}</span><UiIcon name="chevron" size={13} /></span></button>;
+}
+
 export function SettingsView() {
   return (
     <section id="tab-wallet" className="app-screen">
-      {/* Main Settings Header with Random Dummy Avatar & User Name */}
-      <div className="native-topbar settings-header-bar">
-        <div className="settings-header-user">
-          <button
-            type="button"
-            className="settings-avatar-wrap"
-            id="settingsAvatarBtn"
-            title="Tap to change avatar"
-            onClick={() => window.randomizeAvatar()}
-          >
-            <div className="settings-avatar-ring" id="settingsAvatarBox" />
-            <span className="settings-avatar-status" />
-          </button>
-          <div className="settings-user-meta">
-            <div className="settings-user-name-row">
-              <span className="settings-user-name" id="settingsHeaderName">
-                Paiso User
-              </span>
-              <span className="blue-tick-badge" id="settingsVerifiedTick" style={{ display: 'none' }} title="Verified Account">
-                <svg width="18" height="18">
-                  <use href="#icon-blue-tick" />
-                </svg>
-              </span>
-            </div>
-            <div className="settings-user-handle" id="settingsHeaderHandle">
-              @user
-            </div>
-          </div>
-        </div>
-        <div className="settings-header-badge">
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
-          <span>Settings</span>
-        </div>
-      </div>
-
       <div className="screen-content" id="settings-menu-view">
-        <div className="settings-group-label">ACCOUNT &amp; WALLET</div>
-        <div className="settings-group-card">
-          {/* 1. User ID */}
-          <button type="button" className="settings-row" onClick={() => window.openSettingPage('sub-userid')}>
-            <div className="settings-item-left">
-              <div className="settings-icon-box icon-blue">
-                <svg
-                  width="19"
-                  height="19"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <rect x="3" y="4" width="18" height="16" rx="2" />
-                  <circle cx="9" cy="10" r="2" />
-                  <path d="M15 8h2" />
-                  <path d="M15 12h2" />
-                  <path d="M7 16h10" />
-                </svg>
-              </div>
-              <div>
-                <div className="settings-item-title">User ID</div>
-                <div className="settings-item-sub">
-                  ID: #<span id="userIdText">---</span>
-                </div>
-              </div>
-            </div>
-            <span className="settings-chevron">›</span>
-          </button>
-
-          {/* 2. Verification (Blue Tick) */}
-          <button type="button" className="settings-row" onClick={() => window.openSettingPage('sub-verify')}>
-            <div className="settings-item-left">
-              <div className="settings-icon-box icon-sky">
-                <svg width="20" height="20">
-                  <use href="#icon-blue-tick" />
-                </svg>
-              </div>
-              <div>
-                <div className="settings-item-title">Verification</div>
-                <div className="settings-item-sub" id="verifyMenuSub">
-                  Verify email &amp; details for Blue Tick
-                </div>
-              </div>
-            </div>
-            <div className="settings-row-right">
-              <span className="verify-status-pill unverified" id="verifyMenuBadge">
-                Unverified
-              </span>
-              <span className="settings-chevron">›</span>
-            </div>
-          </button>
-
-          {/* 2. Transaction History */}
-          <button type="button" className="settings-row" onClick={() => window.openSettingPage('sub-history')}>
-            <div className="settings-item-left">
-              <div className="settings-icon-box icon-amber">
-                <svg
-                  width="19"
-                  height="19"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                </svg>
-              </div>
-              <div>
-                <div className="settings-item-title">Transaction History</div>
-                <div className="settings-item-sub">Your withdrawal requests &amp; status</div>
-              </div>
-            </div>
-            <span className="settings-chevron">›</span>
-          </button>
-
-          {/* 3. Withdrawal */}
-          <button type="button" className="settings-row" onClick={() => window.openSettingPage('sub-withdraw')}>
-            <div className="settings-item-left">
-              <div className="settings-icon-box icon-green">
-                <svg
-                  width="19"
-                  height="19"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <rect x="2" y="5" width="20" height="14" rx="2" />
-                  <line x1="2" y1="10" x2="22" y2="10" />
-                </svg>
-              </div>
-              <div>
-                <div className="settings-item-title">Withdrawal</div>
-                <div className="settings-item-sub">Redeem coins to eSewa, Khalti, USDT</div>
-              </div>
-            </div>
-            <span className="settings-chevron">›</span>
-          </button>
+        <div className="settings-profile"><button className="settings-avatar-wrap" id="settingsAvatarBtn" onClick={() => window.randomizeAvatar()} aria-label="Change avatar"><div className="settings-avatar-ring" id="settingsAvatarBox" /></button><button className="profile-details" onClick={() => window.openSettingPage('sub-userid')}><b id="settingsHeaderName">Paiso User</b><span id="settingsHeaderHandle">@paiso_user</span><span id="settingsVerifiedTick" style="display:none"><svg width="16" height="16"><use href="#icon-blue-tick" /></svg></span></button><UiIcon name="chevron" size={16} /></div>
+        <h2 className="settings-group-label">Account</h2><div className="settings-group-card">
+          <SettingRow icon="user" title="Edit Profile" action={() => window.openSettingPage('sub-verify')} />
+          <SettingRow icon="shield" title="Verification" action={() => window.openSettingPage('sub-verify')} detail={<span id="verifyMenuBadge">Unverified</span>} />
+          <SettingRow icon="wallet" title="Withdraw Rewards" action={() => window.openSettingPage('sub-withdraw')} />
+          <SettingRow icon="tasks" title="Transaction History" action={() => window.openSettingPage('sub-history')} />
         </div>
-
-        <div className="settings-group-label" style={{ marginTop: '18px' }}>
-          HELP &amp; INFORMATION
+        <h2 className="settings-group-label">Preferences</h2><div className="settings-group-card">
+          <SettingRow icon="bell" title="Notifications" action={() => window.openNotificationsModal()} detail={<span id="notifUnreadBadge" style="display:none">0</span>} />
+          <SettingRow icon="shield" title="Data & Privacy" action={() => window.openSettingPage('sub-privacy')} />
+          <SettingRow icon="globe" title="Language" action={() => window.openSettingPage('sub-language')} detail="English" />
         </div>
-        <div className="settings-group-card">
-          {/* 4. Support */}
-          <button type="button" className="settings-row" onClick={() => window.openSettingPage('sub-support')}>
-            <div className="settings-item-left">
-              <div className="settings-icon-box icon-purple">
-                <svg
-                  width="19"
-                  height="19"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                </svg>
-              </div>
-              <div>
-                <div className="settings-item-title">Support</div>
-                <div className="settings-item-sub">Get help with tasks or withdrawals</div>
-              </div>
-            </div>
-            <span className="settings-chevron">›</span>
-          </button>
-
-          {/* 5. FAQ */}
-          <button type="button" className="settings-row" onClick={() => window.openSettingPage('sub-faq')}>
-            <div className="settings-item-left">
-              <div className="settings-icon-box icon-teal">
-                <svg
-                  width="19"
-                  height="19"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-                  <line x1="12" y1="17" x2="12.01" y2="17" />
-                </svg>
-              </div>
-              <div>
-                <div className="settings-item-title">FAQ</div>
-                <div className="settings-item-sub">Frequently asked questions</div>
-              </div>
-            </div>
-            <span className="settings-chevron">›</span>
-          </button>
-
-          {/* 6. Terms & Conditions */}
-          <button type="button" className="settings-row" onClick={() => window.openSettingPage('sub-terms')}>
-            <div className="settings-item-left">
-              <div className="settings-icon-box icon-blue">
-                <svg
-                  width="19"
-                  height="19"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                  <line x1="16" y1="13" x2="8" y2="13" />
-                  <line x1="16" y1="17" x2="8" y2="17" />
-                </svg>
-              </div>
-              <div>
-                <div className="settings-item-title">Terms &amp; Conditions</div>
-                <div className="settings-item-sub">Terms of use &amp; withdrawal rules</div>
-              </div>
-            </div>
-            <span className="settings-chevron">›</span>
-          </button>
+        <h2 className="settings-group-label">Help & Support</h2><div className="settings-group-card">
+          <SettingRow icon="help" title="Help Center" action={() => window.openSettingPage('sub-faq')} />
+          <SettingRow icon="user" title="Contact Support" action={() => window.openSettingPage('sub-support')} />
+          <SettingRow icon="tasks" title="Terms of Service" action={() => window.openSettingPage('sub-terms')} />
+          <SettingRow icon="shield" title="Privacy Information" action={() => window.openSettingPage('sub-privacy')} />
         </div>
+        <h2 className="settings-group-label">About</h2><div className="settings-group-card">
+          <SettingRow icon="share" title="Share Paiso" action={() => window.shareRef()} />
+          <div className="settings-row"><span className="settings-item-left"><UiIcon name="help" size={18} /><span>Version</span></span><span className="settings-detail">1.0.0</span></div>
+        </div><div hidden><span id="userIdText" /><span id="verifyMenuSub" /></div>
       </div>
-
+      <div id="sub-privacy" className="settings-subpage"><SubpageTopBar title="Data & Privacy" /><div className="screen-content"><div className="card"><h2>Account information</h2><p className="small">Paiso uses your Telegram identity to connect your rewards, completed tasks, referrals and withdrawal requests to your account. Verification details are used for account verification.</p><p className="small">For questions about your information or a deletion request, contact support.</p><button className="primary-btn" onClick={() => window.openSupport()}>Contact Support</button></div></div></div>
+      <div id="sub-language" className="settings-subpage"><SubpageTopBar title="Language" /><div className="screen-content"><div className="card"><h2>English</h2><p className="small">English is the currently available app language.</p></div></div></div>
       {/* Slide-in Fullscreen Sub-Page 1: User ID */}
       <div id="sub-userid" className="settings-subpage">
         <SubpageTopBar title="User ID" />
@@ -615,7 +404,7 @@ export function SettingsView() {
 
       {/* Slide-in Fullscreen Sub-Page 3: Simple Withdrawal + Transaction History */}
       <div id="sub-withdraw" className="settings-subpage">
-        <SubpageTopBar title="Withdrawal" />
+        <SubpageTopBar title="Withdraw Rewards" />
         <div className="screen-content space-y-4 pb-6">
           <WithdrawSection />
 

@@ -1,0 +1,21 @@
+// Shared bundle order for both frontend-only and full project builds.
+module.exports = [
+  'dist/client/jsx.js',
+  'dist/client/components/Icons.js',
+  'dist/client/components/shared/UiIcon.js',
+  'dist/client/components/shared/EarnIcon.js',
+  'dist/client/components/shared/AppHeader.js',
+  'dist/client/components/shared/GameCard.js',
+  'dist/client/components/home/HomeHero.js',
+  'dist/client/components/home/DailyCheckIn.js',
+  'dist/client/components/home/EarnShortcuts.js',
+  'dist/client/components/home/InviteBanner.js',
+  'dist/client/components/home/FeaturedGames.js',
+  'dist/client/components/HomeView.js',
+  'dist/client/components/TasksView.js',
+  'dist/client/components/GamesView.js',
+  'dist/client/components/FriendsView.js',
+  'dist/client/components/SettingsView.js',
+  'dist/client/components/BottomNav.js',
+  'dist/client/app.js',
+];

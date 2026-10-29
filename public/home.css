@@ -1,0 +1,151 @@
+/* Home layout: one spacing scale, intrinsic card heights, and a scrollable content area. */
+.app-shell {
+  height: 100vh;
+  height: 100dvh;
+  max-width: 480px;
+}
+
+.app-header {
+  padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px;
+  min-height: 60px;
+}
+
+.header-actions { gap: 4px; }
+.header-icon, .header-avatar { width: 44px; height: 44px; }
+.header-icon { background: radial-gradient(circle, #e9f7f8 54%, transparent 56%); }
+.header-avatar { background: none; display: grid; place-items: center; }
+.header-avatar .profile-avatar-art { width: 32px; height: 32px; }
+.header-avatar .avatar-dot { top: 5px; right: 4px; }
+
+.home-screen {
+  --home-gap: 12px;
+  --home-inset: 14px;
+  --home-radius: 16px;
+  padding-bottom: 0;
+  overscroll-behavior-y: contain;
+  scroll-padding-block: 16px 32px;
+  touch-action: pan-y pinch-zoom;
+}
+
+.home-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--home-gap);
+  width: 100%;
+  max-width: none;
+  padding: 4px var(--home-inset) 32px;
+}
+
+.home-layout > * { min-width: 0; margin: 0; }
+.home-layout button { touch-action: manipulation; }
+
+.home-hero {
+  width: 100%;
+  min-height: clamp(154px, 41vw, 182px);
+  aspect-ratio: auto;
+  padding: 16px;
+  border-radius: var(--home-radius);
+  background-position: center;
+}
+
+.home-hero .hero-content { width: 62%; max-width: 62%; }
+.home-hero .hero-title { font-size: clamp(20px, 5.6vw, 27px); line-height: 1.15; }
+.home-hero .hero-sub { margin: 8px 0 10px; font-size: 11px; line-height: 1.4; }
+.home-hero .hero-cta { min-height: 44px; height: auto; padding: 9px 14px; font-size: 11px; }
+
+.home-checkin { padding: 14px 12px 12px; border-radius: var(--home-radius); }
+.home-checkin .daily-top { gap: 8px; margin-bottom: 12px; align-items: flex-start; }
+.home-checkin .daily-left { flex: 1; min-width: 0; gap: 8px; }
+.home-checkin .daily-copy { min-width: 0; }
+.home-checkin .daily-title { font-size: 14px; line-height: 1.4; }
+.home-checkin .daily-sub {
+  max-width: none;
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.home-checkin .streak-pill { padding: 7px 10px; margin-top: 2px; font-size: 11px; }
+.home-checkin .days-grid { gap: clamp(4px, 1.5vw, 8px); }
+.home-checkin .day-tile { height: clamp(34px, 9.8vw, 42px); }
+.home-checkin .day-label { font-size: 10px; margin-top: 4px; line-height: 1.3; }
+.home-checkin .daily-claim-wrap { margin-top: 13px; }
+.home-checkin .daily-claim-btn { min-height: 44px; height: auto; padding: 11px 8px; font-size: 13px; line-height: 1.4; }
+
+.home-shortcuts .explore-grid { margin: 0; gap: 10px; height: 100%; }
+.home-shortcuts .explore-card { min-width: 0; min-height: 101px; padding: 10px 4px; gap: 4px; border-radius: var(--home-radius); }
+.home-shortcuts .earn-art { width: 44px; height: 44px; }
+.home-shortcuts .explore-title { font-size: 13px; line-height: 1.3; }
+.home-shortcuts .explore-sub { font-size: 10px; line-height: 1.4; white-space: normal; }
+
+.home-invite { display: grid; grid-template-columns: 42px minmax(0, 1fr) 56px; gap: 10px; padding: 10px 12px; min-height: 78px; border-radius: var(--home-radius); }
+.home-invite > .invite-people { width: 42px; height: 48px; }
+.home-invite > .invite-copy { min-width: 0; }
+.home-invite b { font-size: 14px; line-height: 1.4; }
+.home-invite small { font-size: 11px; line-height: 1.5; margin-top: 3px; }
+.home-invite > img:last-child { width: 56px; height: 56px; }
+
+.home-featured .section-head { margin: 0 0 8px; min-height: 44px; }
+.home-featured .section-head h2 { font-size: 16px; line-height: 1.4; }
+.home-featured .view-all-btn { min-height: 44px; min-width: 52px; font-size: 12px; padding: 8px 0 8px 8px; }
+.home-featured .featured-games { gap: 10px; align-items: start; min-height: 136px; }
+.home-featured .featured-game { gap: 5px; padding: 0 0 4px; border-radius: 12px; }
+.home-featured .game-cover { aspect-ratio: 1; }
+.home-featured .featured-game > b { font-size: 11px; line-height: 1.4; white-space: normal; overflow-wrap: anywhere; }
+.home-featured .featured-game > small { font-size: 10px; line-height: 1.4; white-space: normal; overflow-wrap: anywhere; }
+.home-games-placeholder { grid-column: 1 / -1; min-height: 136px; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 20px; border: 1px solid #e6eef6; border-radius: var(--home-radius); background: #ffffffb3; font-size: 12px; line-height: 1.5; color: var(--text-muted); }
+.home-featured .games-empty-link { min-height: 100px; padding: 16px; }
+
+nav.bottom-nav { min-height: calc(64px + env(safe-area-inset-bottom, 0px)); height: auto; padding: 5px 4px max(8px, env(safe-area-inset-bottom, 0px)); }
+nav.bottom-nav button { min-height: 46px; touch-action: manipulation; }
+nav.bottom-nav .nav-reward > span { bottom: 3px; }
+
+/* Animate only inexpensive properties; content never slides under the dock. */
+.home-layout button, .header-icon, .header-avatar { transition: transform 140ms ease, box-shadow 140ms ease, opacity 140ms ease; }
+.home-layout button:active:not(:disabled), .header-icon:active, .header-avatar:active { transform: scale(.98); }
+@media (hover: hover) and (pointer: fine) {
+  .home-shortcuts .explore-card:hover, .home-featured .featured-game:hover { transform: translateY(-2px); box-shadow: 0 5px 14px #28537413; }
+}
+
+@media (max-width: 359px) {
+  .home-screen { --home-inset: 10px; --home-gap: 10px; }
+  .app-header { padding-right: 10px; padding-left: 12px; }
+  .brand-wrap { gap: 7px; }
+  .header-actions { gap: 0; }
+  .home-hero { padding: 14px; }
+  .home-hero .hero-title { font-size: 20px; }
+  .home-checkin { padding: 12px 10px; }
+  .home-checkin .daily-sub { font-size: 10px; }
+  .home-shortcuts .explore-grid { gap: 8px; }
+  .home-shortcuts .explore-card { min-height: 98px; }
+  .home-shortcuts .explore-sub { font-size: 9px; }
+  .home-featured .featured-games { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 10px; }
+  .home-featured .game-cover { aspect-ratio: 1.5; }
+}
+
+@media (min-width: 700px) {
+  .app-shell { max-width: 760px; }
+  .app-header { padding-left: 24px; padding-right: 24px; }
+  .home-screen { --home-inset: 24px; --home-gap: 16px; }
+  .home-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; padding-top: 8px; }
+  .home-hero, .home-invite, .home-featured { grid-column: 1 / -1; }
+  .home-hero { aspect-ratio: auto; min-height: 228px; padding: 28px; background-position: center 45%; }
+  .home-hero .hero-content { width: 55%; max-width: 55%; }
+  .home-hero .hero-title { font-size: 32px; }
+  .home-hero .hero-sub { font-size: 13px; }
+  .home-hero .hero-cta { font-size: 12px; }
+  .home-checkin { display: flex; flex-direction: column; justify-content: space-between; padding: 18px 14px; }
+  .home-checkin .daily-sub { font-size: 10px; }
+  .home-shortcuts .explore-grid { gap: 10px; }
+  .home-shortcuts .explore-card { min-height: 104px; }
+  .home-invite { grid-template-columns: 48px minmax(0, 1fr) 64px; padding: 12px 18px; }
+  .home-invite > img:last-child { width: 64px; height: 64px; }
+  .home-featured .game-cover { aspect-ratio: 1.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-layout button, .header-icon, .header-avatar { transition: none; }
+  .home-layout button:active:not(:disabled), .home-layout button:hover { transform: none; }
+  .home-screen { scroll-behavior: auto; }
+}

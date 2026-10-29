@@ -1,6 +1,6 @@
 import { h } from '../jsx';
 export function SvgSpriteDefs() {
-    return (h("svg", { style: "display:none", "aria-hidden": "true" },
+    return (h("svg", { style: "position:absolute;width:0;height:0;overflow:hidden", "aria-hidden": "true" },
         h("defs", null,
             h("linearGradient", { id: "pCoinGrad", x1: "0%", y1: "0%", x2: "100%", y2: "100%" },
                 h("stop", { offset: "0%", "stop-color": "#FFE066" }),

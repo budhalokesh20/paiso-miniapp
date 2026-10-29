@@ -87,7 +87,7 @@ function h(tag, props, ...children) {
 
 // --- src/client/components/Icons.tsx ---
 function SvgSpriteDefs() {
-    return (h("svg", { style: "display:none", "aria-hidden": "true" },
+    return (h("svg", { style: "position:absolute;width:0;height:0;overflow:hidden", "aria-hidden": "true" },
         h("defs", null,
             h("linearGradient", { id: "pCoinGrad", x1: "0%", y1: "0%", x2: "100%", y2: "100%" },
                 h("stop", { offset: "0%", "stop-color": "#FFE066" }),
@@ -114,213 +114,312 @@ function SvgSpriteDefs() {
                 h("polyline", { points: "16.2 9.2 10.8 14.6 7.8 11.6", fill: "none", stroke: "#FFFFFF", "stroke-width": "2.4", "stroke-linecap": "round", "stroke-linejoin": "round" })))));
 }
 
-// --- src/client/components/HomeView.tsx ---
-
-
-function DayCheckBox(props) {
-    return (h("div", { className: "day-box", id: `day-box-${props.day}`, "data-day": props.day },
-        h("div", { className: "day-check" },
-            h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor" },
-                h("polyline", { points: "20 6 9 17 4 12" }))),
-        h("div", { className: "day-num" }, props.day),
-        h("div", { className: "day-label" }, "Day")));
+// --- src/client/components/shared/UiIcon.tsx ---
+function UiIcon({ name, size = 20 }) {
+    const paths = {
+        search: 'M21 21l-5-5M19 10.5a8.5 8.5 0 1 1-17 0 8.5 8.5 0 0 1 17 0',
+        crown: 'M3 6l4 4 5-7 5 7 4-4-2 13H5L3 6M6 15h12',
+        home: 'M3 10l9-7 9 7v11h-6v-7H9v7H3V10',
+        tasks: 'M9 5H5v16h14V5h-4M9 3h6v4H9V3M9 11h6M9 15h6',
+        friends: 'M16 21v-3a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v3M16 4a4 4 0 0 1 0 8M22 21v-3a4 4 0 0 0-3-4M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
+        settings: 'M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1 1-3M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
+        arrow: 'M5 12h14M14 7l5 5-5 5',
+        lock: 'M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5V10M12 14v3',
+        bell: 'M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M10 21h4',
+        user: 'M20 21v-2a6 6 0 0 0-6-6h-4a6 6 0 0 0-6 6v2M16 6a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
+        help: 'M9 9a3 3 0 0 1 6 0c0 2-3 2-3 5M12 17h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',
+        globe: 'M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0M2 12h20M12 2c6 6 6 14 0 20-6-6-6-14 0-20',
+        shield: 'M12 2l9 4v6c0 5-9 10-9 10S3 17 3 12V6l9-4M8 12l3 3 5-6',
+        share: 'M12 16V2M7 7l5-5 5 5M6 10H3v12h18V10h-3',
+        wallet: 'M3 6h18v15H3V6M3 6V3h15M16 12h5v5h-5v-5',
+        chevron: 'M9 5l7 7-7 7',
+    };
+    return h("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "1.8", "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": "true" },
+        h("path", { d: paths[name] || paths.tasks }));
 }
+
+// --- src/client/components/shared/EarnIcon.tsx ---
+function EarnIcon({ index }) {
+    return h("span", { className: `earn-art earn-art-${index}`, "aria-hidden": "true" });
+}
+
+// --- src/client/components/shared/AppHeader.tsx ---
+function AppHeader() {
+    return h("header", { className: "app-header" },
+        h("button", { className: "brand-wrap", onClick: () => window.showTab('home'), "aria-label": "Paiso home" },
+            h("svg", { className: "paiso-symbol", viewBox: "0 0 32 40", "aria-hidden": "true" },
+                h("defs", null,
+                    h("linearGradient", { id: "brandGreen", x1: "0", y1: "0", x2: "1", y2: "1" },
+                        h("stop", { offset: "0%", "stop-color": "#24e7a6" }),
+                        h("stop", { offset: "100%", "stop-color": "#008a69" }))),
+                h("path", { d: "M7 5h12a9 9 0 0 1 0 18H9v10", fill: "none", stroke: "url(#brandGreen)", "stroke-width": "8", "stroke-linecap": "round", "stroke-linejoin": "round" }),
+                h("path", { d: "M7 5h9", fill: "none", stroke: "#2bdfa3", "stroke-width": "8", "stroke-linecap": "round" })),
+            h("span", { className: "brand-name" }, "Paiso")),
+        h("div", { className: "header-actions" },
+            h("button", { className: "header-icon", "aria-label": "Search tasks", onClick: () => { window.showTab('tasks'); const field = document.getElementById('taskSearchInput'); field?.closest('.task-search')?.classList.add('search-open'); field?.focus(); } },
+                h(UiIcon, { name: "search", size: 18 })),
+            h("button", { className: "header-icon", "aria-label": "Withdraw rewards", onClick: () => { window.showTab('wallet'); window.openSettingPage('sub-withdraw'); } },
+                h(UiIcon, { name: "crown", size: 20 })),
+            h("button", { className: "header-avatar", "aria-label": "Your profile", onClick: () => window.showTab('wallet') },
+                h("span", { className: "profile-avatar-art" }, "P"),
+                h("span", { className: "avatar-dot" }))));
+}
+
+// --- src/client/components/shared/GameCard.tsx ---
+function GameCard({ game, compact = false, pending = false }) {
+    const price = game.priceCoins > 0 ? `${game.priceCoins.toLocaleString()} coins / play` : 'Free to play';
+    return (h("button", { type: "button", className: compact ? 'featured-game' : 'game-card', onClick: () => window.playGame(game.id), disabled: pending, "aria-label": `${game.title}, ${price}` },
+        h("span", { className: "game-cover" },
+            h(EarnIcon, { index: 2 }),
+            h("span", { className: "game-spark", "aria-hidden": "true" }, "\u2726")),
+        h("b", { title: game.title }, game.title),
+        h("small", null, price),
+        !compact ? h("span", { className: "game-play" }, pending ? 'Starting…' : 'Play Now') : null));
+}
+
+// --- src/client/components/home/HomeHero.tsx ---
+function HomeHero() {
+    return (h("section", { className: "hero-banner home-hero", "aria-labelledby": "home-hero-title" },
+        h("div", { className: "hero-content" },
+            h("h1", { id: "home-hero-title", className: "hero-title" },
+                "Play, Complete",
+                h("br", null),
+                h("span", { className: "cyan" }, "Earn Rewards")),
+            h("p", { className: "hero-sub" }, "Real Tasks. Real Payouts."),
+            h("button", { type: "button", className: "hero-cta", onClick: () => window.showTab('tasks', 'all') },
+                "Explore Now ",
+                h(UiIcon, { name: "arrow", size: 14 })))));
+}
+
+// --- src/client/components/home/DailyCheckIn.tsx ---
+
+
+function CheckInDay({ day }) {
+    return (h("div", { className: `day-box upcoming${day === 7 ? ' day-7' : ''}`, id: `day-box-${day}`, "data-day": day },
+        h("div", { className: "day-tile" }, day === 7 ? (h("img", { src: "/assets/paiso-gift-v2.webp", alt: "Bonus gift", className: "day-gift", width: "32", height: "32" })) : (h("span", null,
+            h("span", { className: "day-check", "aria-hidden": "true" },
+                h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor" },
+                    h("polyline", { points: "20 6 9 17 4 12" }))),
+            h("span", { className: "day-lock" },
+                h(UiIcon, { name: "lock", size: 15 }))))),
+        h("div", { className: "day-label" },
+            "Day ",
+            day)));
+}
+function DailyCheckIn() {
+    return (h("section", { className: "daily-card home-checkin", id: "dailyCard", "aria-labelledby": "daily-title" },
+        h("div", { className: "daily-top" },
+            h("div", { className: "daily-left" },
+                h("span", { className: "daily-flame", "aria-hidden": "true" }, "\uD83D\uDD25"),
+                h("div", { className: "daily-copy" },
+                    h("h2", { className: "daily-title", id: "daily-title" }, "Daily Check-in"),
+                    h("p", { className: "daily-sub", id: "dailySubText" }, "Check in daily to keep your streak!"))),
+            h("span", { className: "streak-pill", id: "streakDayText" }, "Day 1")),
+        h("div", { className: "days-grid", id: "daysGrid" }, [1, 2, 3, 4, 5, 6, 7].map(day => h(CheckInDay, { day: day }))),
+        h("div", { className: "daily-claim-wrap" },
+            h("button", { type: "button", className: "daily-claim-btn", id: "dailyBtn", onClick: () => window.claimDaily() },
+                h("span", { id: "dailyBtnIcon" },
+                    h("svg", { width: "19", height: "19" },
+                        h("use", { href: "#icon-gift" }))),
+                h("span", { id: "dailyBtnText" }, "Claim Today"),
+                h("svg", { id: "dailyBtnCoin", width: "15", height: "15" },
+                    h("use", { href: "#icon-p-coin" })))),
+        h("div", { className: "claim-fx-layer", id: "claimFxLayer", "aria-hidden": "true" }),
+        h("span", { id: "dailyReward", hidden: true })));
+}
+
+// --- src/client/components/home/EarnShortcuts.tsx ---
+
+
+function openSurveys() {
+    window.showTab('tasks', 'all');
+    window.filterTasks('survey');
+    const input = document.getElementById('taskSearchInput');
+    if (input) {
+        input.value = 'survey';
+        input.closest('.task-search')?.classList.add('search-open');
+    }
+}
+const HOME_SHORTCUTS = [
+    { title: 'Watch', description: 'Earn by watching', action: () => window.watchAd() },
+    { title: 'Tasks', description: 'Complete & Earn', action: () => window.showTab('tasks', 'all') },
+    { title: 'Games', description: 'Play & Have Fun', action: () => window.showTab('games') },
+    { title: 'Offers', description: 'Special Offers', action: () => window.showTab('offers') },
+    { title: 'Surveys', description: 'Share Opinion', action: openSurveys },
+    { title: 'More', description: 'Explore More', action: () => window.showTab('tasks', 'all') },
+];
+function EarnShortcuts() {
+    return (h("section", { className: "home-shortcuts", "aria-label": "Explore ways to earn" },
+        h("div", { className: "explore-grid", id: "exploreGrid" }, HOME_SHORTCUTS.map((item, index) => (h("button", { type: "button", className: "explore-card", "data-title": `${item.title} ${item.description}`, id: index === 0 ? 'adBtn' : undefined, onClick: item.action },
+            h(EarnIcon, { index: index }),
+            h("span", { className: "explore-title" }, item.title),
+            h("span", { className: "explore-sub", id: index === 0 ? 'adCardSub' : undefined }, item.description))))),
+        h("div", { hidden: true },
+            h("span", { id: "adReward" }),
+            h("span", { id: "adCount" }, "0"),
+            h("span", { id: "adCap" }, "10"),
+            h("input", { id: "searchInput" }),
+            h("button", { id: "searchClearBtn" }))));
+}
+
+// --- src/client/components/home/InviteBanner.tsx ---
+function InviteBanner() {
+    return (h("button", { type: "button", className: "invite-strip home-invite", onClick: () => window.showTab('refer') },
+        h("span", { className: "invite-people" },
+            h(UiIcon, { name: "friends", size: 38 })),
+        h("span", { className: "invite-copy" },
+            h("b", null, "Invite Friends"),
+            h("small", null, "Get extra rewards when your friends join!")),
+        h("img", { src: "/assets/paiso-gift-v2.webp", alt: "", width: "56", height: "56", decoding: "async" })));
+}
+
+// --- src/client/components/home/FeaturedGames.tsx ---
+function FeaturedGames() {
+    return (h("section", { className: "home-featured", "aria-labelledby": "featured-title" },
+        h("div", { className: "section-head" },
+            h("h2", { id: "featured-title" }, "Featured Games"),
+            h("button", { type: "button", className: "view-all-btn", onClick: () => window.showTab('games') }, "See All")),
+        h("div", { id: "featuredGames", className: "featured-games", "aria-busy": "true" },
+            h("div", { className: "home-games-placeholder", role: "status" },
+                h(EarnIcon, { index: 2 }),
+                h("span", null, "Loading your next adventure\u2026")))));
+}
+function updateFeaturedGames(games, pendingId) {
+    const grid = document.getElementById('featuredGames');
+    if (!grid)
+        return;
+    grid.setAttribute('aria-busy', 'false');
+    grid.replaceChildren(...(games.length ? games.slice(0, 4).map(game => (h(GameCard, { game: game, compact: true, pending: pendingId === game.id }))) : [
+        h("button", { type: "button", className: "games-empty-link", onClick: () => window.showTab('games') },
+            h(EarnIcon, { index: 2 }),
+            h("span", null,
+                h("b", null, "Your next adventure awaits"),
+                h("small", null, "New games are on the way")),
+            h(UiIcon, { name: "chevron" }))
+    ]));
+}
+function showFeaturedGamesError() {
+    const grid = document.getElementById('featuredGames');
+    if (!grid)
+        return;
+    grid.setAttribute('aria-busy', 'false');
+    grid.replaceChildren(h("p", { className: "home-games-placeholder", role: "status" }, "Connecting to your games. Please check your connection."));
+}
+
+// --- src/client/components/HomeView.tsx ---
 function HomeView() {
-    return (h("section", { id: "tab-home", className: "app-screen active-screen" },
-        h("div", { className: "screen-content" },
-            h("header", { className: "app-header" },
-                h("div", { className: "brand-wrap" },
-                    h("img", { src: "/assets/logo.png", alt: "Paiso Logo", className: "brand-logo" }),
-                    h("div", { className: "brand-text" },
-                        h("h1", null, "Paiso"),
-                        h("p", null,
-                            "Small Tasks ",
-                            h("span", { className: "dot" }, "\u2022"),
-                            " Real Rewards"))),
-                h("div", { className: "header-actions" },
-                    h("button", { className: "bell-btn relative", onClick: () => window.openNotificationsModal(), "aria-label": "Notifications" },
-                        h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round" },
-                            h("path", { d: "M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" }),
-                            h("path", { d: "M13.73 21a2 2 0 0 1-3.46 0" })),
-                        h("span", { id: "notifUnreadBadge", style: "display:none", className: "absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-extrabold flex items-center justify-center border-2 border-white shadow-sm" }, "0")))),
-            h("div", { className: "hero-banner" },
-                h("div", { className: "hero-content" },
-                    h("div", { className: "hero-tag" }, "EARN \u2022 PLAY \u2022 REDEEM"),
-                    h("div", { className: "hero-title" },
-                        "Complete Tasks",
-                        h("br", null),
-                        h("span", { className: "cyan" }, "Get Real"),
-                        " ",
-                        h("span", { className: "pink" }, "Rewards")),
-                    h("div", { className: "hero-sub" }, "Simple tasks, big rewards!"),
-                    h("button", { className: "hero-cta", onClick: () => window.showTab('tasks'), "aria-label": "Complete Tasks" },
-                        h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.5", "stroke-linecap": "round", "stroke-linejoin": "round" },
-                            h("line", { x1: "5", y1: "12", x2: "19", y2: "12" }),
-                            h("polyline", { points: "12 5 19 12 12 19" })))),
-                h("img", { src: "/assets/hero-gift.png", alt: "Rewards Gift", className: "hero-art" })),
-            h("div", { className: "search-box" },
-                h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2", "stroke-linecap": "round", "stroke-linejoin": "round" },
-                    h("circle", { cx: "11", cy: "11", r: "8" }),
-                    h("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" })),
-                h("input", { type: "text", id: "searchInput", placeholder: "Search ways to earn...", "aria-label": "Search ways to earn", onInput: (e) => window.filterExplore(e.target.value) }),
-                h("button", { type: "button", className: "search-clear", id: "searchClearBtn", onClick: () => window.clearSearch() },
-                    h("svg", { viewBox: "0 0 24 24", width: "12", height: "12", fill: "none", stroke: "currentColor", "stroke-width": "2.5" },
-                        h("line", { x1: "18", y1: "6", x2: "6", y2: "18" }),
-                        h("line", { x1: "6", y1: "6", x2: "18", y2: "18" })))),
-            h("div", { className: "daily-card", id: "dailyCard" },
-                h("div", { className: "daily-top" },
-                    h("div", { className: "daily-left" },
-                        h("img", { src: "/assets/calendar.png", alt: "Calendar", className: "daily-cal-icon" }),
-                        h("div", { style: { minWidth: '0' } },
-                            h("div", { className: "daily-title" }, "Daily Check-in"),
-                            h("div", { className: "daily-sub", id: "dailySubText" }, "7 day streak! Keep it going!"))),
-                    h("div", { className: "streak-pill" },
-                        h("img", { src: "/assets/flame.png", alt: "Streak", className: "streak-flame-icon" }),
-                        h("span", { id: "streakDayText" }, "Day 1"))),
-                h("div", { className: "days-grid", id: "daysGrid" },
-                    h(DayCheckBox, { day: 1 }),
-                    h(DayCheckBox, { day: 2 }),
-                    h(DayCheckBox, { day: 3 }),
-                    h(DayCheckBox, { day: 4 }),
-                    h(DayCheckBox, { day: 5 }),
-                    h(DayCheckBox, { day: 6 }),
-                    h("div", { className: "day-box day-7", id: "day-box-7", "data-day": "7" },
-                        h("img", { src: "/assets/gift-day7.png", alt: "Day 7 Gift", className: "day-gift" }),
-                        h("div", { className: "day-num" }, "7"),
-                        h("div", { className: "day-label" }, "Day"))),
-                h("div", { className: "daily-claim-wrap" },
-                    h("button", { type: "button", className: "daily-claim-btn", id: "dailyBtn", onClick: () => window.claimDaily() },
-                        h("span", { className: "claim-btn-icon", id: "dailyBtnIcon" },
-                            h("svg", { width: "16", height: "16" },
-                                h("use", { href: "#icon-gift" }))),
-                        h("span", { id: "dailyBtnText" }, "Claim Day 1 Bonus (+100)"),
-                        h("svg", { className: "inline-coin", id: "dailyBtnCoin", width: "15", height: "15" },
-                            h("use", { href: "#icon-p-coin" })))),
-                h("div", { className: "claim-fx-layer", id: "claimFxLayer" })),
-            h("div", { className: "section-head" },
-                h("h2", null, "Explore & Earn"),
-                h("button", { className: "view-all-btn", onClick: () => window.showTab('tasks', 'all') },
-                    "View All",
-                    h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.5", "stroke-linecap": "round", "stroke-linejoin": "round" },
-                        h("polyline", { points: "9 18 15 12 9 6" })))),
-            h("div", { className: "explore-grid", id: "exploreGrid" },
-                h("button", { type: "button", className: "explore-card card-ads", "data-title": "watch ads earn coins video", id: "adBtn", onClick: () => window.watchAd() },
-                    h("div", { className: "explore-icon-wrap" },
-                        h("img", { src: "/assets/icon-ads.png", alt: "Watch Ads", className: "explore-icon" })),
-                    h("div", { className: "explore-info" },
-                        h("div", { className: "explore-title" }, "Watch Ads"),
-                        h("div", { className: "explore-sub", id: "adCardSub" }, "Earn coins"))),
-                h("button", { type: "button", className: "explore-card card-tasks", "data-title": "complete tasks easy fast", onClick: () => window.showTab('tasks', 'all') },
-                    h("div", { className: "explore-icon-wrap" },
-                        h("img", { src: "/assets/icon-tasks.png", alt: "Complete Tasks", className: "explore-icon" })),
-                    h("div", { className: "explore-info" },
-                        h("div", { className: "explore-title" }, "Complete Tasks"),
-                        h("div", { className: "explore-sub" }, "Easy & Fast"))),
-                h("button", { type: "button", className: "explore-card card-games", "data-title": "play games arcade html fun", onClick: () => document.getElementById('exploreGames')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) },
-                    h("div", { className: "explore-icon-wrap" },
-                        h("img", { src: "/assets/icon-games.png", alt: "Games", className: "explore-icon" })),
-                    h("div", { className: "explore-info" },
-                        h("div", { className: "explore-title" }, "Games"),
-                        h("div", { className: "explore-sub" }, "Play instantly")))),
-            h(GamesView, null),
-            h("div", { style: { display: 'none' } },
-                h("span", { id: "adReward" }),
-                h("span", { id: "adCount" }, "0"),
-                h("span", { id: "adCap" }, "10"),
-                h("span", { id: "dailyReward" })))));
+    return (h("section", { id: "tab-home", className: "app-screen home-screen active-screen", "aria-label": "Home" },
+        h("div", { className: "screen-content home-layout" },
+            h(HomeHero, null),
+            h(DailyCheckIn, null),
+            h(EarnShortcuts, null),
+            h(InviteBanner, null),
+            h(FeaturedGames, null))));
 }
 
 // --- src/client/components/TasksView.tsx ---
 function TasksView() {
-    return (h("section", { id: "tab-tasks", className: "app-screen" },
-        h("div", { className: "native-topbar" },
-            h("h2", { className: "page-title" }, "Earn Tasks"),
-            h("div", { className: "coin-pill" },
-                h("svg", { width: "16", height: "16" },
-                    h("use", { href: "#icon-p-coin" })),
-                h("span", { id: "headerCoins" }, "0"))),
-        h("div", { className: "screen-content space-y-3.5" },
-            h("label", { className: "relative block" },
-                h("span", { className: "sr-only" }, "Search tasks"),
-                h("svg", { className: "absolute left-3 top-1/2 -translate-y-1/2 text-slate-400", width: "17", height: "17", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round" },
-                    h("circle", { cx: "11", cy: "11", r: "8" }),
-                    h("path", { d: "m21 21-4.35-4.35" })),
-                h("input", { id: "taskSearchInput", type: "search", placeholder: "Search tasks", onInput: (e) => window.filterTasks(e.target.value), className: "w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" })),
-            h("div", { className: "flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar" },
-                h("button", { className: "filter-chip active", "data-filter": "all", onClick: () => window.setTaskFilter('all') }, "All Tasks"),
-                h("button", { className: "filter-chip", "data-filter": "app_task", onClick: () => window.setTaskFilter('app_task') }, "App Task"),
-                h("button", { className: "filter-chip", "data-filter": "play_game", onClick: () => window.setTaskFilter('play_game') }, "Play Game"),
-                h("button", { className: "filter-chip", "data-filter": "telegram_join", onClick: () => window.setTaskFilter('telegram_join') }, "Telegram"),
-                h("button", { className: "filter-chip", "data-filter": "social_visit", onClick: () => window.setTaskFilter('social_visit') }, "Social & Web"),
-                h("button", { className: "filter-chip", "data-filter": "done", onClick: () => window.setTaskFilter('done') }, "Completed")),
-            h("div", { id: "taskList", className: "space-y-2.5 pb-4" }))));
+    const filters = [{ id: 'all', label: 'All' }, { id: 'video', label: 'Video' }, { id: 'app_task', label: 'Apps' }, { id: 'play_game', label: 'Games' }, { id: 'social_visit', label: 'Web' }, { id: 'telegram_join', label: 'Social' }, { id: 'done', label: 'Done' }];
+    return h("section", { id: "tab-tasks", className: "app-screen" },
+        h("div", { className: "screen-content" },
+            h("div", { className: "page-heading" },
+                h("h1", null, "All Tasks"),
+                h("p", null, "Complete tasks and earn rewards")),
+            h("label", { className: "task-search" },
+                h(UiIcon, { name: "search", size: 17 }),
+                h("input", { id: "taskSearchInput", type: "search", "aria-label": "Search tasks", placeholder: "Search tasks", onInput: (event) => window.filterTasks(event.target.value) })),
+            h("div", { className: "filter-bar" }, filters.map(filter => h("button", { className: `filter-chip${filter.id === 'all' ? ' active' : ''}`, "data-filter": filter.id, onClick: () => window.setTaskFilter(filter.id) }, filter.label))),
+            h("div", { id: "taskList", className: "task-list", "aria-live": "polite" }),
+            h("span", { id: "headerCoins", hidden: true })));
+}
+function OffersView() {
+    return h("section", { id: "tab-offers", className: "app-screen" },
+        h("div", { className: "screen-content" },
+            h("div", { className: "page-heading" },
+                h("h1", null, "Special Offers"),
+                h("p", null, "Discover apps and earn rewards")),
+            h("div", { id: "offerList", className: "task-list" })));
 }
 
 // --- src/client/components/GamesView.tsx ---
 function GamesView() {
-    return (h("div", { id: "exploreGames", className: "mt-5 scroll-mt-4" },
-        h("div", { className: "mb-2.5" },
-            h("h3", { className: "text-sm font-extrabold text-slate-900" }, "Games"),
-            h("p", { className: "mt-0.5 text-[11px] text-slate-500" }, "Coin price is shown before you play.")),
-        h("div", { id: "gamesGrid", className: "grid grid-cols-1 gap-2.5 sm:grid-cols-2" }),
-        h("div", { id: "gameModal", className: "fixed inset-0 z-[120] hidden flex-col bg-slate-950" },
-            h("div", { className: "flex h-12 shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-slate-900 px-3 text-white" },
-                h("div", { id: "activeGameTitle", className: "truncate text-sm font-bold" }, "Game"),
-                h("button", { type: "button", onClick: () => window.closeGame(), "aria-label": "Close game", className: "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-lg hover:bg-white/20" }, "\u00D7")),
-            h("iframe", { id: "gameFrame", title: "Paiso game", sandbox: "allow-scripts", allow: "fullscreen; gamepad; autoplay", allowFullScreen: true, referrerPolicy: "no-referrer", className: "min-h-0 w-full flex-1 border-0 bg-white" }))));
+    return (h("div", { id: "exploreGames", className: "games-page" },
+        h("div", { className: "page-heading" },
+            h("h1", null, "Games"),
+            h("p", null, "Find your next favorite game")),
+        h("div", { id: "gamesGrid", className: "games-grid" })));
+}
+function GameModal() {
+    return (h("div", { id: "gameModal", className: "fixed inset-0 z-[120] hidden flex-col bg-slate-950" },
+        h("div", { className: "flex h-12 shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-slate-900 px-3 text-white" },
+            h("div", { id: "activeGameTitle", className: "truncate text-sm font-bold" }, "Game"),
+            h("button", { type: "button", onClick: () => window.closeGame(), "aria-label": "Close game", className: "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-lg hover:bg-white/20" }, "\u00D7")),
+        h("iframe", { id: "gameFrame", title: "Paiso game", sandbox: "allow-scripts", allow: "fullscreen; gamepad; autoplay", allowFullScreen: true, referrerPolicy: "no-referrer", className: "min-h-0 w-full flex-1 border-0 bg-white" })));
 }
 
 // --- src/client/components/FriendsView.tsx ---
 function FriendsView() {
-    return (h("section", { id: "tab-refer", className: "app-screen" },
-        h("div", { className: "native-topbar" },
-            h("h2", { className: "page-title flex items-center gap-2" },
-                h("svg", { className: "title-icon w-5 h-5 shrink-0", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2", "stroke-linecap": "round", "stroke-linejoin": "round" },
-                    h("path", { d: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" }),
-                    h("circle", { cx: "9", cy: "7", r: "4" }),
-                    h("path", { d: "M23 21v-2a4 4 0 0 0-3-3.87" }),
-                    h("path", { d: "M16 3.13a4 4 0 0 1 0 7.75" })),
-                h("span", null, "Invite Friends"))),
+    return h("section", { id: "tab-refer", className: "app-screen" },
         h("div", { className: "screen-content" },
-            h("div", { className: "refer-hero flex items-center gap-3.5" },
-                h("img", { src: "/assets/icon-friends.png", alt: "Invite Friends", className: "w-14 h-14 object-contain shrink-0" }),
-                h("div", { className: "min-w-0" },
-                    h("h3", { className: "flex items-center gap-1.5 flex-wrap" },
-                        h("span", null,
-                            "Earn ",
-                            h("span", { id: "refBonusValue" }, "+500")),
-                        h("svg", { width: "18", height: "18", className: "inline-block shrink-0" },
-                            h("use", { href: "#icon-p-coin" })),
-                        h("span", null, "/ Friend")),
-                    h("p", null,
-                        "Plus ",
-                        h("b", null, "10% lifetime bonus"),
-                        " on all tasks your friends complete!"))),
-            h("div", { className: "stats-grid-2" },
-                h("div", { className: "stat-box" },
-                    h("div", { className: "num", id: "refCount" }, "0"),
-                    h("div", { className: "lbl" }, "Friends Invited")),
-                h("div", { className: "stat-box" },
-                    h("div", { className: "num" }, "10%"),
-                    h("div", { className: "lbl" }, "Lifetime Bonus"))),
-            h("div", { className: "card" },
-                h("b", { style: { display: 'block', fontSize: '14px' } }, "Your Referral Link"),
-                h("input", { className: "form-input", id: "refLink", readOnly: true }),
-                h("button", { className: "primary-btn btn-with-icon", onClick: () => window.copyRef() },
-                    h("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2", "stroke-linecap": "round", "stroke-linejoin": "round" },
-                        h("rect", { x: "9", y: "9", width: "13", height: "13", rx: "2", ry: "2" }),
-                        h("path", { d: "M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" })),
-                    h("span", null, "Copy Invite Link")),
-                h("button", { className: "ghost-btn btn-with-icon", style: { marginTop: '8px' }, onClick: () => window.shareRef() },
-                    h("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2", "stroke-linecap": "round", "stroke-linejoin": "round" },
-                        h("line", { x1: "22", y1: "2", x2: "11", y2: "13" }),
-                        h("polygon", { points: "22 2 15 22 11 13 2 9 22 2" })),
-                    h("span", null, "Share on Telegram"))),
-            h("div", { className: "section-subtitle" }, "Referral History"),
-            h("div", { id: "refHistory" }))));
+            h("div", { className: "invite-hero" },
+                h("h1", null,
+                    "Invite Friends",
+                    h("br", null),
+                    h("strong", null, "Earn More")),
+                h("p", null, "More friends, more rewards!")),
+            h("div", { className: "ref-link-card" },
+                h("div", null,
+                    h("label", { for: "refLink" }, "Your Invite Link"),
+                    h("input", { id: "refLink", readOnly: true, "aria-label": "Your invite link", placeholder: "Loading your invite link\u2026" })),
+                h("button", { className: "primary-btn", onClick: () => window.copyRef() }, "Copy")),
+            h("div", { className: "ref-stats" },
+                h("div", null,
+                    h(UiIcon, { name: "friends", size: 26 }),
+                    h("b", { id: "refCount" }, "0"),
+                    h("small", null, "Total Invites")),
+                h("div", null,
+                    h(UiIcon, { name: "friends", size: 26 }),
+                    h("b", { id: "refActive" }, "0"),
+                    h("small", null, "Active Users")),
+                h("div", null,
+                    h("svg", { width: "26", height: "26" },
+                        h("use", { href: "#icon-p-coin" })),
+                    h("b", { id: "refEarned" }, "0"),
+                    h("small", null, "Bonus Earned"))),
+            h("h2", { className: "section-subtitle" }, "How It Works?"),
+            h("div", { className: "ref-how" },
+                h("ol", null,
+                    h("li", null,
+                        h("span", null, "1"),
+                        "Share your invite link",
+                        h("br", null),
+                        "with your friends"),
+                    h("li", null,
+                        h("span", null, "2"),
+                        "They join and start using",
+                        h("br", null),
+                        "Paiso bot"),
+                    h("li", null,
+                        h("span", null, "3"),
+                        "They qualify, you earn!")),
+                h("img", { src: "/assets/paiso-gift-v2.webp", alt: "Gift rewards" })),
+            h("button", { className: "bonus-strip", onClick: () => window.shareRef() },
+                h("img", { src: "/assets/paiso-gift-v2.webp", alt: "" }),
+                h("span", null,
+                    h("b", null, "Bonus Rewards"),
+                    h("small", null,
+                        "Earn ",
+                        h("span", { id: "refBonusValue" }, "+500"),
+                        " coins per qualified friend, plus 10% of task earnings.")),
+                h(UiIcon, { name: "chevron", size: 16 })),
+            h("div", { className: "section-head" },
+                h("h2", null, "Your Invites"),
+                h("button", { className: "view-all-btn", onClick: () => document.getElementById('refHistory')?.scrollIntoView({ behavior: 'smooth' }) }, "See All")),
+            h("div", { id: "refHistory" })));
 }
 
 // --- src/client/components/SettingsView.tsx ---
+
 
 const FAQ_STEPS = [
     {
@@ -389,10 +488,10 @@ const TERMS_SECTIONS = [
     }
 ];
 function WithdrawSection() {
-    return (h("div", { className: "bg-white border border-slate-200 rounded-xl p-4 space-y-4" },
-        h("div", { className: "flex items-center justify-between pb-3 border-b border-slate-100" },
+    return (h("div", { className: "withdraw-form bg-white border border-slate-200 rounded-xl p-4 space-y-4" },
+        h("div", { className: "withdraw-balance flex items-center justify-between pb-3 border-b border-slate-100" },
             h("div", null,
-                h("span", { className: "text-[11px] font-semibold text-slate-400 block" }, "Balance"),
+                h("span", { className: "text-[11px] font-semibold text-slate-400 block" }, "Available Balance"),
                 h("div", { className: "flex items-center gap-1.5 mt-0.5" },
                     h("svg", { width: "18", height: "18", className: "shrink-0" },
                         h("use", { href: "#icon-p-coin" })),
@@ -440,107 +539,70 @@ function SubpageTopBar(props) {
         h("h3", { className: "native-subpage-title" }, props.title),
         h("div", { style: { width: '72px' } })));
 }
+function SettingRow({ icon, title, action, detail }) {
+    return h("button", { className: "settings-row", onClick: action },
+        h("span", { className: "settings-item-left" },
+            h(UiIcon, { name: icon, size: 18 }),
+            h("span", { className: "settings-item-title" }, title)),
+        h("span", { className: "settings-row-right" },
+            h("span", { className: "settings-detail" }, detail),
+            h(UiIcon, { name: "chevron", size: 13 })));
+}
 function SettingsView() {
     return (h("section", { id: "tab-wallet", className: "app-screen" },
-        h("div", { className: "native-topbar settings-header-bar" },
-            h("div", { className: "settings-header-user" },
-                h("button", { type: "button", className: "settings-avatar-wrap", id: "settingsAvatarBtn", title: "Tap to change avatar", onClick: () => window.randomizeAvatar() },
-                    h("div", { className: "settings-avatar-ring", id: "settingsAvatarBox" }),
-                    h("span", { className: "settings-avatar-status" })),
-                h("div", { className: "settings-user-meta" },
-                    h("div", { className: "settings-user-name-row" },
-                        h("span", { className: "settings-user-name", id: "settingsHeaderName" }, "Paiso User"),
-                        h("span", { className: "blue-tick-badge", id: "settingsVerifiedTick", style: { display: 'none' }, title: "Verified Account" },
-                            h("svg", { width: "18", height: "18" },
-                                h("use", { href: "#icon-blue-tick" })))),
-                    h("div", { className: "settings-user-handle", id: "settingsHeaderHandle" }, "@user"))),
-            h("div", { className: "settings-header-badge" },
-                h("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2", "stroke-linecap": "round", "stroke-linejoin": "round" },
-                    h("circle", { cx: "12", cy: "12", r: "3" }),
-                    h("path", { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" })),
-                h("span", null, "Settings"))),
         h("div", { className: "screen-content", id: "settings-menu-view" },
-            h("div", { className: "settings-group-label" }, "ACCOUNT & WALLET"),
+            h("div", { className: "settings-profile" },
+                h("button", { className: "settings-avatar-wrap", id: "settingsAvatarBtn", onClick: () => window.randomizeAvatar(), "aria-label": "Change avatar" },
+                    h("div", { className: "settings-avatar-ring", id: "settingsAvatarBox" })),
+                h("button", { className: "profile-details", onClick: () => window.openSettingPage('sub-userid') },
+                    h("b", { id: "settingsHeaderName" }, "Paiso User"),
+                    h("span", { id: "settingsHeaderHandle" }, "@paiso_user"),
+                    h("span", { id: "settingsVerifiedTick", style: "display:none" },
+                        h("svg", { width: "16", height: "16" },
+                            h("use", { href: "#icon-blue-tick" })))),
+                h(UiIcon, { name: "chevron", size: 16 })),
+            h("h2", { className: "settings-group-label" }, "Account"),
             h("div", { className: "settings-group-card" },
-                h("button", { type: "button", className: "settings-row", onClick: () => window.openSettingPage('sub-userid') },
-                    h("div", { className: "settings-item-left" },
-                        h("div", { className: "settings-icon-box icon-blue" },
-                            h("svg", { width: "19", height: "19", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2", "stroke-linecap": "round", "stroke-linejoin": "round" },
-                                h("rect", { x: "3", y: "4", width: "18", height: "16", rx: "2" }),
-                                h("circle", { cx: "9", cy: "10", r: "2" }),
-                                h("path", { d: "M15 8h2" }),
-                                h("path", { d: "M15 12h2" }),
-                                h("path", { d: "M7 16h10" }))),
-                        h("div", null,
-                            h("div", { className: "settings-item-title" }, "User ID"),
-                            h("div", { className: "settings-item-sub" },
-                                "ID: #",
-                                h("span", { id: "userIdText" }, "---")))),
-                    h("span", { className: "settings-chevron" }, "\u203A")),
-                h("button", { type: "button", className: "settings-row", onClick: () => window.openSettingPage('sub-verify') },
-                    h("div", { className: "settings-item-left" },
-                        h("div", { className: "settings-icon-box icon-sky" },
-                            h("svg", { width: "20", height: "20" },
-                                h("use", { href: "#icon-blue-tick" }))),
-                        h("div", null,
-                            h("div", { className: "settings-item-title" }, "Verification"),
-                            h("div", { className: "settings-item-sub", id: "verifyMenuSub" }, "Verify email & details for Blue Tick"))),
-                    h("div", { className: "settings-row-right" },
-                        h("span", { className: "verify-status-pill unverified", id: "verifyMenuBadge" }, "Unverified"),
-                        h("span", { className: "settings-chevron" }, "\u203A"))),
-                h("button", { type: "button", className: "settings-row", onClick: () => window.openSettingPage('sub-history') },
-                    h("div", { className: "settings-item-left" },
-                        h("div", { className: "settings-icon-box icon-amber" },
-                            h("svg", { width: "19", height: "19", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2", "stroke-linecap": "round", "stroke-linejoin": "round" },
-                                h("polyline", { points: "22 12 18 12 15 21 9 3 6 12 2 12" }))),
-                        h("div", null,
-                            h("div", { className: "settings-item-title" }, "Transaction History"),
-                            h("div", { className: "settings-item-sub" }, "Your withdrawal requests & status"))),
-                    h("span", { className: "settings-chevron" }, "\u203A")),
-                h("button", { type: "button", className: "settings-row", onClick: () => window.openSettingPage('sub-withdraw') },
-                    h("div", { className: "settings-item-left" },
-                        h("div", { className: "settings-icon-box icon-green" },
-                            h("svg", { width: "19", height: "19", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2", "stroke-linecap": "round", "stroke-linejoin": "round" },
-                                h("rect", { x: "2", y: "5", width: "20", height: "14", rx: "2" }),
-                                h("line", { x1: "2", y1: "10", x2: "22", y2: "10" }))),
-                        h("div", null,
-                            h("div", { className: "settings-item-title" }, "Withdrawal"),
-                            h("div", { className: "settings-item-sub" }, "Redeem coins to eSewa, Khalti, USDT"))),
-                    h("span", { className: "settings-chevron" }, "\u203A"))),
-            h("div", { className: "settings-group-label", style: { marginTop: '18px' } }, "HELP & INFORMATION"),
+                h(SettingRow, { icon: "user", title: "Edit Profile", action: () => window.openSettingPage('sub-verify') }),
+                h(SettingRow, { icon: "shield", title: "Verification", action: () => window.openSettingPage('sub-verify'), detail: h("span", { id: "verifyMenuBadge" }, "Unverified") }),
+                h(SettingRow, { icon: "wallet", title: "Withdraw Rewards", action: () => window.openSettingPage('sub-withdraw') }),
+                h(SettingRow, { icon: "tasks", title: "Transaction History", action: () => window.openSettingPage('sub-history') })),
+            h("h2", { className: "settings-group-label" }, "Preferences"),
             h("div", { className: "settings-group-card" },
-                h("button", { type: "button", className: "settings-row", onClick: () => window.openSettingPage('sub-support') },
-                    h("div", { className: "settings-item-left" },
-                        h("div", { className: "settings-icon-box icon-purple" },
-                            h("svg", { width: "19", height: "19", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2", "stroke-linecap": "round", "stroke-linejoin": "round" },
-                                h("path", { d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" }))),
-                        h("div", null,
-                            h("div", { className: "settings-item-title" }, "Support"),
-                            h("div", { className: "settings-item-sub" }, "Get help with tasks or withdrawals"))),
-                    h("span", { className: "settings-chevron" }, "\u203A")),
-                h("button", { type: "button", className: "settings-row", onClick: () => window.openSettingPage('sub-faq') },
-                    h("div", { className: "settings-item-left" },
-                        h("div", { className: "settings-icon-box icon-teal" },
-                            h("svg", { width: "19", height: "19", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2", "stroke-linecap": "round", "stroke-linejoin": "round" },
-                                h("circle", { cx: "12", cy: "12", r: "10" }),
-                                h("path", { d: "M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" }),
-                                h("line", { x1: "12", y1: "17", x2: "12.01", y2: "17" }))),
-                        h("div", null,
-                            h("div", { className: "settings-item-title" }, "FAQ"),
-                            h("div", { className: "settings-item-sub" }, "Frequently asked questions"))),
-                    h("span", { className: "settings-chevron" }, "\u203A")),
-                h("button", { type: "button", className: "settings-row", onClick: () => window.openSettingPage('sub-terms') },
-                    h("div", { className: "settings-item-left" },
-                        h("div", { className: "settings-icon-box icon-blue" },
-                            h("svg", { width: "19", height: "19", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.2", "stroke-linecap": "round", "stroke-linejoin": "round" },
-                                h("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
-                                h("polyline", { points: "14 2 14 8 20 8" }),
-                                h("line", { x1: "16", y1: "13", x2: "8", y2: "13" }),
-                                h("line", { x1: "16", y1: "17", x2: "8", y2: "17" }))),
-                        h("div", null,
-                            h("div", { className: "settings-item-title" }, "Terms & Conditions"),
-                            h("div", { className: "settings-item-sub" }, "Terms of use & withdrawal rules"))),
-                    h("span", { className: "settings-chevron" }, "\u203A")))),
+                h(SettingRow, { icon: "bell", title: "Notifications", action: () => window.openNotificationsModal(), detail: h("span", { id: "notifUnreadBadge", style: "display:none" }, "0") }),
+                h(SettingRow, { icon: "shield", title: "Data & Privacy", action: () => window.openSettingPage('sub-privacy') }),
+                h(SettingRow, { icon: "globe", title: "Language", action: () => window.openSettingPage('sub-language'), detail: "English" })),
+            h("h2", { className: "settings-group-label" }, "Help & Support"),
+            h("div", { className: "settings-group-card" },
+                h(SettingRow, { icon: "help", title: "Help Center", action: () => window.openSettingPage('sub-faq') }),
+                h(SettingRow, { icon: "user", title: "Contact Support", action: () => window.openSettingPage('sub-support') }),
+                h(SettingRow, { icon: "tasks", title: "Terms of Service", action: () => window.openSettingPage('sub-terms') }),
+                h(SettingRow, { icon: "shield", title: "Privacy Information", action: () => window.openSettingPage('sub-privacy') })),
+            h("h2", { className: "settings-group-label" }, "About"),
+            h("div", { className: "settings-group-card" },
+                h(SettingRow, { icon: "share", title: "Share Paiso", action: () => window.shareRef() }),
+                h("div", { className: "settings-row" },
+                    h("span", { className: "settings-item-left" },
+                        h(UiIcon, { name: "help", size: 18 }),
+                        h("span", null, "Version")),
+                    h("span", { className: "settings-detail" }, "1.0.0"))),
+            h("div", { hidden: true },
+                h("span", { id: "userIdText" }),
+                h("span", { id: "verifyMenuSub" }))),
+        h("div", { id: "sub-privacy", className: "settings-subpage" },
+            h(SubpageTopBar, { title: "Data & Privacy" }),
+            h("div", { className: "screen-content" },
+                h("div", { className: "card" },
+                    h("h2", null, "Account information"),
+                    h("p", { className: "small" }, "Paiso uses your Telegram identity to connect your rewards, completed tasks, referrals and withdrawal requests to your account. Verification details are used for account verification."),
+                    h("p", { className: "small" }, "For questions about your information or a deletion request, contact support."),
+                    h("button", { className: "primary-btn", onClick: () => window.openSupport() }, "Contact Support")))),
+        h("div", { id: "sub-language", className: "settings-subpage" },
+            h(SubpageTopBar, { title: "Language" }),
+            h("div", { className: "screen-content" },
+                h("div", { className: "card" },
+                    h("h2", null, "English"),
+                    h("p", { className: "small" }, "English is the currently available app language.")))),
         h("div", { id: "sub-userid", className: "settings-subpage" },
             h(SubpageTopBar, { title: "User ID" }),
             h("div", { className: "screen-content" },
@@ -627,7 +689,7 @@ function SettingsView() {
             h("div", { className: "screen-content pb-6" },
                 h("div", { className: "bg-white border border-slate-200 rounded-xl divide-y divide-slate-100", id: "wHistory" }))),
         h("div", { id: "sub-withdraw", className: "settings-subpage" },
-            h(SubpageTopBar, { title: "Withdrawal" }),
+            h(SubpageTopBar, { title: "Withdraw Rewards" }),
             h("div", { className: "screen-content space-y-4 pb-6" },
                 h(WithdrawSection, null),
                 h("div", null,
@@ -666,26 +728,31 @@ function SettingsView() {
 
 // --- src/client/components/BottomNav.tsx ---
 function BottomNav() {
-    return (h("nav", { className: "bottom-nav" },
-        h("button", { "data-tab": "home", className: "active", onClick: () => window.showTab('home') },
-            h("svg", { viewBox: "0 0 24 24" },
-                h("path", { d: "M12 3.2L3 10.5V20a1 1 0 0 0 1 1h5v-6h6v6h5a1 1 0 0 0 1-1v-9.5L12 3.2z" })),
+    return h("nav", { className: "bottom-nav", "aria-label": "Main navigation" },
+        h("button", { "data-tab": "home", className: "active", "aria-current": "page", onClick: () => window.showTab('home') },
+            h(UiIcon, { name: "home" }),
             h("span", null, "Home")),
         h("button", { "data-tab": "tasks", onClick: () => window.showTab('tasks', 'all') },
-            h("svg", { viewBox: "0 0 24 24" },
-                h("path", { d: "M16 4h-1.18A3 3 0 0 0 12 2a3 3 0 0 0-2.82 2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm-4-1a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm-2 14H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V7h2v2zm6 8h-4v-2h4v2zm0-4h-4v-2h4v2zm0-4h-4V7h4v2z" })),
+            h(UiIcon, { name: "tasks" }),
             h("span", null, "Tasks")),
+        h("button", { className: "nav-reward", "aria-label": "Claim daily reward", onClick: () => { window.showTab('home'); document.getElementById('dailyCard')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' }); document.getElementById('dailyBtn')?.focus({ preventScroll: true }); } },
+            h("span", null,
+                h("svg", { viewBox: "0 0 24 24", width: "25", height: "25" },
+                    h("use", { href: "#icon-gift" })))),
         h("button", { "data-tab": "refer", onClick: () => window.showTab('refer') },
-            h("svg", { viewBox: "0 0 24 24" },
-                h("path", { d: "M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" })),
-            h("span", null, "Friends")),
+            h(UiIcon, { name: "friends" }),
+            h("span", null, "Invite")),
         h("button", { "data-tab": "wallet", onClick: () => window.showTab('wallet') },
-            h("svg", { viewBox: "0 0 24 24" },
-                h("path", { d: "M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" })),
-            h("span", null, "Settings"))));
+            h(UiIcon, { name: "settings" }),
+            h("span", null, "Settings")));
 }
 
 // --- src/client/app.tsx ---
+
+
+
+
+
 
 
 
@@ -718,9 +785,15 @@ function PaisoApp() {
         h(SvgSpriteDefs, null),
         h("div", { className: "toast", id: "toast" }),
         h(NotificationModal, null),
+        h(GameModal, null),
+        h(AppHeader, null),
         h("main", { className: "app-viewport" },
             h(HomeView, null),
             h(TasksView, null),
+            h(OffersView, null),
+            h("section", { id: "tab-games", className: "app-screen" },
+                h("div", { className: "screen-content" },
+                    h(GamesView, null))),
             h(FriendsView, null),
             h(SettingsView, null)),
         h(BottomNav, null)));
@@ -735,6 +808,7 @@ let taskSearchQuery = '';
 let isDailyClaiming = false;
 let isWithdrawing = false;
 let startingGameId = null;
+let renderedGamesKey = '';
 const claimingTaskIds = new Set();
 let AdController = null;
 let toastTimer;
@@ -743,6 +817,7 @@ let lastTopNotifId = null;
 const activeTimers = {};
 const COIN_SVG = `<svg width="14" height="14" style="vertical-align:-2px"><use href="#icon-p-coin"/></svg>`;
 const DUMMY_AVATARS = [
+    `<img src="/assets/paiso-avatar-v2.webp" alt="Cat avatar" width="64" height="64" />`,
     `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="av1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#2563EB"/><stop offset="100%" stop-color="#1D4ED8"/></linearGradient></defs><rect width="64" height="64" rx="32" fill="url(#av1)"/><path d="M14 58c2-11 10-16 18-16s16 5 18 16" fill="#60A5FA"/><circle cx="32" cy="27" r="11" fill="#FDE68A"/><path d="M21 25c0-7 5-12 11-12s11 5 11 12v3H21v-3z" fill="#1E293B"/><path d="M18 27a14 14 0 0 1 28 0" fill="none" stroke="#38BDF8" stroke-width="3.5" stroke-linecap="round"/><rect x="15" y="23" width="5" height="10" rx="2.5" fill="#0284C7"/><rect x="44" y="23" width="5" height="10" rx="2.5" fill="#0284C7"/><circle cx="28" cy="28" r="1.6" fill="#0F172A"/><circle cx="36" cy="28" r="1.6" fill="#0F172A"/><path d="M28.5 33c2 1.8 5 1.8 7 0" fill="none" stroke="#0F172A" stroke-width="1.8" stroke-linecap="round"/></svg>`,
     `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="av2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#8B5CF6"/><stop offset="100%" stop-color="#6D28D9"/></linearGradient></defs><rect width="64" height="64" rx="32" fill="url(#av2)"/><path d="M13 58c3-12 10-17 19-17s16 5 19 17" fill="#F43F5E"/><circle cx="32" cy="27" r="11" fill="#FED7AA"/><path d="M20 22c2-6 7-9 12-9s10 3 12 9c-4-2-8-2-12-2s-8 0-12 2z" fill="#311042"/><rect x="22" y="24" width="9" height="5.5" rx="2" fill="#0F172A"/><rect x="33" y="24" width="9" height="5.5" rx="2" fill="#0F172A"/><line x1="31" y1="26.5" x2="33" y2="26.5" stroke="#0F172A" stroke-width="2"/><path d="M29 33.5c2 1.4 4.5 1.4 6 0" fill="none" stroke="#0F172A" stroke-width="1.8" stroke-linecap="round"/></svg>`,
     `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="av3" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#10B981"/><stop offset="100%" stop-color="#047857"/></linearGradient></defs><rect width="64" height="64" rx="32" fill="url(#av3)"/><path d="M14 58c2-11 10-16 18-16s16 5 18 16" fill="#064E3B"/><circle cx="32" cy="29" r="10.5" fill="#FDE68A"/><polygon points="21,20 25,12 32,17 39,12 43,20" fill="#FBBF24" stroke="#F59E0B" stroke-width="1"/><circle cx="28.5" cy="28.5" r="1.6" fill="#0F172A"/><circle cx="35.5" cy="28.5" r="1.6" fill="#0F172A"/><path d="M29 34c2 1.6 4.5 1.6 6 0" fill="none" stroke="#0F172A" stroke-width="1.8" stroke-linecap="round"/></svg>`,
@@ -750,48 +825,20 @@ const DUMMY_AVATARS = [
     `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="av5" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#06B6D4"/><stop offset="100%" stop-color="#0E7490"/></linearGradient></defs><rect width="64" height="64" rx="32" fill="url(#av5)"/><path d="M14 58c2-11 10-16 18-16s16 5 18 16" fill="#0F172A"/><circle cx="32" cy="27" r="11" fill="#1E293B"/><rect x="22" y="23" width="20" height="7" rx="3.5" fill="#FDE68A"/><circle cx="28" cy="26.5" r="1.7" fill="#0F172A"/><circle cx="36" cy="26.5" r="1.7" fill="#0F172A"/><path d="M21 20h22" stroke="#EF4444" stroke-width="3" stroke-linecap="round"/></svg>`,
     `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="av6" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#EC4899"/><stop offset="100%" stop-color="#BE185D"/></linearGradient></defs><rect width="64" height="64" rx="32" fill="url(#av6)"/><path d="M14 58c2-11 10-16 18-16s16 5 18 16" fill="#FBCFE8"/><path d="M19 30c0-9 6-15 13-15s13 6 13 15c0 4-1 8-3 10H22c-2-2-3-6-3-10z" fill="#4C1D95"/><circle cx="32" cy="28" r="10" fill="#FDE68A"/><circle cx="28.5" cy="27.5" r="1.6" fill="#0F172A"/><circle cx="35.5" cy="27.5" r="1.6" fill="#0F172A"/><path d="M29 32.5c2 1.6 4.5 1.6 6 0" fill="none" stroke="#E11D48" stroke-width="1.8" stroke-linecap="round"/></svg>`
 ];
-let currentAvatarIndex = Math.floor(Math.random() * DUMMY_AVATARS.length);
+let currentAvatarIndex = 0;
 function renderDummyAvatar(idx = currentAvatarIndex) {
     const box = $('settingsAvatarBox');
     if (box) {
         box.innerHTML = DUMMY_AVATARS[idx % DUMMY_AVATARS.length];
+    }
+    for (const avatar of document.querySelectorAll('.profile-avatar-art')) {
+        avatar.innerHTML = DUMMY_AVATARS[idx % DUMMY_AVATARS.length];
     }
 }
 function randomizeAvatar() {
     tg?.HapticFeedback?.impactOccurred?.('light');
     currentAvatarIndex = (currentAvatarIndex + 1 + Math.floor(Math.random() * (DUMMY_AVATARS.length - 1))) % DUMMY_AVATARS.length;
     renderDummyAvatar(currentAvatarIndex);
-}
-function TaskSvgIcon({ task }) {
-    if (task.type === 'app_task') {
-        return (h("svg", { width: "21", height: "21", viewBox: "0 0 24 24", fill: "none", stroke: "#4F46E5", "stroke-width": "2.1", "stroke-linecap": "round", "stroke-linejoin": "round" },
-            h("rect", { x: "3", y: "3", width: "7", height: "7", rx: "1.5" }),
-            h("rect", { x: "14", y: "3", width: "7", height: "7", rx: "1.5" }),
-            h("rect", { x: "14", y: "14", width: "7", height: "7", rx: "1.5" }),
-            h("rect", { x: "3", y: "14", width: "7", height: "7", rx: "1.5" })));
-    }
-    if (task.type === 'play_game') {
-        return (h("svg", { width: "22", height: "22", viewBox: "0 0 24 24", fill: "none", stroke: "#7C3AED", "stroke-width": "2.1", "stroke-linecap": "round", "stroke-linejoin": "round" },
-            h("line", { x1: "6", y1: "12", x2: "10", y2: "12" }),
-            h("line", { x1: "8", y1: "10", x2: "8", y2: "14" }),
-            h("line", { x1: "15", y1: "13", x2: "15.01", y2: "13" }),
-            h("line", { x1: "18", y1: "11", x2: "18.01", y2: "11" }),
-            h("rect", { x: "2", y: "6", width: "20", height: "12", rx: "4" })));
-    }
-    if (task.type === 'telegram_join') {
-        return (h("svg", { width: "21", height: "21", viewBox: "0 0 24 24", fill: "none", stroke: "#0284C7", "stroke-width": "2.1", "stroke-linecap": "round", "stroke-linejoin": "round" },
-            h("line", { x1: "22", y1: "2", x2: "11", y2: "13" }),
-            h("polygon", { points: "22 2 15 22 11 13 2 9 22 2" })));
-    }
-    if (task.url.includes('youtube.com') || task.url.includes('youtu.be')) {
-        return (h("svg", { width: "21", height: "21", viewBox: "0 0 24 24", fill: "none", stroke: "#DC2626", "stroke-width": "2.1", "stroke-linecap": "round", "stroke-linejoin": "round" },
-            h("rect", { x: "2", y: "4", width: "20", height: "16", rx: "4" }),
-            h("polygon", { points: "10 9 15 12 10 15 10 9", fill: "#DC2626" })));
-    }
-    return (h("svg", { width: "21", height: "21", viewBox: "0 0 24 24", fill: "none", stroke: "#2563EB", "stroke-width": "2.1", "stroke-linecap": "round", "stroke-linejoin": "round" },
-        h("circle", { cx: "12", cy: "12", r: "10" }),
-        h("line", { x1: "2", y1: "12", x2: "22", y2: "12" }),
-        h("path", { d: "M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" })));
 }
 function $(id) {
     return document.getElementById(id);
@@ -825,7 +872,7 @@ async function api(path, opts = {}) {
 }
 function showTab(name, taskFilter) {
     tg?.HapticFeedback?.impactOccurred?.('light');
-    const tabs = ['home', 'tasks', 'refer', 'wallet'];
+    const tabs = ['home', 'tasks', 'refer', 'wallet', 'games', 'offers'];
     tabs.forEach((t) => {
         const sec = $(`tab-${t}`);
         if (sec) {
@@ -833,9 +880,19 @@ function showTab(name, taskFilter) {
         }
     });
     document.querySelectorAll('nav.bottom-nav button').forEach((btn) => {
-        btn.classList.toggle('active', btn.dataset.tab === name);
+        const active = btn.dataset.tab === name || (name === 'offers' && btn.dataset.tab === 'tasks') || (name === 'games' && btn.dataset.tab === 'home');
+        btn.classList.toggle('active', active);
+        if (active)
+            btn.setAttribute('aria-current', 'page');
+        else
+            btn.removeAttribute('aria-current');
     });
+    closeSettingPage();
     if (name === 'tasks' && taskFilter) {
+        taskSearchQuery = '';
+        const search = $('taskSearchInput');
+        if (search)
+            search.value = '';
         setTaskFilter(taskFilter);
     }
     if (name === 'wallet') {
@@ -1025,11 +1082,11 @@ function renderDailyCheckin() {
         if (btnIcon)
             btnIcon.innerHTML = `<svg width="16" height="16"><use href="#icon-gift"/></svg>`;
         if (btnText)
-            btnText.textContent = isDailyClaiming ? 'Claiming...' : `Claim Day ${targetDay} Bonus (+${nextReward})`;
+            btnText.textContent = isDailyClaiming ? 'Claiming...' : `Claim Today (+${nextReward})`;
         if (btnCoin)
             btnCoin.style.display = 'inline-block';
         if (subText)
-            subText.textContent = `7 day streak! Keep it going!`;
+            subText.textContent = `Check in daily to keep your streak!`;
     }
     else {
         if (btn) {
@@ -1116,6 +1173,8 @@ function renderReferralsAndQualification() {
         }
     }
     const hist = state.referralHistory || [];
+    setText('refActive', hist.filter(r => r.qualified).length);
+    setText('refEarned', hist.reduce((sum, r) => sum + (r.qualified ? r.bonusCoins : 0), 0).toLocaleString());
     const refHistEl = $('refHistory');
     if (refHistEl) {
         if (!hist.length) {
@@ -1139,124 +1198,67 @@ function renderReferralsAndQualification() {
         }
     }
 }
-function getTaskIconBoxClass(task) {
-    if (task.type === 'app_task')
-        return 'bg-indigo-50 border-indigo-200/80 text-indigo-600';
-    if (task.type === 'play_game')
-        return 'bg-violet-50 border-violet-200/80 text-violet-600';
-    if (task.type === 'telegram_join')
-        return 'bg-sky-50 border-sky-200/80 text-sky-600';
-    if (task.url.includes('youtube.com') || task.url.includes('youtu.be'))
-        return 'bg-red-50 border-red-200/80 text-red-600';
-    return 'bg-blue-50 border-blue-200/80 text-blue-600';
+function TaskCard({ task, prefix = 'verify' }) {
+    const wait = activeTimers[task.id] || 0;
+    const started = startedTasks.has(task.id);
+    const index = task.type === 'app_task' ? 1 : task.type === 'play_game' ? 2 : /survey/i.test(task.title) ? 4 : 5;
+    const category = task.type === 'app_task' ? 'Apps' : task.type === 'play_game' ? 'Games' : task.type === 'telegram_join' ? 'Social' : 'Web';
+    return h("article", { className: "task-card" },
+        h("div", { className: `task-art task-art-${task.type}` }, task.type === 'telegram_join' ? h("img", { src: "/assets/icon-channels.png", alt: "" }) : h(EarnIcon, { index: index })),
+        h("div", { className: "task-copy" },
+            h("h2", null, task.title),
+            h("p", null, task.description || 'Complete this task to earn coins'),
+            h("div", { className: "task-tags" },
+                h("span", null, category),
+                h("span", null, task.done ? 'Completed' : task.type === 'play_game' ? 'Play' : 'Easy'),
+                h("span", null, task.type === 'telegram_join' ? 'Join' : (task.waitSeconds || 15) + ' sec'))),
+        h("div", { className: "task-actions" },
+            h("span", { className: "reward-pill" },
+                h("svg", { width: "14", height: "14" },
+                    h("use", { href: "#icon-p-coin" })),
+                "+",
+                task.reward.toLocaleString()),
+            h("button", { id: `${prefix}-${task.id}`, disabled: !!task.done || wait > 0 || claimingTaskIds.has(task.id), onClick: () => { if (started)
+                    claimTask(task.id);
+                else {
+                    startedTasks.add(task.id);
+                    doTask(task.id, task.url);
+                } }, className: "task-start" }, task.done ? 'Done' : claimingTaskIds.has(task.id) ? 'Checking' : wait > 0 ? wait + 's' : started ? 'Verify' : 'Start')));
 }
+const startedTasks = new Set();
 function renderTasks() {
-    const listEl = $('taskList');
-    if (!listEl || !state)
+    if (!state)
         return;
-    const allTasks = state.tasks || [];
-    const availableTasks = allTasks.filter((t) => !t.done);
-    const completedCount = allTasks.filter((t) => Boolean(t.done)).length;
-    const totalAvailableReward = availableTasks.reduce((sum, t) => sum + (t.reward || 0), 0);
-    const availAppCount = availableTasks.filter((t) => t.type === 'app_task').length;
-    const availGameCount = availableTasks.filter((t) => t.type === 'play_game').length;
-    setText('tasksAvailableBadge', `${availableTasks.length} Left`);
-    setText('tasksTotalRewardText', `+${totalAvailableReward.toLocaleString()}`);
-    setText('tasksDoneCountText', `${completedCount}/${allTasks.length}`);
-    setText('appTaskCountText', availAppCount > 0 ? `${availAppCount} Available` : 'Try apps & earn');
-    setText('playGameCountText', availGameCount > 0 ? `${availGameCount} Available` : 'Play & win coins');
-    const appQuickCard = $('quickCardAppTask');
-    const gameQuickCard = $('quickCardPlayGame');
-    if (appQuickCard) {
-        appQuickCard.className = `flex items-center gap-3 p-3 rounded-2xl border text-left transition active:scale-[0.98] ${currentTaskFilter === 'app_task'
-            ? 'bg-indigo-100/80 border-indigo-500 ring-2 ring-indigo-500/20'
-            : 'bg-gradient-to-br from-indigo-50/90 to-blue-50/60 border-indigo-200/80'}`;
+    const all = state.tasks || [];
+    const source = all.filter(t => currentTaskFilter === 'done' ? t.done : !t.done);
+    const tasks = source.filter(t => (currentTaskFilter === 'all' || currentTaskFilter === 'done' || t.type === currentTaskFilter) && (!taskSearchQuery || (t.title + ' ' + t.description + ' ' + t.type).toLowerCase().includes(taskSearchQuery)));
+    const nodes = tasks.map(task => h(TaskCard, { task: task }));
+    if ((currentTaskFilter === 'all' || currentTaskFilter === 'video') && (!taskSearchQuery || 'watch video ads'.includes(taskSearchQuery)) && state.ads) {
+        nodes.unshift(h("article", { className: "task-card" },
+            h("div", { className: "task-art" },
+                h(EarnIcon, { index: 0 })),
+            h("div", { className: "task-copy" },
+                h("h2", null, "Watch Video Ads"),
+                h("p", null, "Watch short videos and earn coins"),
+                h("div", { className: "task-tags" },
+                    h("span", null, "Video"),
+                    h("span", null, "Easy"),
+                    h("span", null, "1\u20132 min"))),
+            h("div", { className: "task-actions" },
+                h("span", { className: "reward-pill" },
+                    h("svg", { width: "14", height: "14" },
+                        h("use", { href: "#icon-p-coin" })),
+                    "+",
+                    state.ads.reward),
+                h("button", { className: "task-start", disabled: state.ads.watchedToday >= state.ads.dailyCap, onClick: () => watchAd() }, state.ads.watchedToday >= state.ads.dailyCap ? 'Done' : 'Start'))));
     }
-    if (gameQuickCard) {
-        gameQuickCard.className = `flex items-center gap-3 p-3 rounded-2xl border text-left transition active:scale-[0.98] ${currentTaskFilter === 'play_game'
-            ? 'bg-violet-100/80 border-violet-500 ring-2 ring-violet-500/20'
-            : 'bg-gradient-to-br from-violet-50/90 to-purple-50/60 border-violet-200/80'}`;
-    }
-    const sourceTasks = currentTaskFilter === 'done' ? allTasks.filter((t) => t.done) : availableTasks;
-    const filtered = sourceTasks.filter((t) => {
-        const matchesFilter = currentTaskFilter === 'all' || currentTaskFilter === 'done' || t.type === currentTaskFilter;
-        const searchable = `${t.title} ${t.description || ''} ${t.target || ''} ${t.type}`.toLowerCase();
-        return matchesFilter && (!taskSearchQuery || searchable.includes(taskSearchQuery));
-    });
-    if (!filtered.length) {
-        const emptyTitle = taskSearchQuery
-            ? 'No matching tasks'
-            : currentTaskFilter === 'done'
-                ? 'No completed tasks yet'
-                : availableTasks.length === 0
-                    ? 'All tasks completed!'
-                    : 'No tasks in this category';
-        const emptyMessage = taskSearchQuery
-            ? 'Try another title, category, or keyword.'
-            : currentTaskFilter === 'done'
-                ? 'Tasks you verify will appear here.'
-                : availableTasks.length === 0
-                    ? 'New or repeatable tasks will appear here when ready.'
-                    : 'Try another category or check back later.';
-        listEl.replaceChildren(h("div", { className: "bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-2xs my-2" },
-            h("div", { className: "w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto mb-3" },
-                h("svg", { width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.4" },
-                    h("polyline", { points: "20 6 9 17 4 12" }))),
-            h("div", { className: "text-sm font-extrabold text-slate-900" }, emptyTitle),
-            h("div", { className: "text-xs text-slate-500 mt-1 leading-relaxed" }, emptyMessage)));
-        return;
-    }
-    listEl.replaceChildren(...filtered.map((t) => {
-        const waitRemaining = activeTimers[t.id] || 0;
-        const iconBoxClass = getTaskIconBoxClass(t);
-        const resetHours = +(t.resetHours || 0);
-        const repeatLabel = resetHours === 24 ? 'Daily' : resetHours > 0 ? `${resetHours}h` : '';
-        const categoryLabel = t.type === 'app_task'
-            ? 'App Task'
-            : t.type === 'play_game'
-                ? 'Play Game'
-                : t.type === 'telegram_join'
-                    ? 'Telegram'
-                    : 'Social';
-        const timerHint = t.type === 'telegram_join'
-            ? 'Join to verify'
-            : t.type === 'play_game'
-                ? `Play ${t.waitSeconds || 30}s`
-                : `${t.waitSeconds || 15}s visit`;
-        const openBtnLabel = t.type === 'play_game'
-            ? 'Play'
-            : t.type === 'app_task'
-                ? 'Open App'
-                : t.type === 'telegram_join'
-                    ? 'Join'
-                    : 'Open';
-        return (h("div", { className: "bg-white border border-slate-200/90 hover:border-blue-300 rounded-2xl p-3.5 shadow-2xs flex items-center justify-between gap-3 transition" },
-            h("div", { className: "flex items-center gap-3 min-w-0" },
-                h("div", { className: `w-11 h-11 rounded-xl border flex items-center justify-center shrink-0 ${iconBoxClass}` },
-                    h(TaskSvgIcon, { task: t })),
-                h("div", { className: "min-w-0" },
-                    h("div", { className: "text-[13px] font-extrabold text-slate-900 truncate" }, t.title),
-                    h("div", { className: "flex flex-wrap items-center gap-1.5 mt-1" },
-                        t.done ? (h("span", { className: "inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-extrabold" },
-                            h("svg", { width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "3" },
-                                h("path", { d: "m5 12 4 4L19 6" })),
-                            "Completed")) : (h("span", { className: "inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200/80 text-amber-800 text-[11px] font-extrabold" },
-                            h("svg", { width: "12", height: "12" },
-                                h("use", { href: "#icon-p-coin" })),
-                            h("span", null,
-                                "+",
-                                t.reward))),
-                        h("span", { className: "px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold" }, categoryLabel),
-                        h("span", { className: "text-[10px] font-semibold text-slate-400" },
-                            "\u2022 ",
-                            timerHint),
-                        repeatLabel ? (h("span", { className: "px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-extrabold uppercase" }, repeatLabel)) : null))),
-            t.done ? null : h("div", { className: "flex items-center gap-1.5 shrink-0" },
-                h("button", { type: "button", className: "px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-extrabold transition", onClick: () => doTask(t.id, t.url) }, openBtnLabel),
-                h("button", { type: "button", id: `verify-${t.id}`, disabled: waitRemaining > 0 || claimingTaskIds.has(t.id), onClick: () => claimTask(t.id), className: `px-3.5 py-2 rounded-xl text-xs font-extrabold text-white transition ${waitRemaining > 0 || claimingTaskIds.has(t.id)
-                        ? 'bg-slate-400 cursor-not-allowed'
-                        : 'bg-blue-600 hover:bg-blue-700 shadow-xs'}` }, claimingTaskIds.has(t.id) ? 'Checking...' : waitRemaining > 0 ? `${waitRemaining}s` : 'Verify'))));
-    }));
+    const empty = (title) => h("div", { className: "empty-state" },
+        h(EarnIcon, { index: 1 }),
+        h("h2", null, title),
+        h("p", null, "Try another category or check back for new rewards."));
+    $('taskList')?.replaceChildren(...(nodes.length ? nodes : [empty(taskSearchQuery ? 'No matching tasks' : 'No tasks here yet')]));
+    const offers = all.filter(t => t.type === 'app_task' && !t.done);
+    $('offerList')?.replaceChildren(...(offers.length ? offers.map(task => h(TaskCard, { task: task, prefix: "offer-verify" })) : [empty('New offers are on the way')]));
 }
 function formatTimeAgo(iso) {
     const diffSec = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
@@ -1397,6 +1399,11 @@ function startTaskCountdown(taskId, seconds) {
     renderTasks();
     const interval = window.setInterval(() => {
         activeTimers[taskId] -= 1;
+        const offerButton = $(`offer-verify-${taskId}`);
+        if (offerButton) {
+            offerButton.disabled = activeTimers[taskId] > 0;
+            offerButton.textContent = activeTimers[taskId] > 0 ? `${activeTimers[taskId]}s` : 'Verify';
+        }
         const btn = $(`verify-${taskId}`);
         if (activeTimers[taskId] <= 0) {
             delete activeTimers[taskId];
@@ -1418,9 +1425,13 @@ async function load() {
         state = await api('/api/me');
     }
     catch {
+        if (!renderedGamesKey)
+            showFeaturedGamesError();
         return;
     }
     if (!state || state.error) {
+        if (!renderedGamesKey)
+            showFeaturedGamesError();
         if (state?.error)
             toast(state.error, 'error');
         return;
@@ -1576,31 +1587,19 @@ async function claimTask(id) {
     }
 }
 function renderGames() {
-    const grid = $('gamesGrid');
-    if (!grid || !state)
+    if (!state)
         return;
     const games = state.games || [];
-    if (!games.length) {
-        grid.replaceChildren(h("div", { className: "col-span-full rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center" },
-            h("div", { className: "mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50" },
-                h("img", { src: "/assets/icon-games.png", alt: "", className: "h-7 w-7 object-contain" })),
-            h("div", { className: "text-sm font-extrabold text-slate-900" }, "No games yet"),
-            h("div", { className: "mt-1 text-xs text-slate-500" }, "New games will show up here when they are published.")));
+    const key = JSON.stringify([startingGameId, games.map(({ id, title, priceCoins }) => [id, title, priceCoins])]);
+    if (key === renderedGamesKey)
         return;
-    }
-    grid.replaceChildren(...games.map((game) => (h("article", { className: "explore-game-card flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm", "data-title": `${game.title} ${game.description || ''} game play online` },
-        h("div", { className: "flex items-start gap-3 p-4" },
-            h("div", { className: "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-50" },
-                h("img", { src: "/assets/icon-games.png", alt: "", className: "h-6 w-6 object-contain" })),
-            h("div", { className: "min-w-0 flex-1" },
-                h("h3", { className: "truncate text-sm font-extrabold text-slate-900" }, game.title),
-                h("p", { className: "mt-1 line-clamp-2 min-h-8 text-xs leading-4 text-slate-500" }, game.description || 'Ready to play.'))),
-        h("div", { className: "flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/70 p-3.5" },
-            h("div", { className: "flex items-center gap-1.5 text-xs font-bold text-slate-700" },
-                h("svg", { width: "15", height: "15" },
-                    h("use", { href: "#icon-p-coin" })),
-                game.priceCoins > 0 ? `${game.priceCoins.toLocaleString()} coins / play` : 'Free to play'),
-            h("button", { type: "button", disabled: startingGameId === game.id, onClick: () => window.playGame(game.id), className: "shrink-0 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-extrabold text-white transition hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-60" }, startingGameId === game.id ? 'Starting...' : 'Play'))))));
+    renderedGamesKey = key;
+    const empty = h("div", { className: "empty-state" },
+        h(EarnIcon, { index: 2 }),
+        h("h2", null, "Games coming soon"),
+        h("p", null, "New games will appear here when published."));
+    $('gamesGrid')?.replaceChildren(...(games.length ? games.map(game => h(GameCard, { game: game, pending: startingGameId === game.id })) : [empty]));
+    updateFeaturedGames(games, startingGameId);
 }
 async function playGame(id) {
     if (startingGameId)

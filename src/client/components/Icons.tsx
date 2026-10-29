@@ -2,7 +2,7 @@ import { h } from '../jsx';
 
 export function SvgSpriteDefs() {
   return (
-    <svg style="display:none" aria-hidden="true">
+    <svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
       <defs>
         <linearGradient id="pCoinGrad" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stop-color="#FFE066" />

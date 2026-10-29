@@ -1,25 +1,24 @@
 import { h } from '../jsx';
+import { UiIcon } from './shared/UiIcon';
 export function TasksView() {
-    return (h("section", { id: "tab-tasks", className: "app-screen" },
-        h("div", { className: "native-topbar" },
-            h("h2", { className: "page-title" }, "Earn Tasks"),
-            h("div", { className: "coin-pill" },
-                h("svg", { width: "16", height: "16" },
-                    h("use", { href: "#icon-p-coin" })),
-                h("span", { id: "headerCoins" }, "0"))),
-        h("div", { className: "screen-content space-y-3.5" },
-            h("label", { className: "relative block" },
-                h("span", { className: "sr-only" }, "Search tasks"),
-                h("svg", { className: "absolute left-3 top-1/2 -translate-y-1/2 text-slate-400", width: "17", height: "17", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round" },
-                    h("circle", { cx: "11", cy: "11", r: "8" }),
-                    h("path", { d: "m21 21-4.35-4.35" })),
-                h("input", { id: "taskSearchInput", type: "search", placeholder: "Search tasks", onInput: (e) => window.filterTasks(e.target.value), className: "w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" })),
-            h("div", { className: "flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar" },
-                h("button", { className: "filter-chip active", "data-filter": "all", onClick: () => window.setTaskFilter('all') }, "All Tasks"),
-                h("button", { className: "filter-chip", "data-filter": "app_task", onClick: () => window.setTaskFilter('app_task') }, "App Task"),
-                h("button", { className: "filter-chip", "data-filter": "play_game", onClick: () => window.setTaskFilter('play_game') }, "Play Game"),
-                h("button", { className: "filter-chip", "data-filter": "telegram_join", onClick: () => window.setTaskFilter('telegram_join') }, "Telegram"),
-                h("button", { className: "filter-chip", "data-filter": "social_visit", onClick: () => window.setTaskFilter('social_visit') }, "Social & Web"),
-                h("button", { className: "filter-chip", "data-filter": "done", onClick: () => window.setTaskFilter('done') }, "Completed")),
-            h("div", { id: "taskList", className: "space-y-2.5 pb-4" }))));
+    const filters = [{ id: 'all', label: 'All' }, { id: 'video', label: 'Video' }, { id: 'app_task', label: 'Apps' }, { id: 'play_game', label: 'Games' }, { id: 'social_visit', label: 'Web' }, { id: 'telegram_join', label: 'Social' }, { id: 'done', label: 'Done' }];
+    return h("section", { id: "tab-tasks", className: "app-screen" },
+        h("div", { className: "screen-content" },
+            h("div", { className: "page-heading" },
+                h("h1", null, "All Tasks"),
+                h("p", null, "Complete tasks and earn rewards")),
+            h("label", { className: "task-search" },
+                h(UiIcon, { name: "search", size: 17 }),
+                h("input", { id: "taskSearchInput", type: "search", "aria-label": "Search tasks", placeholder: "Search tasks", onInput: (event) => window.filterTasks(event.target.value) })),
+            h("div", { className: "filter-bar" }, filters.map(filter => h("button", { className: `filter-chip${filter.id === 'all' ? ' active' : ''}`, "data-filter": filter.id, onClick: () => window.setTaskFilter(filter.id) }, filter.label))),
+            h("div", { id: "taskList", className: "task-list", "aria-live": "polite" }),
+            h("span", { id: "headerCoins", hidden: true })));
+}
+export function OffersView() {
+    return h("section", { id: "tab-offers", className: "app-screen" },
+        h("div", { className: "screen-content" },
+            h("div", { className: "page-heading" },
+                h("h1", null, "Special Offers"),
+                h("p", null, "Discover apps and earn rewards")),
+            h("div", { id: "offerList", className: "task-list" })));
 }

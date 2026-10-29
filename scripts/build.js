@@ -1,3 +1,4 @@
+require('./build-css');
 /**
  * TypeScript + Modular TSX Builder for Paiso Mini App & Admin Panel
  */
@@ -21,17 +22,7 @@ function stripModuleSyntax(raw) {
 }
 
 // 3. Bundle compiled MiniApp TSX modules -> public/app.js
-const clientModules = [
-  'dist/client/jsx.js',
-  'dist/client/components/Icons.js',
-  'dist/client/components/HomeView.js',
-  'dist/client/components/TasksView.js',
-  'dist/client/components/GamesView.js',
-  'dist/client/components/FriendsView.js',
-  'dist/client/components/SettingsView.js',
-  'dist/client/components/BottomNav.js',
-  'dist/client/app.js'
-];
+const clientModules = require('./client-modules');
 
 let appBundle = '(function() {\n"use strict";\n';
 for (const relPath of clientModules) {
