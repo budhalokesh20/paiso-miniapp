@@ -1,0 +1,40 @@
+/* Game lounge uses live game data and the shared app palette. */
+.games-page { max-width: 1200px; margin: 0 auto; }
+.games-heading { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; overflow: hidden; padding: 26px 22px; border-radius: 22px; color: #fff; background: radial-gradient(circle at 88% 0%,#20c9a95c,transparent 45%),linear-gradient(120deg,#0b203a,#07564e); box-shadow: 0 8px 24px #0d554b18; }
+.games-heading > div { position: relative; z-index: 1; min-width: 0; }
+.games-eyebrow { color: #9cebd8; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; }
+.games-heading h1 { margin: 9px 0 7px; font-size: clamp(25px,5vw,34px); line-height: 1.12; letter-spacing: -.7px; font-weight: 700; }
+.games-heading h1 span { color: #91f0d7; }
+.games-heading p { color: #d7f1eb; font-size: 13px; line-height: 1.5; }
+.games-heading-icon { flex-shrink: 0; display: grid; place-items: center; width: 72px; height: 72px; border-radius: 24px; color: #a5f2df; background: #ffffff19; transform: rotate(-9deg); }
+.games-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin: 25px 2px 13px; }
+.games-toolbar h2,.game-history h2 { font-size: 19px; line-height: 1.3; font-weight: 700; letter-spacing: -.35px; color: var(--ui-ink); }
+.games-toolbar p { margin-top: 4px; font-size: 12px; color: var(--ui-muted); }
+.games-search { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 14px; border: 1px solid var(--ui-line); border-radius: 15px; background: #fff; color: #788ba0; }
+.games-search:focus-within { border-color: #4dbda3; box-shadow: 0 0 0 3px #009b7e16; }
+.games-search input { min-width: 0; flex: 1; border: 0; outline: none; background: transparent; color: var(--ui-ink); font-size: 14px; }
+.games-filters { display: flex; gap: 8px; margin: 14px 0 18px; }
+.games-filters button { min-height: 40px; padding: 8px 16px; border: 1px solid var(--ui-line); border-radius: 999px; color: #61748a; background: #fff; font-size: 13px; font-weight: 600; }
+.games-filters button.active { border-color: #008f79; background: #e3f6ef; color: #007b67; }
+.games-grid { align-items: stretch; }
+.games-grid .game-card { align-items: stretch; text-align: left; padding: 9px; gap: 7px; transition: transform 160ms ease,box-shadow 160ms ease; }
+.games-grid .game-card:active:not(:disabled) { transform: scale(.98); }
+.games-grid .game-card > b { padding: 2px 3px 0; }
+.games-grid .game-card > small { padding: 0 3px; color: #00866e; font-weight: 600; }
+.game-description { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; padding: 0 3px; color: var(--ui-muted); font-size: 12px; line-height: 1.4; }
+.games-grid .game-play { margin-top: auto; min-height: 40px; }
+.games-empty { grid-column: 1 / -1; }
+.games-retry { margin-top: 15px; padding: 10px 18px; border: 0; border-radius: 12px; color: #fff; background: var(--green); font-weight: 600; }
+.game-history { margin-top: 28px; }
+.game-history[hidden] { display: none; }
+.game-history h2 { margin: 0 2px 12px; }
+#gameHistory { overflow: hidden; border: 1px solid var(--ui-line); border-radius: 18px; background: #fff; }
+.game-history-row { display: flex; align-items: center; gap: 12px; padding: 13px 14px; }
+.game-history-row + .game-history-row { border-top: 1px solid #edf2f5; }
+.game-history-icon { display: grid; place-items: center; flex: 0 0 40px; height: 40px; border-radius: 13px; color: #008f79; background: #eaf8f2; }
+.game-history-row > span:nth-child(2) { flex: 1; min-width: 0; }
+.game-history-row b { display: block; overflow-wrap: anywhere; color: var(--ui-ink); font-size: 13px; }
+.game-history-row small { display: block; margin-top: 3px; color: var(--ui-muted); font-size: 11px; }
+.game-history-row strong { flex-shrink: 0; color: #68798d; font-size: 12px; }
+@media (max-width: 359px) { .games-heading { padding: 22px 16px; } .games-heading-icon { width: 54px; height: 54px; border-radius: 18px; } .games-filters button { padding-inline: 13px; } }
+@media (prefers-reduced-motion: reduce) { .games-grid .game-card { transition: none; } .games-grid .game-card:active:not(:disabled) { transform: none; } }

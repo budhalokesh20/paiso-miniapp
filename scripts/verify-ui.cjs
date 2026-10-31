@@ -16,13 +16,14 @@ const fixtures = {
     {id:'channel',title:'Join Channel',description:'Join and stay',type:'telegram_join',reward:100},
     {id:'quiz',title:'Daily Quiz',description:'Answer 5 questions',type:'social_visit',reward:50,waitSeconds:15},
   ].map(t=>({...t,url:'https://example.com',target:'',icon:''})),
-  games:[{id:'fruit',title:'Fruit Master'},{id:'racer',title:'Car Racing'},{id:'puzzle',title:'Puzzle Match'},{id:'bubble',title:'Bubble Pop'}].map(g=>({...g,description:'Play for fun',priceCoins:0,enabled:true,plays:0,coinsCollected:0})),
+  games:[{id:'fruit',title:'Fruit Master'},{id:'racer',title:'Car Racing'},{id:'puzzle',title:'Puzzle Match'},{id:'bubble',title:'Bubble Pop'}].map(g=>({...g,description:'Play for fun',priceCoins:g.id==='bubble'?50:0,enabled:true,plays:0,coinsCollected:0})),
   coinPerNpr:100,minWithdrawCoins:10000,referralBonusCoins:200,dailyBonus:100,
   ads:{blockId:'',reward:50,dailyCap:10,watchedToday:0},canDaily:true,nextDailyAt:0,dailyStreak:3,
   qualification:{adsDone:3,adsReq:3,tasksDone:2,tasksReq:2,dailyDone:3,dailyReq:2,qualified:true},
   referralHistory:['user123','nepali_user','gaming_boy'].map((name,i)=>({id:String(i),name:'@'+name,username:'',joinedAt:'2026-10-29T10:00:00Z',qualified:true,bonusCoins:200,adsDone:3,adsReq:3,tasksDone:2,tasksReq:2,dailyDone:2,dailyReq:2})),
   withdrawSettings:{methods:[{id:'esewa',name:'eSewa',logo:'',placeholder:'eSewa ID',enabled:true},{id:'khalti',name:'Khalti',logo:'',enabled:true}],countries:[]},
-  refLink:'https://t.me/paiso_bot?start=12345',notifications:[],unreadCount:0
+  refLink:'https://t.me/paiso_bot?start=12345',notifications:[],unreadCount:0,
+  recentGames:[{gameId:'fruit',gameTitle:'Fruit Master',coins:0,at:'2026-10-29T10:00:00Z'}]
 };
 async function run(){
   const server=app.listen(0,'127.0.0.1'); await new Promise(resolve=>server.once('listening',resolve));
@@ -69,6 +70,21 @@ async function run(){
     if (overflow) console.log(await page.locator('#tab-'+tab).evaluate(el=>({width:el.clientWidth,scroll:el.scrollWidth,children:[...el.querySelectorAll('*')].filter(child=>child.getBoundingClientRect().right>el.getBoundingClientRect().right+1).slice(0,12).map(child=>({class:child.className,width:child.getBoundingClientRect().width,right:child.getBoundingClientRect().right}))})));
     assert.equal(overflow,false,tab+' must not overflow horizontally');
   }
+  await page.evaluate(()=>window.showTab('games'));
+  await page.getByRole('searchbox',{name:'Search games'}).fill('puzzle');
+  assert.equal(await page.locator('#gamesGrid .game-card').count(),1);
+  assert.match(await page.locator('#gamesGrid').innerText(),/Puzzle Match/);
+  await page.getByRole('searchbox',{name:'Search games'}).fill('');
+  await page.getByRole('button',{name:'Coins',exact:true}).click();
+  assert.equal(await page.locator('#gamesGrid .game-card').count(),1);
+  assert.match(await page.locator('#gamesGrid').innerText(),/Bubble Pop/);
+  await page.getByRole('button',{name:'Free',exact:true}).click();
+  assert.equal(await page.locator('#gamesGrid .game-card').count(),3);
+  await page.getByRole('button',{name:'All games',exact:true}).click();
+  await page.getByRole('searchbox',{name:'Search games'}).fill('no such game');
+  assert.match(await page.locator('#gamesGrid').innerText(),/No games found/);
+  await page.getByRole('searchbox',{name:'Search games'}).fill('');
+  assert.match(await page.locator('#gameHistory').innerText(),/Fruit Master/);
 
 
   // Reference Tasks landing and real category lists.
@@ -117,7 +133,7 @@ async function run(){
   assert.equal(await page.locator('#sub-language').count(),0);
   assert.equal(await page.getByRole('button',{name:'Change avatar',exact:true}).count(),0);
   const settingsLinks=[['Profile & Verification','sub-verify'],['Withdraw Rewards','sub-withdraw'],['My Activity','sub-history'],['Help Center','sub-faq'],['Contact Support','sub-support'],['Privacy Information','sub-privacy'],['Terms of Service','sub-terms']];
-  for(const width of [320,390,768]) {
+  for(const width of [320,390,768,1280]) {
     await page.setViewportSize({width,height:844});
     await page.evaluate(()=>{window.showTab('wallet');document.getElementById('tab-wallet').scrollTop=0;});
     assert.equal(await page.locator('#settings-menu-view .settings-row').evaluateAll(rows=>rows.every(row=>row.getBoundingClientRect().height>=60 && parseFloat(getComputedStyle(row.querySelector('.settings-item-title')).fontSize)>=16)),true,'Readable settings rows at '+width);
@@ -130,6 +146,8 @@ async function run(){
       const panelBounds=await pane.boundingBox();
       const shellBounds=await page.locator('.app-shell').boundingBox();
       assert.ok(Math.abs(panelBounds.y-shellBounds.y)<1 && Math.abs(panelBounds.height-shellBounds.height)<1,id+' must fill app from the top, including after menu scroll: '+JSON.stringify({panelBounds,shellBounds}));
+      const detailContent=await pane.locator(':scope > .screen-content').boundingBox();
+      if(detailContent) assert.ok(Math.abs(detailContent.width-panelBounds.width)<1,id+' content fills the available page');
       assert.equal(await pane.evaluate(el=>el.scrollTop),0,id+' opens at the top');
       assert.equal(await page.locator('.app-viewport').evaluate(el=>el.inert),true,'Background is inactive behind a detail page');
       assert.equal(await pane.evaluate(el=>el.contains(document.elementFromPoint(el.getBoundingClientRect().left+20,20))),true,'Detail page covers the app header');
@@ -248,7 +266,8 @@ async function run(){
   await page.clock.install();
   const refresh=page.waitForResponse(response=>response.url().endsWith('/api/my-withdrawals'));
   await page.clock.fastForward(8000); await refresh;
-  assert.equal(await page.evaluate(()=>window.__featuredNode===document.querySelector('#featuredGames button')&&document.activeElement===window.__featuredNode&&document.getElementById('tab-home').scrollTop===window.__homeScroll),true,'Background refresh preserves game button, focus and scroll');
+  const stableGame=await page.evaluate(()=>({node:window.__featuredNode===document.querySelector('#featuredGames button'),focus:document.activeElement===window.__featuredNode,scroll:document.getElementById('tab-home').scrollTop===window.__homeScroll}));
+  assert.deepEqual(stableGame,{node:true,focus:true,scroll:true},'Background refresh preserves game button, focus and scroll');
   await page.clock.resume();
   await page.emulateMedia({reducedMotion:'reduce'});
   assert.equal(await page.locator('.home-hero button').evaluate(el=>getComputedStyle(el).transitionDuration),'0s');
@@ -392,6 +411,13 @@ async function run(){
   await page.reload({waitUntil:'networkidle'});
   await page.waitForFunction(()=>document.getElementById('featuredGames').getAttribute('aria-busy')==='false');
   assert.match(await page.locator('#featuredGames').innerText(),/check your connection/i);
+  await page.evaluate(()=>window.showTab('games'));
+  await page.getByRole('button',{name:'Try again',exact:true}).waitFor({state:'visible'});
+  assert.match(await page.locator('#gamesGrid').innerText(),/Unable to load games/);
+  await context.unroute('**/api/me');
+  await page.getByRole('button',{name:'Try again',exact:true}).click();
+  await page.locator('#gamesGrid .game-card').first().waitFor();
+  assert.equal(await page.locator('#gamesGrid .game-card').count(),4,'Retry restores games after a connection failure');
   assert.deepEqual(errors,[]);
   console.log(JSON.stringify({passed:true,homeOnlyHeader:true,personalizedGreeting:true,headerNotifications:true,feedbackStates:true,feedbackAboveDialog:true,stableTaskAndPaymentPolling:true,taskLanding:true,taskCategoryNavigation:true,settingsEssentialActions:8,settingsSubpages:true,screens:7,homeSizes,taskStartAndVerify:true,search:true,filters:true,withdrawal:true,homeGameLaunch:true,dailyCheckin:true,copyReferral:true,notifications:true,stablePolling:true,emptyAndOffline:true,reducedMotion:true,brokenImages,errors},null,2));
   await browser.close();server.close();

@@ -4,6 +4,7 @@ import { DailyCheckInModal } from './components/home/DailyCheckIn';
 import { HomeView } from './components/HomeView';
 import { FeedbackToast, showFeedback } from './components/shared/FeedbackToast';
 import { EarnIcon } from './components/shared/EarnIcon';
+import { UiIcon } from './components/shared/UiIcon';
 import { GameCard } from './components/shared/GameCard';
 import { updateFeaturedGames, showFeaturedGamesError } from './components/home/FeaturedGames';
 import { TaskListPage } from './components/tasks/TaskListPage';
@@ -82,6 +83,9 @@ let isDailyClaiming = false;
 let isWithdrawing = false;
 let startingGameId = null;
 let renderedGamesKey = '';
+let renderedFeaturedKey = '';
+let gameSearch = '';
+let gameFilter = 'all';
 const claimingTaskIds = new Set();
 let AdController = null;
 let renderedTasksKey = '';
@@ -752,21 +756,27 @@ function startTaskCountdown(taskId, seconds) {
     }, 1000);
 }
 async function load() {
+    let response;
     try {
-        state = await api('/api/me');
+        response = await api('/api/me');
     }
     catch {
-        if (!renderedGamesKey)
+        if (!renderedGamesKey) {
             showFeaturedGamesError();
+            showGamesConnectionError();
+        }
         return;
     }
-    if (!state || state.error) {
-        if (!renderedGamesKey)
+    if (!response || response.error) {
+        if (!renderedGamesKey) {
             showFeaturedGamesError();
-        if (state?.error)
-            toast(state.error, 'error');
+            showGamesConnectionError();
+        }
+        if (response?.error)
+            toast(response.error, 'error');
         return;
     }
+    state = response;
     const u = state.user;
     const fullName = u.verification?.fullName || u.first_name || u.username || 'Paiso User';
     const firstName = (u.first_name?.trim() || u.verification?.fullName?.trim() || u.username || 'there').split(/\s+/)[0];
@@ -920,20 +930,44 @@ async function claimTask(id) {
         renderTasks();
     }
 }
+function showGamesConnectionError() {
+    setText('gameCount', 'Unable to load games');
+    $('gamesGrid')?.replaceChildren(h("div", { className: "empty-state games-empty" },
+        h("h2", null, "Unable to load games"),
+        h("p", null, "Check your connection and try again."),
+        h("button", { type: "button", className: "games-retry", onClick: () => window.retryGames() }, "Try again")));
+}
 function renderGames() {
     if (!state)
         return;
     const games = state.games || [];
-    const key = JSON.stringify([startingGameId, games.map(({ id, title, priceCoins }) => [id, title, priceCoins])]);
+    const key = JSON.stringify([startingGameId, gameSearch, gameFilter, state.recentGames, games.map(({ id, title, description, priceCoins }) => [id, title, description, priceCoins])]);
     if (key === renderedGamesKey)
         return;
     renderedGamesKey = key;
-    const empty = h("div", { className: "empty-state" },
+    const matching = games.filter(game => (gameFilter === 'all' || (gameFilter === 'free' ? game.priceCoins === 0 : game.priceCoins > 0)) && `${game.title} ${game.description || ''}`.toLowerCase().includes(gameSearch));
+    const empty = h("div", { className: "empty-state games-empty" },
         h(EarnIcon, { index: 2 }),
-        h("h2", null, "Games coming soon"),
-        h("p", null, "New games will appear here when published."));
-    $('gamesGrid')?.replaceChildren(...(games.length ? games.map(game => h(GameCard, { game: game, pending: startingGameId === game.id })) : [empty]));
-    updateFeaturedGames(games, startingGameId);
+        h("h2", null, games.length ? 'No games found' : 'Games coming soon'),
+        h("p", null, games.length ? 'Try another search or filter.' : 'New games will appear here when published.'));
+    $('gamesGrid')?.replaceChildren(...(matching.length ? matching.map(game => h(GameCard, { game: game, pending: startingGameId === game.id })) : [empty]));
+    setText('gameCount', `${matching.length} ${matching.length === 1 ? 'game' : 'games'} available`);
+    const history = state.recentGames || [];
+    const section = $('gameHistorySection');
+    if (section)
+        section.hidden = history.length === 0;
+    $('gameHistory')?.replaceChildren(...history.map(play => h("div", { className: "game-history-row" },
+        h("span", { className: "game-history-icon" },
+            h(UiIcon, { name: "game", size: 20 })),
+        h("span", null,
+            h("b", null, play.gameTitle),
+            h("small", null, new Date(play.at).toLocaleDateString())),
+        h("strong", null, play.coins ? `−${play.coins.toLocaleString()} coins` : 'Free'))));
+    const featuredKey = JSON.stringify([startingGameId, games.map(({ id, title, priceCoins }) => [id, title, priceCoins])]);
+    if (featuredKey !== renderedFeaturedKey) {
+        renderedFeaturedKey = featuredKey;
+        updateFeaturedGames(games, startingGameId);
+    }
 }
 async function playGame(id) {
     if (startingGameId)
@@ -971,9 +1005,11 @@ async function playGame(id) {
             modal.classList.add('flex');
         }
         toast(game.priceCoins ? `${game.priceCoins.toLocaleString()} coins used. Have fun!` : 'Game started. Have fun!', 'success');
+        void load();
     }
     catch {
-        toast('Network error. Your balance was not charged.', 'error');
+        toast('Could not confirm whether the game started. Check your balance and activity before trying again.', 'error');
+        void load();
     }
     finally {
         startingGameId = null;
@@ -1239,7 +1275,7 @@ async function withdraw() {
         }
     }
     catch {
-        toast('Network error. Please try again.', 'error');
+        toast('Could not confirm your request. Check My Activity before submitting again.', 'error');
     }
     finally {
         isWithdrawing = false;
@@ -1271,6 +1307,9 @@ window.doTask = doTask;
 window.claimTask = claimTask;
 window.playGame = playGame;
 window.closeGame = closeGame;
+window.searchGames = (query) => { gameSearch = query.trim().toLowerCase(); renderGames(); };
+window.filterGames = (filter) => { gameFilter = filter; document.querySelectorAll('[data-game-filter]').forEach(button => { const selected = button.dataset.gameFilter === filter; button.classList.toggle('active', selected); button.setAttribute('aria-pressed', String(selected)); }); renderGames(); };
+window.retryGames = () => { void load(); };
 window.watchAd = watchAd;
 window.claimDaily = claimDaily;
 window.openDailyCheckin = () => {

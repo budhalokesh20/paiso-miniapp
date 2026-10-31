@@ -129,6 +129,7 @@ interface ClientMeResponse {
   user: ClientUser;
   tasks: ClientTask[];
   games: ClientGame[];
+  recentGames?: { gameId: string; gameTitle: string; coins: number; at: string }[];
   coinPerNpr: number;
   minWithdrawCoins: number;
   referralBonusCoins?: number;
@@ -231,6 +232,9 @@ declare global {
     claimTask: (id: string) => Promise<void>;
     playGame: (id: string) => Promise<void>;
     closeGame: () => void;
+    searchGames: (query: string) => void;
+    filterGames: (filter: 'all' | 'free' | 'paid') => void;
+    retryGames: () => void;
     watchAd: () => Promise<void>;
     claimDaily: () => Promise<void>;
     openDailyCheckin: () => void;
@@ -352,6 +356,9 @@ let isDailyClaiming = false;
 let isWithdrawing = false;
 let startingGameId: string | null = null;
 let renderedGamesKey = '';
+let renderedFeaturedKey = '';
+let gameSearch = '';
+let gameFilter: 'all' | 'free' | 'paid' = 'all';
 const claimingTaskIds = new Set<string>();
 let AdController: AdsgramController | null = null;
 let renderedTasksKey = '';
@@ -1096,17 +1103,19 @@ function startTaskCountdown(taskId: string, seconds: number): void {
 }
 
 async function load(): Promise<void> {
+  let response: ClientMeResponse;
   try {
-    state = await api<ClientMeResponse>('/api/me');
+    response = await api<ClientMeResponse>('/api/me');
   } catch {
-    if (!renderedGamesKey) showFeaturedGamesError();
+    if (!renderedGamesKey) { showFeaturedGamesError(); showGamesConnectionError(); }
     return;
   }
-  if (!state || state.error) {
-    if (!renderedGamesKey) showFeaturedGamesError();
-    if (state?.error) toast(state.error, 'error');
+  if (!response || response.error) {
+    if (!renderedGamesKey) { showFeaturedGamesError(); showGamesConnectionError(); }
+    if (response?.error) toast(response.error, 'error');
     return;
   }
+  state = response;
 
   const u = state.user;
   const fullName = u.verification?.fullName || u.first_name || u.username || 'Paiso User';
@@ -1273,16 +1282,31 @@ async function claimTask(id: string): Promise<void> {
   }
 }
 
+function showGamesConnectionError(): void {
+  setText('gameCount', 'Unable to load games');
+  $('gamesGrid')?.replaceChildren(<div className="empty-state games-empty"><h2>Unable to load games</h2><p>Check your connection and try again.</p><button type="button" className="games-retry" onClick={() => window.retryGames()}>Try again</button></div>);
+}
+
 function renderGames(): void {
   if (!state) return;
   const games = state.games || [];
   // Polling should not replace unchanged buttons or disturb focus and scrolling.
-  const key = JSON.stringify([startingGameId, games.map(({ id, title, priceCoins }) => [id, title, priceCoins])]);
+  const key = JSON.stringify([startingGameId, gameSearch, gameFilter, state.recentGames, games.map(({ id, title, description, priceCoins }) => [id, title, description, priceCoins])]);
   if (key === renderedGamesKey) return;
   renderedGamesKey = key;
-  const empty = <div className="empty-state"><EarnIcon index={2} /><h2>Games coming soon</h2><p>New games will appear here when published.</p></div>;
-  $('gamesGrid')?.replaceChildren(...(games.length ? games.map(game => <GameCard game={game} pending={startingGameId === game.id} />) : [empty]));
-  updateFeaturedGames(games, startingGameId);
+  const matching = games.filter(game => (gameFilter === 'all' || (gameFilter === 'free' ? game.priceCoins === 0 : game.priceCoins > 0)) && `${game.title} ${game.description || ''}`.toLowerCase().includes(gameSearch));
+  const empty = <div className="empty-state games-empty"><EarnIcon index={2} /><h2>{games.length ? 'No games found' : 'Games coming soon'}</h2><p>{games.length ? 'Try another search or filter.' : 'New games will appear here when published.'}</p></div>;
+  $('gamesGrid')?.replaceChildren(...(matching.length ? matching.map(game => <GameCard game={game} pending={startingGameId === game.id} />) : [empty]));
+  setText('gameCount', `${matching.length} ${matching.length === 1 ? 'game' : 'games'} available`);
+  const history = state.recentGames || [];
+  const section = $('gameHistorySection');
+  if (section) section.hidden = history.length === 0;
+  $('gameHistory')?.replaceChildren(...history.map(play => <div className="game-history-row"><span className="game-history-icon"><UiIcon name="game" size={20} /></span><span><b>{play.gameTitle}</b><small>{new Date(play.at).toLocaleDateString()}</small></span><strong>{play.coins ? `−${play.coins.toLocaleString()} coins` : 'Free'}</strong></div>));
+  const featuredKey = JSON.stringify([startingGameId, games.map(({ id, title, priceCoins }) => [id, title, priceCoins])]);
+  if (featuredKey !== renderedFeaturedKey) {
+    renderedFeaturedKey = featuredKey;
+    updateFeaturedGames(games, startingGameId);
+  }
 }
 
 async function playGame(id: string): Promise<void> {
@@ -1318,8 +1342,10 @@ async function playGame(id: string): Promise<void> {
       modal.classList.add('flex');
     }
     toast(game.priceCoins ? `${game.priceCoins.toLocaleString()} coins used. Have fun!` : 'Game started. Have fun!', 'success');
+    void load();
   } catch {
-    toast('Network error. Your balance was not charged.', 'error');
+    toast('Could not confirm whether the game started. Check your balance and activity before trying again.', 'error');
+    void load();
   } finally {
     startingGameId = null;
     renderGames();
@@ -1590,7 +1616,7 @@ async function withdraw(): Promise<void> {
       toast(r.error || 'Withdraw request failed', 'error');
     }
   } catch {
-    toast('Network error. Please try again.', 'error');
+    toast('Could not confirm your request. Check My Activity before submitting again.', 'error');
   } finally {
     isWithdrawing = false;
     if (btn) {
@@ -1622,6 +1648,9 @@ window.doTask = doTask;
 window.claimTask = claimTask;
 window.playGame = playGame;
 window.closeGame = closeGame;
+window.searchGames = (query) => { gameSearch = query.trim().toLowerCase(); renderGames(); };
+window.filterGames = (filter) => { gameFilter = filter; document.querySelectorAll<HTMLButtonElement>('[data-game-filter]').forEach(button => { const selected = button.dataset.gameFilter === filter; button.classList.toggle('active', selected); button.setAttribute('aria-pressed', String(selected)); }); renderGames(); };
+window.retryGames = () => { void load(); };
 window.watchAd = watchAd;
 window.claimDaily = claimDaily;
 window.openDailyCheckin = () => {

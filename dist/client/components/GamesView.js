@@ -1,10 +1,32 @@
 import { h } from '../jsx';
+import { UiIcon } from './shared/UiIcon';
 export function GamesView() {
     return (h("div", { id: "exploreGames", className: "games-page" },
-        h("div", { className: "page-heading" },
-            h("h1", null, "Games"),
-            h("p", null, "Find your next favorite game")),
-        h("div", { id: "gamesGrid", className: "games-grid" })));
+        h("div", { className: "games-heading" },
+            h("div", null,
+                h("span", { className: "games-eyebrow" }, "YOUR GAME LOUNGE"),
+                h("h1", null,
+                    "Find your next",
+                    h("br", null),
+                    h("span", null, "favorite game.")),
+                h("p", null, "Take a break and discover something fun.")),
+            h("span", { className: "games-heading-icon", "aria-hidden": "true" },
+                h(UiIcon, { name: "game", size: 38 }))),
+        h("div", { className: "games-toolbar" },
+            h("div", null,
+                h("h2", null, "Explore games"),
+                h("p", { id: "gameCount", "aria-live": "polite" }, "Loading games\u2026"))),
+        h("label", { className: "games-search" },
+            h(UiIcon, { name: "search", size: 19 }),
+            h("input", { type: "search", "aria-label": "Search games", placeholder: "Search games", onInput: (e) => window.searchGames(e.target.value) })),
+        h("div", { className: "games-filters", "aria-label": "Game price filters" },
+            h("button", { type: "button", "data-game-filter": "all", className: "active", "aria-pressed": "true", onClick: () => window.filterGames('all') }, "All games"),
+            h("button", { type: "button", "data-game-filter": "free", "aria-pressed": "false", onClick: () => window.filterGames('free') }, "Free"),
+            h("button", { type: "button", "data-game-filter": "paid", "aria-pressed": "false", onClick: () => window.filterGames('paid') }, "Coins")),
+        h("div", { id: "gamesGrid", className: "games-grid" }),
+        h("section", { className: "game-history", id: "gameHistorySection", hidden: true },
+            h("h2", null, "Recently played"),
+            h("div", { id: "gameHistory" }))));
 }
 export function GameModal() {
     return (h("div", { id: "gameModal", className: "fixed inset-0 z-[120] hidden flex-col bg-slate-950" },

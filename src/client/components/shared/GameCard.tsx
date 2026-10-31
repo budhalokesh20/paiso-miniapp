@@ -5,6 +5,7 @@ export interface GameCardData {
   id: string;
   title: string;
   priceCoins: number;
+  description?: string;
 }
 
 export function GameCard({ game, compact = false, pending = false }: { game: GameCardData; compact?: boolean; pending?: boolean }) {
@@ -14,6 +15,7 @@ export function GameCard({ game, compact = false, pending = false }: { game: Gam
     <button type="button" className={compact ? 'featured-game' : 'game-card'} onClick={() => window.playGame(game.id)} disabled={pending} aria-label={`${game.title}, ${price}`}>
       <span className="game-cover">{artworkIndex >= 0 ? <span className={'reference-art popular-art art-game-' + artworkIndex} aria-hidden="true" /> : <span className="game-fallback"><UiIcon name="game" size={56} /></span>}{compact && game.priceCoins > 0 ? <span className="game-price">{game.priceCoins.toLocaleString()} coins</span> : null}</span>
       <b title={game.title}>{game.title}</b>
+      {!compact && game.description ? <span className="game-description">{game.description}</span> : null}
       {!compact ? <small>{price}</small> : null}
       {!compact ? <span className="game-play">{pending ? 'Starting…' : 'Play Now'}</span> : null}
     </button>

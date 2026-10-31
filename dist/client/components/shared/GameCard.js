@@ -11,6 +11,7 @@ export function GameCard({ game, compact = false, pending = false }) {
                 game.priceCoins.toLocaleString(),
                 " coins") : null),
         h("b", { title: game.title }, game.title),
+        !compact && game.description ? h("span", { className: "game-description" }, game.description) : null,
         !compact ? h("small", null, price) : null,
         !compact ? h("span", { className: "game-play" }, pending ? 'Starting…' : 'Play Now') : null));
 }

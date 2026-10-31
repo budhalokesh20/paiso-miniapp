@@ -1,13 +1,15 @@
 import { h } from '../jsx';
+import { UiIcon } from './shared/UiIcon';
 
 export function GamesView() {
   return (
     <div id="exploreGames" className="games-page">
-      <div className="page-heading">
-        <h1>Games</h1>
-        <p>Find your next favorite game</p>
-      </div>
+      <div className="games-heading"><div><span className="games-eyebrow">YOUR GAME LOUNGE</span><h1>Find your next<br /><span>favorite game.</span></h1><p>Take a break and discover something fun.</p></div><span className="games-heading-icon" aria-hidden="true"><UiIcon name="game" size={38} /></span></div>
+      <div className="games-toolbar"><div><h2>Explore games</h2><p id="gameCount" aria-live="polite">Loading games…</p></div></div>
+      <label className="games-search"><UiIcon name="search" size={19} /><input type="search" aria-label="Search games" placeholder="Search games" onInput={(e: Event) => window.searchGames((e.target as HTMLInputElement).value)} /></label>
+      <div className="games-filters" aria-label="Game price filters"><button type="button" data-game-filter="all" className="active" aria-pressed="true" onClick={() => window.filterGames('all')}>All games</button><button type="button" data-game-filter="free" aria-pressed="false" onClick={() => window.filterGames('free')}>Free</button><button type="button" data-game-filter="paid" aria-pressed="false" onClick={() => window.filterGames('paid')}>Coins</button></div>
       <div id="gamesGrid" className="games-grid" />
+      <section className="game-history" id="gameHistorySection" hidden><h2>Recently played</h2><div id="gameHistory" /></section>
     </div>
   );
 }

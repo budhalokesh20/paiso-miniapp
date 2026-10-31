@@ -595,10 +595,9 @@ app.get('/api/countries', async (_req: Request, res: Response) => {
 function auth(req: Request, res: Response, next: NextFunction): void {
   const initData = String(req.headers['x-init-data'] || '');
   const isLocalDev = !initData && isTrueLocalRequest(req);
-  const tgUser: TelegramUserPayload | null =
-    BOT_TOKEN && !isLocalDev
-      ? verifyInitData(initData)
-      : { id: 999001, first_name: 'Test User', username: 'test' };
+  const tgUser: TelegramUserPayload | null = isLocalDev
+    ? { id: 999001, first_name: 'Test User', username: 'test' }
+    : verifyInitData(initData);
   if (!tgUser) {
     res.status(401).json({ error: 'Invalid Telegram login' });
     return;
@@ -645,6 +644,7 @@ app.get('/api/me', auth, (req: Request, res: Response) => {
       const { url: _hiddenUrl, ...safeGame } = publicGame(g);
       return safeGame;
     }),
+    recentGames: getGamePlays().filter((play) => play.userId === user.id).slice(-5).reverse().map(({ gameId, gameTitle, coins, at }) => ({ gameId, gameTitle, coins, at })),
     coinPerNpr: cfg.coinPerNpr || COIN_PER_NPR,
     minWithdrawCoins: cfg.minWithdrawCoins || MIN_WITHDRAW_COINS,
     referralBonusCoins: REFERRAL_BONUS,

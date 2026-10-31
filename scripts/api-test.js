@@ -21,9 +21,13 @@ try {
 } catch {}
 
 const BASE = process.argv[2] || 'http://127.0.0.1:3000';
-const BOT_TOKEN = process.argv[3] || process.env.BOT_TOKEN || '8539552673:AAGU3m9NE3yCi7c4ZujRyAnfh0xBfoTCpew';
-const ADMIN_SECRET = process.argv[4] || process.env.ADMIN_SECRET || 'YZNnwM29E1I0rpgJIERqyIBv';
-const ADS_SECRET = process.env.ADSGRAM_REWARD_SECRET || 'y34aL57e9YkM01sA';
+const BOT_TOKEN = process.argv[3] || process.env.BOT_TOKEN || '';
+const ADMIN_SECRET = process.argv[4] || process.env.ADMIN_SECRET || '';
+const ADS_SECRET = process.env.ADSGRAM_REWARD_SECRET || '';
+
+if (!BOT_TOKEN || !ADMIN_SECRET || !ADS_SECRET) {
+  throw new Error('Set BOT_TOKEN, ADMIN_SECRET and ADSGRAM_REWARD_SECRET for the isolated test server.');
+}
 
 let pass = 0;
 let fail = 0;
