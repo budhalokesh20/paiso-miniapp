@@ -27,6 +27,8 @@ module.exports = [
   'dist/client/components/settings/SettingsWithdrawalPages.js',
   'dist/client/components/settings/SettingsHelpPages.js',
   'dist/client/components/SettingsView.js',
+  'dist/client/components/rewards/SpinPage.js',
+  'dist/client/components/rewards/BonusCodePage.js',
   'dist/client/components/BottomNav.js',
   'dist/client/app.js',
 ];

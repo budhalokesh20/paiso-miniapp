@@ -1,9 +1,9 @@
 import { h } from '../../jsx';
 import { UiIcon } from '../shared/UiIcon';
-export function SubpageTopBar(props: { title: string }) {
+export function SubpageTopBar(props: { title: string; backLabel?: string; onBack?: () => void }) {
   return (
     <div className="native-subpage-bar">
-      <button type="button" className="native-back-btn" aria-label="Back to Settings" onClick={() => window.closeSettingPage()}>
+      <button type="button" className="native-back-btn" aria-label={props.backLabel || 'Back to Settings'} onClick={() => props.onBack ? props.onBack() : window.closeSettingPage()}>
         <svg
           width="20"
           height="20"
@@ -16,7 +16,7 @@ export function SubpageTopBar(props: { title: string }) {
         >
           <polyline points="15 18 9 12 15 6" />
         </svg>
-        <span>Settings</span>
+        <span>{props.backLabel || 'Settings'}</span>
       </button>
       <h3 className="native-subpage-title">{props.title}</h3>
       <div style={{ width: '72px' }} />

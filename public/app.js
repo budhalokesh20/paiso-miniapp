@@ -343,22 +343,6 @@ function DailyCheckInModal() {
             h(DailyCheckIn, null),
             h("p", { className: "checkin-note" }, "Check in once every 24 hours to continue your streak.")));
 }
-function RewardsModal() {
-    return h("dialog", { id: "rewardsModal", className: "home-checkin-dialog", "aria-labelledby": "rewardDialogTitle" },
-        h("div", { className: "checkin-dialog-content reward-dialog-content" },
-            h("button", { type: "button", className: "checkin-close", "aria-label": "Close rewards", onClick: () => window.closeRewards() }, "\u00D7"),
-            h("h2", { id: "rewardDialogTitle" }, "Daily Spin"),
-            h("p", { id: "rewardDialogDescription" }),
-            h("div", { id: "spinRewardPanel" },
-                h("div", { className: "reward-wheel", "aria-hidden": "true" }, "P"),
-                h("p", { id: "spinRewardOptions" }),
-                h("button", { id: "spinClaimButton", type: "button", className: "primary-btn", onClick: () => window.claimSpin() }, "Spin now")),
-            h("form", { id: "bonusCodePanel", hidden: true, onSubmit: (event) => { event.preventDefault(); void window.redeemBonus(); } },
-                h("label", { for: "bonusCodeInput" }, "Bonus code"),
-                h("input", { id: "bonusCodeInput", required: true, maxLength: 40, autoComplete: "off", placeholder: "Enter your code" }),
-                h("button", { id: "bonusRedeemButton", className: "primary-btn", type: "submit" }, "Redeem points")),
-            h("p", { id: "rewardResult", role: "status", "aria-live": "polite" })));
-}
 
 // --- src/client/components/home/EarnShortcuts.tsx ---
 
@@ -628,10 +612,10 @@ function FriendsView() {
 // --- src/client/components/settings/SettingsParts.tsx ---
 function SubpageTopBar(props) {
     return (h("div", { className: "native-subpage-bar" },
-        h("button", { type: "button", className: "native-back-btn", "aria-label": "Back to Settings", onClick: () => window.closeSettingPage() },
+        h("button", { type: "button", className: "native-back-btn", "aria-label": props.backLabel || 'Back to Settings', onClick: () => props.onBack ? props.onBack() : window.closeSettingPage() },
             h("svg", { width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": "2.5", "stroke-linecap": "round", "stroke-linejoin": "round" },
                 h("polyline", { points: "15 18 9 12 15 6" })),
-            h("span", null, "Settings")),
+            h("span", null, props.backLabel || 'Settings')),
         h("h3", { className: "native-subpage-title" }, props.title),
         h("div", { style: { width: '72px' } })));
 }
@@ -960,6 +944,33 @@ function SettingsOverlays({ children }) {
         children);
 }
 
+// --- src/client/components/rewards/SpinPage.tsx ---
+function SpinPage() {
+    return h("section", { id: "sub-spin", className: "settings-subpage reward-page", "aria-labelledby": "spinPageTitle" },
+        h(SubpageTopBar, { title: "Daily Spin", backLabel: "Back", onBack: () => window.closeRewards() }),
+        h("div", { className: "screen-content reward-dialog-content reward-page-content" },
+            h("h2", { id: "spinPageTitle" }, "Your daily chance to earn"),
+            h("p", null, "Your reward is chosen securely when you spin."),
+            h("div", { className: "reward-wheel", "aria-hidden": "true" }, "P"),
+            h("p", { id: "spinRewardOptions" }),
+            h("button", { id: "spinClaimButton", type: "button", className: "primary-btn", onClick: () => window.claimSpin() }, "Spin now"),
+            h("p", { id: "spinRewardResult", role: "status", "aria-live": "polite" })));
+}
+
+// --- src/client/components/rewards/BonusCodePage.tsx ---
+function BonusCodePage() {
+    return h("section", { id: "sub-bonus", className: "settings-subpage reward-page", "aria-labelledby": "bonusPageTitle" },
+        h(SubpageTopBar, { title: "Bonus Code", backLabel: "Back", onBack: () => window.closeRewards() }),
+        h("div", { className: "screen-content reward-dialog-content reward-page-content" },
+            h("h2", { id: "bonusPageTitle" }, "Redeem your bonus"),
+            h("p", null, "Enter a code published by Paiso to add P points to your balance."),
+            h("form", { id: "bonusCodePanel", onSubmit: (event) => { event.preventDefault(); void window.redeemBonus(); } },
+                h("label", { for: "bonusCodeInput" }, "Bonus code"),
+                h("input", { id: "bonusCodeInput", required: true, maxLength: 40, autoComplete: "off", placeholder: "Enter your code" }),
+                h("button", { id: "bonusRedeemButton", className: "primary-btn", type: "submit" }, "Redeem points")),
+            h("p", { id: "bonusRewardResult", role: "status", "aria-live": "polite" })));
+}
+
 // --- src/client/components/BottomNav.tsx ---
 function BottomNav() {
     return h("nav", { className: "bottom-nav", "aria-label": "Main navigation" },
@@ -987,6 +998,8 @@ function BottomNav() {
 }
 
 // --- src/client/app.tsx ---
+
+
 
 
 
@@ -1048,9 +1061,10 @@ function PaisoApp() {
         h(NotificationModal, null),
         h(GameModal, null),
         h(DailyCheckInModal, null),
-        h(RewardsModal, null),
         h(SettingsOverlays, null,
-            h(TaskListPage, null)),
+            h(TaskListPage, null),
+            h(SpinPage, null),
+            h(BonusCodePage, null)),
         h("main", { className: "app-viewport" },
             h(HomeView, null),
             h(TasksView, null),
@@ -2312,46 +2326,42 @@ window.openDailyCheckin = () => {
 };
 window.closeDailyCheckin = () => document.getElementById('dailyCheckinModal').close();
 let rewardBusy = false;
-function openRewardDialog(bonus) {
-    setText('rewardDialogTitle', bonus ? 'Bonus code' : 'Daily Spin');
-    setText('rewardDialogDescription', bonus ? 'Redeem a code published by Paiso.' : 'Your reward is chosen securely when you spin.');
-    setText('rewardResult', '');
-    $('spinRewardPanel').hidden = bonus;
-    $('bonusCodePanel').hidden = !bonus;
+function openRewardPage(bonus) {
+    setText(bonus ? 'bonusRewardResult' : 'spinRewardResult', '');
     setText('spinRewardOptions', (state?.spinSettings?.rewards || []).join(' · ') + ' P points');
     const button = $('spinClaimButton');
     const ready = Boolean(state?.spinSettings?.enabled && (state.nextSpinAt || 0) <= Date.now());
     button.disabled = !ready;
     button.textContent = ready ? 'Spin now' : state?.spinSettings?.enabled ? 'Next spin: ' + new Date(state.nextSpinAt || 0).toLocaleString() : 'Spin is paused';
-    const dialog = $('rewardsModal');
-    if (!dialog.open)
-        dialog.showModal();
+    openSettingPage(bonus ? 'sub-bonus' : 'sub-spin');
 }
-window.openDailySpin = () => openRewardDialog(false);
-window.openBonusCode = () => openRewardDialog(true);
+window.openDailySpin = () => openRewardPage(false);
+window.openBonusCode = () => openRewardPage(true);
 window.closeRewards = () => { if (!rewardBusy)
-    $('rewardsModal')?.close(); };
+    closeSettingPage(); };
 async function submitReward(bonus) {
     if (rewardBusy)
         return;
     rewardBusy = true;
     const button = $(bonus ? 'bonusRedeemButton' : 'spinClaimButton');
     button.disabled = true;
-    $('rewardsModal')?.classList.add('reward-pending');
-    setText('rewardResult', 'Processing…');
+    const page = $(bonus ? 'sub-bonus' : 'sub-spin');
+    const resultId = bonus ? 'bonusRewardResult' : 'spinRewardResult';
+    page?.classList.add('reward-pending');
+    setText(resultId, 'Processing…');
     try {
         const result = await api(bonus ? '/api/rewards/redeem' : '/api/rewards/spin', { method: 'POST', body: JSON.stringify(bonus ? { code: $('bonusCodeInput').value } : {}) });
-        setText('rewardResult', result.ok ? '+' + result.points + ' P points credited.' : result.error || 'Reward unavailable.');
+        setText(resultId, result.ok ? '+' + result.points + ' P points credited.' : result.error || 'Reward unavailable.');
         if (result.ok && bonus)
             $('bonusCodeInput').value = '';
         await load();
     }
     catch {
-        setText('rewardResult', 'Could not confirm this reward. Refresh your balance before retrying.');
+        setText(resultId, 'Could not confirm this reward. Refresh your balance before retrying.');
     }
     finally {
         rewardBusy = false;
-        $('rewardsModal')?.classList.remove('reward-pending');
+        page?.classList.remove('reward-pending');
         button.disabled = bonus ? false : Boolean(!state?.spinSettings?.enabled || (state.nextSpinAt || 0) > Date.now());
     }
 }

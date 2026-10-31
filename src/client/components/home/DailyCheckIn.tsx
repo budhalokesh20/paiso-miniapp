@@ -53,13 +53,3 @@ export function DailyCheckInModal() {
     </div>
   </dialog>;
 }
-
-export function RewardsModal() {
-  return <dialog id="rewardsModal" className="home-checkin-dialog" aria-labelledby="rewardDialogTitle"><div className="checkin-dialog-content reward-dialog-content">
-    <button type="button" className="checkin-close" aria-label="Close rewards" onClick={() => window.closeRewards()}>×</button>
-    <h2 id="rewardDialogTitle">Daily Spin</h2><p id="rewardDialogDescription" />
-    <div id="spinRewardPanel"><div className="reward-wheel" aria-hidden="true">P</div><p id="spinRewardOptions" /><button id="spinClaimButton" type="button" className="primary-btn" onClick={() => window.claimSpin()}>Spin now</button></div>
-    <form id="bonusCodePanel" hidden onSubmit={(event:Event)=>{event.preventDefault();void window.redeemBonus();}}><label for="bonusCodeInput">Bonus code</label><input id="bonusCodeInput" required maxLength={40} autoComplete="off" placeholder="Enter your code" /><button id="bonusRedeemButton" className="primary-btn" type="submit">Redeem points</button></form>
-    <p id="rewardResult" role="status" aria-live="polite" />
-  </div></dialog>;
-}

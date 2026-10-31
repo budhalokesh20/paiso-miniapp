@@ -1,9 +1,0 @@
-name = "paiso-keep-awake"
-main = "keep-awake.mjs"
-compatibility_date = "2026-10-01"
-
-[vars]
-PAISO_URL = "https://paiso-miniapp.onrender.com"
-
-[triggers]
-crons = ["*/10 * * * *"]

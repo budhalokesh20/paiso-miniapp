@@ -1,0 +1,14 @@
+# Separate Blueprint: adding this service incurs Render Cron Job charges.
+services:
+  - type: cron
+    name: paiso-keep-awake
+    runtime: node
+    repo: https://github.com/budhalokesh20/paiso-miniapp.git
+    branch: main
+    plan: 0.5c-512mb
+    schedule: "*/10 * * * *"
+    buildCommand: node --version
+    startCommand: node worker/keep-awake.mjs
+    envVars:
+      - key: PAISO_URL
+        value: https://paiso-miniapp.onrender.com

@@ -91,6 +91,26 @@ async function run(){
 
 
   // Reference Tasks landing and real category lists.
+  for(const size of [{width:320,height:568},{width:768,height:1024},{width:1280,height:800}]) {
+    await page.setViewportSize(size);
+    for(const tab of ['home','tasks']) {
+      await page.evaluate(tab=>window.showTab(tab),tab);
+      for(const [card,id] of [['spin','sub-spin'],['bonus','sub-bonus']]) {
+        const opener=page.locator('#tab-'+tab+' .quick-'+card+' > button');
+        await opener.scrollIntoViewIfNeeded();
+        const scroll=await page.locator('#tab-'+tab).evaluate(el=>el.scrollTop);
+        await opener.click();
+        await page.locator('#'+id).evaluate(el=>Promise.all(el.getAnimations().map(animation=>animation.finished.catch(()=>{}))));
+        const bounds=await page.locator('#'+id).boundingBox();
+        assert.ok(Math.abs(bounds.x)<1 && Math.abs(bounds.y)<1 && Math.abs(bounds.width-size.width)<1 && Math.abs(bounds.height-size.height)<1,'Separate reward page fills viewport');
+        assert.equal(await page.locator('#'+id).evaluate(el=>el.scrollWidth>el.clientWidth),false);
+        if(size.width===320 && tab==='home') await page.screenshot({path:path.join(root,'ui/preview',id+'-320.png')});
+        await page.locator('#'+id).getByRole('button',{name:'Back',exact:true}).click();
+        assert.equal(await page.locator('#tab-'+tab).evaluate(el=>el.scrollTop),scroll,'Back preserves the originating page scroll');
+      }
+    }
+  }
+  await page.setViewportSize({width:390,height:844});
   console.log('Checking Tasks layouts and category actions');
   const taskSizes=[{width:320,height:568},{width:390,height:844},{width:768,height:1024},{width:844,height:390},{width:1280,height:800}];
   for(const size of taskSizes) {
@@ -279,20 +299,25 @@ async function run(){
   await page.keyboard.press('Escape');
   assert.equal(await page.locator('#dailyCheckinModal').isVisible(),false);
   await page.getByRole('button',{name:'Spin Now',exact:true}).click();
+  assert.equal(await page.locator('#sub-spin').isVisible(),true);
+  assert.equal(await page.locator('#sub-bonus').isVisible(),false);
+  assert.equal(Math.round((await page.locator('#sub-spin').boundingBox()).height),844);
   await page.locator('#spinClaimButton').click();
-  await page.waitForFunction(()=>document.getElementById('rewardResult').textContent.includes('+10'));
+  await page.waitForFunction(()=>document.getElementById('spinRewardResult').textContent.includes('+10'));
   assert.equal(await page.locator('#spinClaimButton').isDisabled(),true);
   await page.screenshot({path:path.join(root,'ui/preview','rewards-spin.png')});
-  await page.getByRole('button',{name:'Close rewards',exact:true}).click();
+  await page.locator('#sub-spin').getByRole('button',{name:'Back',exact:true}).click();
   await page.locator('#quickBonusBtn').click();
+  assert.equal(await page.locator('#sub-bonus').isVisible(),true);
+  assert.equal(await page.locator('#sub-spin').isVisible(),false);
   await page.locator('#bonusCodeInput').fill('BAD');
   await page.locator('#bonusRedeemButton').click();
-  await page.waitForFunction(()=>document.getElementById('rewardResult').textContent==='Invalid bonus code.');
+  await page.waitForFunction(()=>document.getElementById('bonusRewardResult').textContent==='Invalid bonus code.');
   await page.locator('#bonusCodeInput').fill('TEST-25');
   await page.locator('#bonusRedeemButton').click();
-  await page.waitForFunction(()=>document.getElementById('rewardResult').textContent.includes('+25'));
+  await page.waitForFunction(()=>document.getElementById('bonusRewardResult').textContent.includes('+25'));
   await page.screenshot({path:path.join(root,'ui/preview','rewards-code.png')});
-  await page.getByRole('button',{name:'Close rewards',exact:true}).click();
+  await page.locator('#sub-bonus').getByRole('button',{name:'Back',exact:true}).click();
   await page.emulateMedia({reducedMotion:'no-preference'});
   await page.locator('.bottom-nav').getByRole('button',{name:'Tasks',exact:true}).click();
   await page.locator('#tab-tasks').getByRole('button',{name:'View All',exact:true}).click();

@@ -30,10 +30,25 @@
 .app-viewport, .settings-overlay-layer { border-left: env(safe-area-inset-left, 0px) solid transparent; border-right: env(safe-area-inset-right, 0px) solid transparent; }
 .settings-subpage > .screen-content { max-width: 760px; }
 /* Settings details fill the available page while keeping safe, responsive gutters. */
-.settings-overlay-layer .settings-subpage:not(.task-detail-page) > .screen-content {
+.settings-overlay-layer .settings-subpage:not(.task-detail-page):not(.reward-page) > .screen-content {
   width: 100%; max-width: none; min-height: calc(100% - 64px - env(safe-area-inset-top, 0px));
   padding-inline: var(--page-gutter);
 }
+/* Detail content is the page surface, including forms and help sections. */
+.settings-overlay-layer .settings-subpage:not(.task-detail-page):not(.reward-page) { background: #fff; padding-bottom: 0; }
+.settings-overlay-layer .settings-subpage:not(.task-detail-page):not(.reward-page) > .screen-content { padding: 0; margin: 0; }
+.settings-overlay-layer .settings-subpage:not(.task-detail-page):not(.reward-page) > .screen-content > div { width: 100%; margin-inline: 0; border: 0; border-radius: 0; box-shadow: none; }
+.settings-overlay-layer .settings-subpage:not(.task-detail-page):not(.reward-page) > .screen-content > .card {
+  width: 100%; min-height: inherit; margin: 0; padding: 24px var(--page-gutter) max(28px,env(safe-area-inset-bottom,0px));
+  border: 0; border-radius: 0; box-shadow: none; background: #fff;
+}
+.settings-overlay-layer .settings-subpage .withdraw-form { width: 100%; margin: 0; padding: 24px var(--page-gutter); border: 0; border-radius: 0; box-shadow: none; }
+.settings-overlay-layer #sub-withdraw > .screen-content > div:last-child { padding: 0 var(--page-gutter) 28px; }
+.settings-overlay-layer #wHistory { min-height: inherit; border: 0; border-radius: 0; padding: 12px var(--page-gutter); }
+.settings-overlay-layer #wWithdrawHistory { border-radius: 0; border-inline: 0; }
+.settings-overlay-layer .settings-subpage.reward-page > .reward-page-content { width: 100%; max-width: none; min-height: calc(100% - 64px); padding: 28px var(--page-gutter); }
+.reward-page-content .reward-wheel { margin-block: 36px; }
+#spinRewardResult, #bonusRewardResult { color: #00866e; font-weight: 600; }
 /* Simple monochrome settings icons and consistent circular back controls. */
 .settings-screen .settings-row-icon { background: transparent; color: #17191c; border-radius: 0; }
 .settings-screen .native-back-btn { border-radius: 50%; background: #fff; color: #17191c; box-shadow: 0 3px 12px #173d4b18; transition: transform 160ms ease, box-shadow 160ms ease; }

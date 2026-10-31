@@ -1,6 +1,6 @@
 # Spin and bonus codes
 
-Home and Tasks provide Daily Spin and Bonus Code dialogs. Spin defaults to one attempt per 24 hours with equally likely 5, 10, 20 and 50 P points. The server selects the outcome with `crypto.randomInt`; the client cannot choose the outcome. P points use the existing coin balance and conversion settings. Redeeming a code is separate from daily check-in.
+Home and Tasks open separate fullscreen Daily Spin and Bonus Code pages. SpinPage.tsx and BonusCodePage.tsx own their own content and result messages. Both use the shared detail layer and preserve the originating page when going back. Spin defaults to one attempt per 24 hours with equally likely 5, 10, 20 and 50 P points. The server selects the outcome with `crypto.randomInt`; the client cannot choose the outcome. P points use the existing coin balance and conversion settings. Redeeming a code is separate from daily check-in.
 
 In Admin → Games → Spin & bonus rewards, change the spin enable switch, cooldown hours and reward list. Create codes with points, a global usage limit and an optional expiry, or pause/re-enable existing codes. Codes are case-insensitive and each user can claim a code once. Reusing an existing code name is rejected, so historical redemptions cannot accidentally be reset.
 
