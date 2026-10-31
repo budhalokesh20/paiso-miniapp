@@ -7,8 +7,8 @@ export function FeaturedGames() {
   return (
     <section className="home-featured" aria-labelledby="featured-title">
       <div className="section-head">
-        <h2 id="featured-title">Featured Games</h2>
-        <button type="button" className="view-all-btn" onClick={() => window.showTab('games')}>See All</button>
+        <h2 id="featured-title"><span className="popular-icon" aria-hidden="true"></span>Popular Games</h2>
+        <button type="button" className="view-all-btn" onClick={() => window.showTab('games')}>View All <UiIcon name="chevron" size={14} /></button>
       </div>
       <div id="featuredGames" className="featured-games" aria-busy="true">
         <div className="home-games-placeholder" role="status"><EarnIcon index={2} /><span>Loading your next adventure…</span></div>

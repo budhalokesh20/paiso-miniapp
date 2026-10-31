@@ -33,3 +33,11 @@ export function DailyCheckIn() {
         h("div", { className: "claim-fx-layer", id: "claimFxLayer", "aria-hidden": "true" }),
         h("span", { id: "dailyReward", hidden: true })));
 }
+export function DailyCheckInModal() {
+    return h("dialog", { id: "dailyCheckinModal", className: "home-checkin-dialog", "aria-labelledby": "daily-title", onClick: (event) => { if (event.target === event.currentTarget)
+            window.closeDailyCheckin(); } },
+        h("div", { className: "checkin-dialog-content" },
+            h("button", { className: "checkin-close", "aria-label": "Close daily check-in", onClick: () => window.closeDailyCheckin() }, "\u00D7"),
+            h(DailyCheckIn, null),
+            h("p", { className: "checkin-note" }, "Your daily check-in includes today's bonus.")));
+}

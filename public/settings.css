@@ -1,0 +1,94 @@
+/* Settings: readable type, generous touch targets, and focused groups. */
+.settings-overlay-layer { display: none; position: absolute; inset: 0; z-index: 110; overflow: hidden; }
+.settings-overlay-layer.is-open { display: block; }
+.settings-overlay-layer .settings-subpage {
+  position: absolute; inset: 0; width: 100%; max-width: none; height: 100%;
+  margin: 0; transform: none; transition: none; background: var(--bg-page);
+}
+.settings-overlay-layer .settings-subpage.open { transform: none; }
+.settings-screen { padding-bottom: 0; }
+.settings-content { padding: 14px 16px 28px; }
+.settings-heading { margin: 0 2px 20px; }
+.settings-heading h1 { font-size: 26px; line-height: 1.2; font-weight: 750; letter-spacing: -.7px; }
+.settings-heading p { margin-top: 7px; color: #60718d; font-size: 14px; line-height: 1.5; }
+.settings-screen .settings-profile {
+  display: flex; align-items: center; gap: 14px; width: 100%; padding: 18px 14px;
+  background: #fff; border: 1px solid #e7eef4; border-radius: 20px;
+  text-align: left; margin: 0 0 24px; box-shadow: 0 4px 16px #193c5710;
+}
+.settings-screen .settings-avatar-ring { display: block; flex-shrink: 0; width: 56px; height: 56px; overflow: hidden; border-radius: 50%; }
+.settings-screen .profile-details { display: block; flex: 1; min-width: 0; padding: 0; }
+.settings-screen .profile-details .profile-name-line { display: flex; align-items: center; gap: 6px; margin: 0; }
+.settings-screen .profile-details b { font-size: 18px; line-height: 1.4; white-space: normal; overflow-wrap: anywhere; color: #101936; }
+.settings-screen #settingsVerifiedTick { position: static; flex-shrink: 0; }
+.settings-screen #settingsHeaderHandle { display: block; margin-top: 3px; font-size: 14px; line-height: 1.4; color: #637693; overflow-wrap: anywhere; }
+.settings-screen .profile-details small { display: block; margin-top: 8px; font-size: 12px; color: #008b72; }
+.settings-profile > svg { flex-shrink: 0; color: #8b9ab0; }
+.settings-screen .settings-group { margin-top: 24px; }
+.settings-screen .settings-group-label { font-size: 15px; line-height: 1.4; font-weight: 700; color: #546580; margin: 0 4px 10px; }
+.settings-screen .settings-group-card { background: white; padding: 0 14px; border: 1px solid #e7eef4; border-radius: 18px; overflow: hidden; }
+.settings-screen .settings-row {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 66px;
+  padding: 13px 0; text-align: left; background: none; border: 0;
+  border-bottom: 1px solid #edf1f6; color: #15223e; font-size: 16px; line-height: 1.4;
+}
+.settings-screen .settings-row:last-child { border-bottom: 0; }
+.settings-screen .settings-row-icon { display: grid; place-items: center; flex-shrink: 0; width: 36px; height: 36px; border-radius: 12px; background: #e8f8f2; color: #00967b; }
+.settings-screen .setting-icon-bell { background: #fff4e1; color: #cc861e; }
+.settings-screen .setting-icon-help, .settings-screen .setting-icon-user { background: #eeedff; color: #7360d7; }
+.settings-screen .setting-icon-tasks { background: #eaf3ff; color: #477bb9; }
+.settings-screen .settings-item-title { flex: 1; min-width: 0; font-size: 16px; line-height: 1.4; font-weight: 500; }
+.settings-screen .settings-row-right { display: flex; align-items: center; flex-shrink: 0; gap: 6px; color: #8b9ab0; }
+.settings-screen .settings-detail { font-size: 12px; }
+.settings-screen .verify-status-pill { font-size: 10px; padding: 4px 6px; border-radius: 7px; }
+.settings-screen #notifUnreadBadge { font-size: 12px; min-width: 22px; padding: 3px 6px; border-radius: 7px; background: #e8f8f2; color: #00856b; }
+.settings-screen .settings-subpage { padding-bottom: max(24px,env(safe-area-inset-bottom,0px)); overscroll-behavior: contain; }
+.settings-screen .settings-subpage > .screen-content { padding: 18px 16px 24px; }
+.settings-screen .native-subpage-bar { display: grid; grid-template-columns: 44px minmax(0,1fr) 44px; gap: 8px; min-height: 64px; padding: calc(8px + env(safe-area-inset-top,0px)) 12px 8px; }
+.settings-screen .native-back-btn { width: 44px; height: 44px; justify-content: center; padding: 0; border-radius: 12px; background: #edf8f4; }
+.settings-screen .native-subpage-title { text-align: center; font-size: 18px; line-height: 1.3; letter-spacing: -.3px; }
+.settings-screen .native-subpage-bar > div:last-child { width: 44px !important; }
+.settings-screen .native-back-btn span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.settings-screen .settings-subpage .card { padding: 20px 16px; border-radius: 18px; }
+.settings-screen .settings-subpage h2 { font-size: 20px; line-height: 1.4; }
+.settings-screen .settings-subpage .small,
+.settings-screen .settings-subpage .text-xs,
+.settings-screen .settings-subpage [class*="text-[11px]"],
+.settings-screen .settings-subpage p { font-size: 14px; line-height: 1.6; }
+.settings-screen .settings-subpage .primary-btn,
+.settings-screen #withdrawBtn { min-height: 48px; padding: 12px 16px; font-size: 15px; line-height: 1.4; border-radius: 13px; }
+.settings-screen .settings-subpage .form-input,
+.settings-screen .settings-subpage input:not([type=hidden]) { min-width: 0; width: 100%; min-height: 48px; font-size: 16px; line-height: 1.4; border-radius: 12px; padding: 12px; }
+.settings-screen .verify-field-label { display: block; font-size: 14px; line-height: 1.5; margin: 18px 0 7px; }
+.settings-screen .verify-banner-title { font-size: 18px; line-height: 1.3; }
+.settings-screen .verify-banner-sub, .settings-screen .verify-done-sub, .settings-screen .verify-otp-info { font-size: 14px; line-height: 1.5; }
+.settings-screen .gender-pill { min-height: 46px; font-size: 15px; }
+.settings-screen .uid-detail-row { gap: 14px; align-items: flex-start; padding: 12px 0; font-size: 15px; line-height: 1.5; }
+.settings-screen .uid-detail-row b { min-width: 0; text-align: right; overflow-wrap: anywhere; }
+.settings-screen .withdraw-form { padding: 16px; border-radius: 18px; }
+.settings-screen .withdraw-balance { flex-wrap: wrap; gap: 12px; padding: 18px 14px !important; margin: -4px -4px 4px; }
+.settings-screen .withdraw-balance > div:first-child { width: 100%; min-width: 0; }
+.settings-screen .withdraw-balance > div:first-child > div { flex-wrap: wrap; }
+.settings-screen .withdraw-balance .text-right { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; border-left: 0; border-top: 1px solid #ffffff40; padding: 12px 0 0; }
+.settings-screen .withdraw-balance #wCoins { font-size: 28px; line-height: 1.3; }
+.settings-screen .withdraw-balance .text-right b { font-size: 14px; }
+.settings-screen #wMethodsGrid button { min-height: 50px; border-radius: 12px; }
+.settings-screen #wMethodsGrid button span { font-size: 14px; }
+.settings-screen #wMethodsGrid button > div { font-size: 12px; }
+.settings-screen #wAmount { margin-top: 4px; }
+.settings-screen .withdraw-form button:not(#withdrawBtn) { min-height: 44px; }
+.settings-screen #wHistory, .settings-screen #wWithdrawHistory { font-size: 14px; line-height: 1.5; }
+.settings-screen button { touch-action: manipulation; }
+.settings-profile, .settings-row { transition: background-color 140ms ease; }
+.settings-screen .settings-row:active { background: #f4faf7; }
+@media (max-width: 359px) {
+  .settings-content { padding-left: 12px; padding-right: 12px; }
+  .settings-screen .settings-group-card { padding: 0 12px; }
+  .settings-screen .settings-row { gap: 9px; }
+  .settings-screen .settings-row-icon { width: 32px; height: 34px; }
+  .settings-screen .settings-row-icon svg { width: 20px; height: 20px; }
+  .settings-screen .settings-subpage > .screen-content { padding-left: 12px; padding-right: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-screen .settings-subpage, .settings-profile, .settings-row { transition: none; }
+}

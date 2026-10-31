@@ -45,3 +45,11 @@ export function DailyCheckIn() {
     </section>
   );
 }
+
+export function DailyCheckInModal() {
+  return <dialog id="dailyCheckinModal" className="home-checkin-dialog" aria-labelledby="daily-title" onClick={(event: MouseEvent) => { if (event.target === event.currentTarget) window.closeDailyCheckin(); }}>
+    <div className="checkin-dialog-content"><button className="checkin-close" aria-label="Close daily check-in" onClick={() => window.closeDailyCheckin()}>×</button>
+      <DailyCheckIn /><p className="checkin-note">Your daily check-in includes today's bonus.</p>
+    </div>
+  </dialog>;
+}

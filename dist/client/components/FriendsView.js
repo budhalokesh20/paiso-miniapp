@@ -56,6 +56,6 @@ export function FriendsView() {
                 h(UiIcon, { name: "chevron", size: 16 })),
             h("div", { className: "section-head" },
                 h("h2", null, "Your Invites"),
-                h("button", { className: "view-all-btn", onClick: () => document.getElementById('refHistory')?.scrollIntoView({ behavior: 'smooth' }) }, "See All")),
+                h("button", { className: "view-all-btn", onClick: () => document.getElementById('refHistory')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }) }, "See All")),
             h("div", { id: "refHistory" })));
 }

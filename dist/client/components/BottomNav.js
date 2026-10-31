@@ -8,7 +8,7 @@ export function BottomNav() {
         h("button", { "data-tab": "tasks", onClick: () => window.showTab('tasks', 'all') },
             h(UiIcon, { name: "tasks" }),
             h("span", null, "Tasks")),
-        h("button", { className: "nav-reward", "aria-label": "Claim daily reward", onClick: () => { window.showTab('home'); document.getElementById('dailyCard')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' }); document.getElementById('dailyBtn')?.focus({ preventScroll: true }); } },
+        h("button", { className: "nav-reward", "aria-label": "Claim daily reward", onClick: () => { window.showTab('home'); window.openDailyCheckin(); } },
             h("span", null,
                 h("svg", { viewBox: "0 0 24 24", width: "25", height: "25" },
                     h("use", { href: "#icon-gift" })))),

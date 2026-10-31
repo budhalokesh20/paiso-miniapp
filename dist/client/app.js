@@ -1,17 +1,39 @@
 import { h } from './jsx';
 import { SvgSpriteDefs } from './components/Icons';
+import { DailyCheckInModal } from './components/home/DailyCheckIn';
 import { HomeView } from './components/HomeView';
+import { FeedbackToast, showFeedback } from './components/shared/FeedbackToast';
 import { AppHeader } from './components/shared/AppHeader';
 import { EarnIcon } from './components/shared/EarnIcon';
 import { GameCard } from './components/shared/GameCard';
 import { updateFeaturedGames, showFeaturedGamesError } from './components/home/FeaturedGames';
+import { TaskListPage } from './components/tasks/TaskListPage';
 import { TasksView, OffersView } from './components/TasksView';
 import { FriendsView } from './components/FriendsView';
-import { SettingsView } from './components/SettingsView';
+import { SettingsView, SettingsOverlays } from './components/SettingsView';
 import { BottomNav } from './components/BottomNav';
 import { GamesView, GameModal } from './components/GamesView';
 function NotificationModal() {
-    return (h("div", { id: "notifModal", className: "fixed inset-0 z-[9999] bg-slate-900/50 backdrop-blur-[2px] hidden items-end sm:items-center justify-center p-0 sm:p-4", onClick: (e) => {
+    return (h("div", { id: "notifModal", role: "dialog", "aria-modal": "true", "aria-labelledby": "notificationsTitle", className: "fixed inset-0 z-[9999] bg-slate-900/50 backdrop-blur-[2px] hidden items-end sm:items-center justify-center p-0 sm:p-4", onKeyDown: (event) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                closeNotificationsModal();
+                return;
+            }
+            if (event.key !== 'Tab')
+                return;
+            const buttons = Array.from(event.currentTarget.querySelectorAll('button:not(:disabled)'));
+            const first = buttons[0];
+            const last = buttons[buttons.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last?.focus();
+            }
+            else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first?.focus();
+            }
+        }, onClick: (e) => {
             if (e.target.id === 'notifModal')
                 closeNotificationsModal();
         } },
@@ -23,19 +45,22 @@ function NotificationModal() {
                             h("path", { d: "M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" }),
                             h("path", { d: "M13.73 21a2 2 0 0 1-3.46 0" }))),
                     h("div", null,
-                        h("h3", { className: "text-sm font-extrabold text-slate-900 leading-tight" }, "Notifications"),
+                        h("h3", { id: "notificationsTitle", className: "text-sm font-extrabold text-slate-900 leading-tight" }, "Notifications"),
                         h("p", { className: "text-[11px] text-slate-500 font-medium", id: "notifSubHeader" }, "Activity & Admin updates"))),
                 h("div", { className: "flex items-center gap-1.5" },
                     h("button", { type: "button", onClick: () => clearAllNotifications(), className: "px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px] font-bold transition" }, "Clear All"),
-                    h("button", { type: "button", onClick: () => closeNotificationsModal(), className: "w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold text-xs flex items-center justify-center transition" }, "\u2715"))),
+                    h("button", { type: "button", onClick: () => closeNotificationsModal(), "aria-label": "Close notifications", className: "w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold text-xs flex items-center justify-center transition" }, "\u2715"))),
             h("div", { id: "notifList", className: "flex-1 overflow-y-auto p-4 space-y-2.5 bg-[#F8FAFC]" }))));
 }
 function PaisoApp() {
     return (h("div", { className: "app-shell" },
         h(SvgSpriteDefs, null),
-        h("div", { className: "toast", id: "toast" }),
+        h(FeedbackToast, null),
         h(NotificationModal, null),
         h(GameModal, null),
+        h(DailyCheckInModal, null),
+        h(SettingsOverlays, null,
+            h(TaskListPage, null)),
         h(AppHeader, null),
         h("main", { className: "app-viewport" },
             h(HomeView, null),
@@ -61,13 +86,14 @@ let startingGameId = null;
 let renderedGamesKey = '';
 const claimingTaskIds = new Set();
 let AdController = null;
-let toastTimer;
+let renderedTasksKey = '';
+let renderedMethodsKey = '';
 let dailyCountdownTimer;
 let lastTopNotifId = null;
 const activeTimers = {};
 const COIN_SVG = `<svg width="14" height="14" style="vertical-align:-2px"><use href="#icon-p-coin"/></svg>`;
 const DUMMY_AVATARS = [
-    `<img src="/assets/paiso-avatar-v2.webp" alt="Cat avatar" width="64" height="64" />`,
+    `<span class="reference-art reference-avatar" role="img" aria-label="Dog avatar"></span>`,
     `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="av1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#2563EB"/><stop offset="100%" stop-color="#1D4ED8"/></linearGradient></defs><rect width="64" height="64" rx="32" fill="url(#av1)"/><path d="M14 58c2-11 10-16 18-16s16 5 18 16" fill="#60A5FA"/><circle cx="32" cy="27" r="11" fill="#FDE68A"/><path d="M21 25c0-7 5-12 11-12s11 5 11 12v3H21v-3z" fill="#1E293B"/><path d="M18 27a14 14 0 0 1 28 0" fill="none" stroke="#38BDF8" stroke-width="3.5" stroke-linecap="round"/><rect x="15" y="23" width="5" height="10" rx="2.5" fill="#0284C7"/><rect x="44" y="23" width="5" height="10" rx="2.5" fill="#0284C7"/><circle cx="28" cy="28" r="1.6" fill="#0F172A"/><circle cx="36" cy="28" r="1.6" fill="#0F172A"/><path d="M28.5 33c2 1.8 5 1.8 7 0" fill="none" stroke="#0F172A" stroke-width="1.8" stroke-linecap="round"/></svg>`,
     `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="av2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#8B5CF6"/><stop offset="100%" stop-color="#6D28D9"/></linearGradient></defs><rect width="64" height="64" rx="32" fill="url(#av2)"/><path d="M13 58c3-12 10-17 19-17s16 5 19 17" fill="#F43F5E"/><circle cx="32" cy="27" r="11" fill="#FED7AA"/><path d="M20 22c2-6 7-9 12-9s10 3 12 9c-4-2-8-2-12-2s-8 0-12 2z" fill="#311042"/><rect x="22" y="24" width="9" height="5.5" rx="2" fill="#0F172A"/><rect x="33" y="24" width="9" height="5.5" rx="2" fill="#0F172A"/><line x1="31" y1="26.5" x2="33" y2="26.5" stroke="#0F172A" stroke-width="2"/><path d="M29 33.5c2 1.4 4.5 1.4 6 0" fill="none" stroke="#0F172A" stroke-width="1.8" stroke-linecap="round"/></svg>`,
     `<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="av3" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#10B981"/><stop offset="100%" stop-color="#047857"/></linearGradient></defs><rect width="64" height="64" rx="32" fill="url(#av3)"/><path d="M14 58c2-11 10-16 18-16s16 5 18 16" fill="#064E3B"/><circle cx="32" cy="29" r="10.5" fill="#FDE68A"/><polygon points="21,20 25,12 32,17 39,12 43,20" fill="#FBBF24" stroke="#F59E0B" stroke-width="1"/><circle cx="28.5" cy="28.5" r="1.6" fill="#0F172A"/><circle cx="35.5" cy="28.5" r="1.6" fill="#0F172A"/><path d="M29 34c2 1.6 4.5 1.6 6 0" fill="none" stroke="#0F172A" stroke-width="1.8" stroke-linecap="round"/></svg>`,
@@ -99,17 +125,9 @@ function setText(id, text) {
         el.textContent = String(text);
 }
 function toast(msg, type = 'success') {
-    const t = $('toast');
-    if (!t)
-        return;
-    t.textContent = msg;
-    t.className = `toast show ${type}`;
-    if (toastTimer)
-        window.clearTimeout(toastTimer);
-    toastTimer = window.setTimeout(() => {
-        t.className = 'toast';
-    }, 3200);
-    tg?.HapticFeedback?.notificationOccurred(type);
+    showFeedback(msg, type);
+    if (type !== 'info')
+        tg?.HapticFeedback?.notificationOccurred(type);
 }
 async function api(path, opts = {}) {
     const headers = {
@@ -122,11 +140,16 @@ async function api(path, opts = {}) {
 }
 function showTab(name, taskFilter) {
     tg?.HapticFeedback?.impactOccurred?.('light');
+    const header = document.querySelector('.app-header');
+    if (header)
+        header.hidden = name !== 'home';
     const tabs = ['home', 'tasks', 'refer', 'wallet', 'games', 'offers'];
     tabs.forEach((t) => {
         const sec = $(`tab-${t}`);
         if (sec) {
             sec.classList.toggle('active-screen', t === name);
+            if (t === name)
+                sec.scrollTop = 0;
         }
     });
     document.querySelectorAll('nav.bottom-nav button').forEach((btn) => {
@@ -149,28 +172,51 @@ function showTab(name, taskFilter) {
         closeSettingPage();
     }
 }
+let settingsOpener = null;
+function setSettingsBackgroundInert(inert) {
+    document.querySelectorAll('.app-shell > .app-header, .app-shell > .app-viewport, .app-shell > .bottom-nav').forEach(el => {
+        el.inert = inert;
+    });
+}
 function openSettingPage(subId) {
-    tg?.HapticFeedback?.impactOccurred?.('light');
+    const layer = $('settingsLayer');
     const page = $(subId);
-    if (page) {
-        page.classList.add('open');
+    if (!layer || !page || !layer.contains(page))
+        return;
+    tg?.HapticFeedback?.impactOccurred?.('light');
+    if (!layer.classList.contains('is-open')) {
+        settingsOpener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     }
+    layer.querySelectorAll('.settings-subpage').forEach(el => el.classList.toggle('open', el === page));
+    layer.classList.add('is-open');
+    page.scrollTop = 0;
+    setSettingsBackgroundInert(true);
+    page.querySelector('.native-back-btn')?.focus({ preventScroll: true });
 }
 function closeSettingPage() {
-    tg?.HapticFeedback?.impactOccurred?.('light');
+    const layer = $('settingsLayer');
+    const wasOpen = layer?.classList.contains('is-open');
+    if (wasOpen)
+        tg?.HapticFeedback?.impactOccurred?.('light');
     document.querySelectorAll('.settings-subpage').forEach((el) => {
         el.classList.remove('open');
     });
+    layer?.classList.remove('is-open');
+    setSettingsBackgroundInert(false);
+    if (wasOpen && settingsOpener?.isConnected && getComputedStyle(settingsOpener).visibility === 'visible') {
+        settingsOpener.focus({ preventScroll: true });
+    }
+    settingsOpener = null;
 }
 function copyUserId() {
     const uid = state?.user?.id || '';
     if (!uid)
         return;
     if (navigator.clipboard?.writeText) {
-        navigator.clipboard.writeText(uid).then(() => toast(`User ID (${uid}) copied!`));
+        navigator.clipboard.writeText(uid).then(() => toast(`User ID (${uid}) copied.`)).catch(() => toast('Could not copy your user ID. Please try again.', 'error'));
     }
     else {
-        toast(`User ID: ${uid}`);
+        toast(`User ID: ${uid}`, 'info');
     }
 }
 function openSupport() {
@@ -200,8 +246,20 @@ function clearSearch() {
         input.focus();
     }
 }
+function openTaskList(filter = 'all') {
+    if (!$('tab-tasks')?.classList.contains('active-screen'))
+        showTab('tasks');
+    taskSearchQuery = '';
+    const search = $('taskSearchInput');
+    if (search)
+        search.value = '';
+    setTaskFilter(filter);
+    openSettingPage('sub-task-list');
+}
 function setTaskFilter(filter) {
     currentTaskFilter = filter;
+    const titles = { all: 'All Tasks', video: 'Watch Videos', app_task: 'Complete Offers', play_game: 'Play Games', social_visit: 'Web Tasks', telegram_join: 'Social Tasks', done: 'Completed Tasks' };
+    setText('task-list-title', titles[filter]);
     document.querySelectorAll('.filter-chip').forEach((btn) => {
         btn.classList.toggle('active', btn.dataset.filter === filter);
     });
@@ -235,6 +293,10 @@ function renderWithdrawMethodsAndCountries() {
     const cBar = $('wAllowedCountriesBar');
     const methods = (state?.withdrawSettings?.methods || []).filter((m) => m.enabled !== false);
     const countries = state?.withdrawSettings?.countries || [];
+    const key = JSON.stringify([methods, countries]);
+    if (key === renderedMethodsKey || !grid)
+        return;
+    renderedMethodsKey = key;
     if (cBar) {
         if (countries.length) {
             cBar.replaceChildren(h("div", { className: "flex flex-wrap items-center gap-1.5 pb-2 border-b border-slate-100" },
@@ -298,6 +360,12 @@ function renderDailyCheckin() {
         return;
     const streak = state.dailyStreak || 0;
     const canDaily = state.canDaily;
+    document.querySelectorAll('[data-daily-bonus]').forEach(button => {
+        button.disabled = isDailyClaiming || !canDaily;
+        const label = button.querySelector('[data-daily-label]');
+        if (label)
+            label.textContent = isDailyClaiming ? 'Claiming…' : canDaily ? 'Claim Now' : 'Claimed';
+    });
     const targetDay = canDaily ? (streak % 7) + 1 : streak || 1;
     const nextReward = targetDay === 7 ? state.dailyBonus * 2 : state.dailyBonus;
     setText('streakDayText', `Day ${targetDay}`);
@@ -369,7 +437,8 @@ function renderDailyCheckin() {
     }
 }
 function triggerClaimAnimation(claimedDay, reward) {
-    tg?.HapticFeedback?.impactOccurred?.('heavy');
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+        return;
     const dayBox = $(`day-box-${claimedDay}`);
     if (dayBox) {
         dayBox.classList.remove('claimed-anim');
@@ -382,7 +451,7 @@ function triggerClaimAnimation(claimedDay, reward) {
     fxLayer.innerHTML = '';
     const starSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="#FBBF24"><path d="M12 2l2.6 6.8L21 12l-6.4 3.2L12 22l-2.6-6.8L3 12l6.4-3.2L12 2z"/></svg>`;
     const coinSvg = `<svg width="20" height="20"><use href="#icon-p-coin"/></svg>`;
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < 8; i++) {
         const p = document.createElement('span');
         p.className = 'claim-particle';
         p.innerHTML = i % 2 === 0 ? coinSvg : starSvg;
@@ -480,6 +549,10 @@ function renderTasks() {
     if (!state)
         return;
     const all = state.tasks || [];
+    const key = JSON.stringify([all, state.ads, currentTaskFilter, taskSearchQuery, [...startedTasks], [...claimingTaskIds], Object.keys(activeTimers)]);
+    if (key === renderedTasksKey)
+        return;
+    renderedTasksKey = key;
     const source = all.filter(t => currentTaskFilter === 'done' ? t.done : !t.done);
     const tasks = source.filter(t => (currentTaskFilter === 'all' || currentTaskFilter === 'done' || t.type === currentTaskFilter) && (!taskSearchQuery || (t.title + ' ' + t.description + ' ' + t.type).toLowerCase().includes(taskSearchQuery)));
     const nodes = tasks.map(task => h(TaskCard, { task: task }));
@@ -550,16 +623,19 @@ function NotifTypeIcon({ type }) {
 function renderNotifications() {
     const list = state?.notifications || [];
     const unread = state?.unreadCount || 0;
-    const badge = $('notifUnreadBadge');
-    if (badge) {
-        if (unread > 0) {
-            badge.style.display = 'flex';
-            badge.textContent = unread > 9 ? '9+' : String(unread);
-        }
-        else {
-            badge.style.display = 'none';
+    for (const id of ['notifUnreadBadge', 'homeUnreadBadge']) {
+        const badge = $(id);
+        if (badge) {
+            if (unread > 0) {
+                badge.style.display = 'flex';
+                badge.textContent = unread > 9 ? '9+' : String(unread);
+            }
+            else {
+                badge.style.display = 'none';
+            }
         }
     }
+    $('homeNotificationsBtn')?.setAttribute('aria-description', unread > 0 ? `${unread} unread notifications` : 'No unread notifications');
     const subHeader = $('notifSubHeader');
     if (subHeader) {
         subHeader.textContent = unread > 0 ? `${unread} unread notification${unread > 1 ? 's' : ''}` : 'All caught up';
@@ -601,12 +677,16 @@ function renderNotifications() {
                 n.type === 'admin' ? (h("span", { className: "px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 text-[10px] font-bold" }, "Admin Broadcast")) : null)),
         !n.read ? h("span", { className: "w-2 h-2 rounded-full bg-blue-600 shrink-0 mt-1.5" }) : null))));
 }
+let notificationsOpener = null;
 function openNotificationsModal() {
     tg?.HapticFeedback?.impactOccurred?.('light');
     const modal = $('notifModal');
     if (modal) {
+        notificationsOpener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         modal.classList.remove('hidden');
         modal.classList.add('flex');
+        setSettingsBackgroundInert(true);
+        modal.querySelector('[aria-label="Close notifications"]')?.focus({ preventScroll: true });
     }
     if ((state?.unreadCount || 0) > 0) {
         markAllNotificationsRead();
@@ -618,6 +698,9 @@ function closeNotificationsModal() {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
     }
+    setSettingsBackgroundInert(Boolean($('settingsLayer')?.classList.contains('is-open')));
+    notificationsOpener?.focus({ preventScroll: true });
+    notificationsOpener = null;
 }
 async function markAllNotificationsRead() {
     try {
@@ -688,6 +771,9 @@ async function load() {
     }
     const u = state.user;
     const fullName = u.verification?.fullName || u.first_name || u.username || 'Paiso User';
+    const firstName = (u.first_name?.trim() || u.verification?.fullName?.trim() || u.username || 'there').split(/\s+/)[0];
+    setText('homeGreeting', `Hey, ${firstName}`);
+    $('homeGreeting')?.setAttribute('title', `Hey, ${firstName}`);
     const displayName = fullName + (u.username ? ` (@${u.username})` : '');
     setText('uname', displayName);
     setText('settingsHeaderName', fullName);
@@ -908,11 +994,11 @@ function closeGame() {
 }
 async function watchAd() {
     if (!window.Adsgram || !state?.ads?.blockId) {
-        toast('Ads ajhai ready chhaina', 'warning');
+        toast("Videos are not available yet. Please try again shortly.", 'warning');
         return;
     }
     if (state.ads.watchedToday >= state.ads.dailyCap) {
-        toast('Aaja ko ad limit sakiyo!', 'warning');
+        toast("You've reached today's video limit. Come back tomorrow.", 'warning');
         return;
     }
     const before = state.ads.watchedToday || 0;
@@ -922,28 +1008,29 @@ async function watchAd() {
         }
         const result = await AdController.show();
         if (result && result.done === false) {
-            toast('Ad pura here matra coins milchha', 'warning');
+            toast("Watch the full video to receive your reward.", 'warning');
             return;
         }
-        toast('Ad sakiyo! Coins credit hudai chha…', 'success');
+        toast('Video completed. Confirming your reward…', 'info');
         for (let i = 0; i < 4; i++) {
             await new Promise((r) => window.setTimeout(r, 3000));
             await load();
             if ((state.ads?.watchedToday || 0) > before) {
-                toast(`+${state.ads.reward} coins milyo!`, 'success');
+                toast(`Video reward received. +${state.ads.reward} coins added.`, 'success');
                 return;
             }
         }
-        toast('Coins kei chhin ma balance ma aauchha', 'success');
+        toast('Your reward is still being confirmed. Your balance will update when it arrives.', 'info');
     }
     catch {
-        toast('Ahile ad uplabdha chhaina, pachhi try gara', 'warning');
+        toast("No video is available right now. Please try again later.", 'warning');
     }
 }
 async function claimDaily() {
     if (isDailyClaiming || !state?.canDaily)
         return;
     isDailyClaiming = true;
+    renderDailyCheckin();
     const btn = $('dailyBtn');
     if (btn)
         btn.disabled = true;
@@ -956,10 +1043,10 @@ async function claimDaily() {
             const claimedDay = r.dailyStreak || 1;
             const reward = r.reward || 100;
             triggerClaimAnimation(claimedDay, reward);
-            toast(`Day ${claimedDay} Check-in: +${reward} coins milyo!`, 'success');
+            toast(`Day ${claimedDay} complete. +${reward} coins added.`, 'success');
         }
         else {
-            toast(r.error || 'Aaja ko bonus liyi sakyo', 'warning');
+            toast(r.error || "Today's reward has already been claimed.", 'warning');
         }
     }
     catch {
@@ -969,19 +1056,20 @@ async function claimDaily() {
         isDailyClaiming = false;
         await load();
     }
-    await load();
 }
 function copyRef() {
     const input = $('refLink');
     if (!input)
         return;
     if (navigator.clipboard?.writeText) {
-        navigator.clipboard.writeText(input.value).then(() => toast('Referral link copy bhayo!'));
+        navigator.clipboard.writeText(input.value).then(() => toast("Referral link copied.")).catch(() => toast('Could not copy the link. Please try again.', 'error'));
     }
     else {
         input.select();
-        document.execCommand('copy');
-        toast('Referral link copy bhayo!');
+        if (document.execCommand('copy'))
+            toast("Referral link copied.");
+        else
+            toast('Could not copy the link. Please select and copy it manually.', 'error');
     }
 }
 function shareRef() {
@@ -1048,15 +1136,15 @@ async function sendVerifyOtp() {
     const dob = $('vDob')?.value.trim() || '';
     const gender = ($('vGender')?.value || 'Male');
     if (fullName.length < 2) {
-        toast('Full Name halnuहोस्', 'warning');
+        toast("Enter your full name.", 'warning');
         return;
     }
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        toast('Valid Email Address halnuहोस्', 'warning');
+        toast("Enter a valid email address.", 'warning');
         return;
     }
     if (!dob) {
-        toast('Date of Birth छान्नुहोस्', 'warning');
+        toast("Select your date of birth.", 'warning');
         return;
     }
     const btn = $('sendOtpBtn');
@@ -1088,7 +1176,7 @@ async function sendVerifyOtp() {
 async function confirmVerifyOtp() {
     const otp = $('vOtpInput')?.value.trim() || '';
     if (otp.length !== 6) {
-        toast('6-digit OTP code halnuहोस्', 'warning');
+        toast("Enter the 6-digit verification code.", 'warning');
         return;
     }
     const btn = $('confirmOtpBtn');
@@ -1103,7 +1191,7 @@ async function confirmVerifyOtp() {
             toast(r.error || 'Invalid OTP code', 'error');
             return;
         }
-        toast('Profile Verified! Blue Tick activated!', 'success');
+        toast("Your profile is verified. Your verification badge is now active.", 'success');
         await load();
     }
     finally {
@@ -1143,7 +1231,7 @@ async function withdraw() {
             body: JSON.stringify({ method: methodEl.value, account: accEl.value.trim(), amountCoins: amount })
         });
         if (r.ok) {
-            toast('Withdraw request gayo! Admin le 1-2 din ma approve garcha', 'success');
+            toast("Withdrawal request submitted. Track its status in History.", 'success');
             accEl.value = '';
             amtEl.value = '';
             updateWithdrawPreview();
@@ -1169,6 +1257,7 @@ window.filterExplore = filterExplore;
 window.filterTasks = filterTasks;
 window.clearSearch = clearSearch;
 window.setTaskFilter = setTaskFilter;
+window.openTaskList = openTaskList;
 window.selectMethod = selectMethod;
 window.setWithdrawAmount = setWithdrawAmount;
 window.updateWithdrawPreview = updateWithdrawPreview;
@@ -1186,6 +1275,23 @@ window.playGame = playGame;
 window.closeGame = closeGame;
 window.watchAd = watchAd;
 window.claimDaily = claimDaily;
+window.openDailyCheckin = () => {
+    const dialog = document.getElementById('dailyCheckinModal');
+    if (!dialog.open)
+        dialog.showModal();
+    const button = document.getElementById('dailyBtn');
+    if (!button.disabled)
+        button.focus();
+};
+window.closeDailyCheckin = () => document.getElementById('dailyCheckinModal').close();
+window.openDailySpin = () => {
+    const spin = state?.games.find(game => game.enabled && /spin|wheel/i.test(game.title));
+    if (spin) {
+        void playGame(spin.id);
+        return;
+    }
+    toast("Daily Spin isn't available yet. Check back soon.", 'warning');
+};
 window.copyRef = copyRef;
 window.shareRef = shareRef;
 window.withdraw = withdraw;

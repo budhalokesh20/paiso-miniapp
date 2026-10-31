@@ -1,32 +1,30 @@
 import { h } from '../../jsx';
-import { EarnIcon } from '../shared/EarnIcon';
-function openSurveys() {
-    window.showTab('tasks', 'all');
-    window.filterTasks('survey');
-    const input = document.getElementById('taskSearchInput');
-    if (input) {
-        input.value = 'survey';
-        input.closest('.task-search')?.classList.add('search-open');
-    }
-}
+import { UiIcon } from '../shared/UiIcon';
 const HOME_SHORTCUTS = [
-    { title: 'Watch', description: 'Earn by watching', action: () => window.watchAd() },
+    { title: 'Watch', description: 'Earn Coins', action: () => window.watchAd() },
     { title: 'Tasks', description: 'Complete & Earn', action: () => window.showTab('tasks', 'all') },
-    { title: 'Games', description: 'Play & Have Fun', action: () => window.showTab('games') },
+    { title: 'Games', description: 'Play & Earn', action: () => window.showTab('games') },
     { title: 'Offers', description: 'Special Offers', action: () => window.showTab('offers') },
-    { title: 'Surveys', description: 'Share Opinion', action: openSurveys },
-    { title: 'More', description: 'Explore More', action: () => window.showTab('tasks', 'all') },
 ];
 export function EarnShortcuts() {
-    return (h("section", { className: "home-shortcuts", "aria-label": "Explore ways to earn" },
-        h("div", { className: "explore-grid", id: "exploreGrid" }, HOME_SHORTCUTS.map((item, index) => (h("button", { type: "button", className: "explore-card", "data-title": `${item.title} ${item.description}`, id: index === 0 ? 'adBtn' : undefined, onClick: item.action },
-            h(EarnIcon, { index: index }),
-            h("span", { className: "explore-title" }, item.title),
-            h("span", { className: "explore-sub", id: index === 0 ? 'adCardSub' : undefined }, item.description))))),
+    return h("section", { className: "home-shortcuts", "aria-labelledby": "earn-title" },
+        h("div", { className: "section-head" },
+            h("h2", { id: "earn-title" }, "Earn Coins"),
+            h("button", { className: "view-all-btn", onClick: () => window.showTab('tasks', 'all') },
+                "View All ",
+                h(UiIcon, { name: "chevron", size: 14 }))),
+        h("div", { className: "explore-grid", id: "exploreGrid" }, HOME_SHORTCUTS.map((item, index) => (h("button", { type: "button", className: 'explore-card earn-tile earn-tile-' + index, "data-title": item.title + ' ' + item.description, id: index === 0 ? 'adBtn' : undefined, onClick: item.action },
+            h("span", { className: 'reference-art tile-art art-earn-' + index, "aria-hidden": "true" }),
+            h("span", { className: "earn-copy" },
+                h("span", { className: "explore-title" }, item.title),
+                h("span", { className: "explore-sub" }, item.description)),
+            h("span", { className: "tile-arrow" },
+                h(UiIcon, { name: "arrow", size: 21 })))))),
         h("div", { hidden: true },
+            h("span", { id: "adCardSub" }),
             h("span", { id: "adReward" }),
             h("span", { id: "adCount" }, "0"),
             h("span", { id: "adCap" }, "10"),
             h("input", { id: "searchInput" }),
-            h("button", { id: "searchClearBtn" }))));
+            h("button", { id: "searchClearBtn" })));
 }
