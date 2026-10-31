@@ -10,6 +10,6 @@ export function BottomNav() {
       <button type="button" data-tab="refer" aria-label="Invite" onClick={() => window.showTab('refer')}><span className="nav-icon"><UiIcon name="friends" /></span><span className="nav-label" aria-hidden="true">Invite</span></button>
       <button type="button" data-tab="wallet" aria-label="Settings" onClick={() => window.showTab('wallet')}><span className="nav-icon"><UiIcon name="settings" /></span><span className="nav-label" aria-hidden="true">Settings</span></button>
     </div>
-    <button type="button" className="nav-reward" aria-label="Claim daily reward" title="Daily rewards" onClick={() => { window.showTab('home'); window.openDailyCheckin(); }}><span className="nav-icon"><UiIcon name="gift" /></span></button>
+    <button type="button" className="nav-reward" aria-label="Withdraw rewards" title="Withdraw rewards" onClick={() => { window.showTab('wallet'); window.openSettingPage('sub-withdraw'); }}><span className="nav-icon"><UiIcon name="wallet" /></span></button>
   </nav>;
 }

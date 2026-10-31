@@ -637,7 +637,7 @@ function SettingsMenu() {
         h(SettingsGroup, { title: "Account & Rewards", id: "settings-account-title" },
             h(SettingRow, { icon: "shield", title: "Profile & Verification", action: () => window.openSettingPage('sub-verify'), detail: h("span", { id: "verifyMenuBadge" }, "Unverified") }),
             h(SettingRow, { icon: "wallet", title: "Withdraw Rewards", action: () => window.openSettingPage('sub-withdraw') }),
-            h(SettingRow, { icon: "tasks", title: "Withdrawal History", action: () => window.openSettingPage('sub-history') }),
+            h(SettingRow, { icon: "tasks", title: "My Activity", action: () => window.openSettingPage('sub-history') }),
             h(SettingRow, { icon: "bell", title: "Notifications", action: () => window.openNotificationsModal(), detail: h("span", { id: "notifUnreadBadge", style: "display:none" }, "0") })),
         h(SettingsGroup, { title: "Help & Support", id: "settings-support-title" },
             h(SettingRow, { icon: "help", title: "Help Center", action: () => window.openSettingPage('sub-faq') }),
@@ -784,7 +784,7 @@ function WithdrawSection() {
 function SettingsWithdrawalPages() {
     return h("div", { className: "settings-pages" },
         h("div", { id: "sub-history", className: "settings-subpage" },
-            h(SubpageTopBar, { title: "Withdrawal History" }),
+            h(SubpageTopBar, { title: "My Activity" }),
             h("div", { className: "screen-content pb-6" },
                 h("div", { className: "bg-white border border-slate-200 rounded-xl divide-y divide-slate-100", id: "wHistory" }))),
         h("div", { id: "sub-withdraw", className: "settings-subpage" },
@@ -943,9 +943,9 @@ function BottomNav() {
                 h("span", { className: "nav-icon" },
                     h(UiIcon, { name: "settings" })),
                 h("span", { className: "nav-label", "aria-hidden": "true" }, "Settings"))),
-        h("button", { type: "button", className: "nav-reward", "aria-label": "Claim daily reward", title: "Daily rewards", onClick: () => { window.showTab('home'); window.openDailyCheckin(); } },
+        h("button", { type: "button", className: "nav-reward", "aria-label": "Withdraw rewards", title: "Withdraw rewards", onClick: () => { window.showTab('wallet'); window.openSettingPage('sub-withdraw'); } },
             h("span", { className: "nav-icon" },
-                h(UiIcon, { name: "gift" }))));
+                h(UiIcon, { name: "wallet" }))));
 }
 
 // --- src/client/app.tsx ---

@@ -2,7 +2,7 @@
 
 SettingsView contains SettingsMenu. SettingsOverlays mounts SettingsAccountPages, SettingsWithdrawalPages and SettingsHelpPages directly under the app shell, outside the scrolling tab. SettingsProfile and SettingsParts provide the profile card, reusable menu rows, groups and subpage header. All modules are registered in scripts/client-modules.js for both build commands.
 
-The menu keeps eight distinct actions: Profile & Verification, Withdraw Rewards, Withdrawal History, Notifications, Help Center, Contact Support, Privacy Information and Terms of Service. The profile card opens account details and Copy User ID. Duplicate Edit Profile and privacy entries, the non-selectable Language page, random avatar switching, the version row and redundant Share shortcut were removed from Settings. Referral sharing remains available from Invite.
+The menu keeps eight distinct actions: Profile & Verification, Withdraw Rewards, My Activity, Notifications, Help Center, Contact Support, Privacy Information and Terms of Service. The profile card opens account details and Copy User ID. Duplicate Edit Profile and privacy entries, the non-selectable Language page, random avatar switching, the version row and redundant Share shortcut were removed from Settings. Referral sharing remains available from Invite.
 
 public/settings.css scopes the design to Settings: 16px menu labels, at least 66px rows, 14px body copy, 16px form inputs and 44–48px controls. Groups wrap on small screens, content scrolls above navigation and reduced motion is respected. Verification/withdrawal fields now have associated labels. Existing backend field IDs and actions are preserved.
 

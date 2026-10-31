@@ -103,7 +103,7 @@ function WithdrawSection() {
 export function SettingsWithdrawalPages() { return <div className="settings-pages">
       {/* Slide-in Fullscreen Sub-Page 2: Withdrawal History */}
       <div id="sub-history" className="settings-subpage">
-        <SubpageTopBar title="Withdrawal History" />
+        <SubpageTopBar title="My Activity" />
         <div className="screen-content pb-6">
           <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100" id="wHistory" />
         </div>

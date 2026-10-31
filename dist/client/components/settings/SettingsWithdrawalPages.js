@@ -46,7 +46,7 @@ function WithdrawSection() {
 export function SettingsWithdrawalPages() {
     return h("div", { className: "settings-pages" },
         h("div", { id: "sub-history", className: "settings-subpage" },
-            h(SubpageTopBar, { title: "Withdrawal History" }),
+            h(SubpageTopBar, { title: "My Activity" }),
             h("div", { className: "screen-content pb-6" },
                 h("div", { className: "bg-white border border-slate-200 rounded-xl divide-y divide-slate-100", id: "wHistory" }))),
         h("div", { id: "sub-withdraw", className: "settings-subpage" },

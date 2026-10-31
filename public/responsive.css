@@ -16,6 +16,11 @@
 .app-header { padding-left: max(var(--page-gutter), env(safe-area-inset-left, 0px)); padding-right: max(var(--page-gutter), env(safe-area-inset-right, 0px)); }
 .app-viewport, .settings-overlay-layer { border-left: env(safe-area-inset-left, 0px) solid transparent; border-right: env(safe-area-inset-right, 0px) solid transparent; }
 .settings-subpage > .screen-content { max-width: 760px; }
+/* Simple monochrome settings icons and consistent circular back controls. */
+.settings-screen .settings-row-icon { background: transparent; color: #17191c; border-radius: 0; }
+.settings-screen .native-back-btn { border-radius: 50%; background: #fff; color: #17191c; box-shadow: 0 3px 12px #173d4b18; transition: transform 160ms ease, box-shadow 160ms ease; }
+.settings-screen .native-back-btn:active { transform: scale(.94); box-shadow: 0 1px 5px #173d4b16; }
+@media (prefers-reduced-motion: reduce) { .settings-screen .native-back-btn { transition: none; } .settings-screen .native-back-btn:active { transform: none; } }
 
 /* Floating capsule and independent reward action. Reserve scroll space naturally. */
 nav.bottom-nav {

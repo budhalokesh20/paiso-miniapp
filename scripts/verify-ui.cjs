@@ -116,7 +116,7 @@ async function run(){
   assert.equal(await page.locator('#settings-menu-view .settings-row').count(),8);
   assert.equal(await page.locator('#sub-language').count(),0);
   assert.equal(await page.getByRole('button',{name:'Change avatar',exact:true}).count(),0);
-  const settingsLinks=[['Profile & Verification','sub-verify'],['Withdraw Rewards','sub-withdraw'],['Withdrawal History','sub-history'],['Help Center','sub-faq'],['Contact Support','sub-support'],['Privacy Information','sub-privacy'],['Terms of Service','sub-terms']];
+  const settingsLinks=[['Profile & Verification','sub-verify'],['Withdraw Rewards','sub-withdraw'],['My Activity','sub-history'],['Help Center','sub-faq'],['Contact Support','sub-support'],['Privacy Information','sub-privacy'],['Terms of Service','sub-terms']];
   for(const width of [320,390,768]) {
     await page.setViewportSize({width,height:844});
     await page.evaluate(()=>{window.showTab('wallet');document.getElementById('tab-wallet').scrollTop=0;});
@@ -234,9 +234,9 @@ async function run(){
   await page.locator('.bottom-nav button[data-tab="tasks"]').focus();
   await page.keyboard.press('Enter');
   assert.equal(await page.locator('.bottom-nav [aria-current="page"]').getAttribute('data-tab'),'tasks');
-  await page.getByRole('button',{name:'Claim daily reward',exact:true}).click();
-  assert.equal(await page.locator('.home-checkin-dialog').isVisible(),true,'Footer reward action opens daily rewards');
-  await page.locator('.checkin-close').click();
+  await page.locator('.bottom-nav').getByRole('button',{name:'Withdraw rewards',exact:true}).click();
+  assert.equal(await page.locator('#sub-withdraw').isVisible(),true,'Footer wallet opens withdrawal');
+  await page.evaluate(()=>{window.closeSettingPage();window.showTab('home');});
   if(process.argv.includes('--layout-only')) {
     assert.deepEqual(errors,[]);
     console.log(JSON.stringify({passed:true,fullscreen:true,footerNavigation:true,homeSizes,taskSizes,errors},null,2));
@@ -252,7 +252,7 @@ async function run(){
   await page.clock.resume();
   await page.emulateMedia({reducedMotion:'reduce'});
   assert.equal(await page.locator('.home-hero button').evaluate(el=>getComputedStyle(el).transitionDuration),'0s');
-  await page.getByRole('button',{name:'Claim daily reward',exact:true}).click();
+  await page.locator('#tab-home .quick-checkin button').click();
   assert.equal(await page.locator('#dailyBtn').evaluate(el=>el===document.activeElement),true);
   await page.keyboard.press('Escape');
   assert.equal(await page.locator('#dailyCheckinModal').isVisible(),false);
@@ -305,7 +305,7 @@ async function run(){
   assert.deepEqual(brokenImages,[]); assert.deepEqual(errors,[]);
   await page.setViewportSize({width:390,height:844});
   await page.evaluate(()=>window.showTab('home'));
-  await page.getByRole('button',{name:'Claim daily reward',exact:true}).click();
+  await page.locator('#tab-home .quick-checkin button').click();
   assert.equal(await page.locator('#dailyBtn').evaluate(el=>el===document.activeElement),true);
   await page.emulateMedia({reducedMotion:'reduce'});
   await page.locator('#dailyBtn').click();

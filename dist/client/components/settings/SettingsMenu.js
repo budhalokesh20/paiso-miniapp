@@ -10,7 +10,7 @@ export function SettingsMenu() {
         h(SettingsGroup, { title: "Account & Rewards", id: "settings-account-title" },
             h(SettingRow, { icon: "shield", title: "Profile & Verification", action: () => window.openSettingPage('sub-verify'), detail: h("span", { id: "verifyMenuBadge" }, "Unverified") }),
             h(SettingRow, { icon: "wallet", title: "Withdraw Rewards", action: () => window.openSettingPage('sub-withdraw') }),
-            h(SettingRow, { icon: "tasks", title: "Withdrawal History", action: () => window.openSettingPage('sub-history') }),
+            h(SettingRow, { icon: "tasks", title: "My Activity", action: () => window.openSettingPage('sub-history') }),
             h(SettingRow, { icon: "bell", title: "Notifications", action: () => window.openNotificationsModal(), detail: h("span", { id: "notifUnreadBadge", style: "display:none" }, "0") })),
         h(SettingsGroup, { title: "Help & Support", id: "settings-support-title" },
             h(SettingRow, { icon: "help", title: "Help Center", action: () => window.openSettingPage('sub-faq') }),

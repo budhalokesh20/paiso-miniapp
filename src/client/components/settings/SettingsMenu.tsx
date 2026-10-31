@@ -8,7 +8,7 @@ export function SettingsMenu() {
     <SettingsGroup title="Account & Rewards" id="settings-account-title">
       <SettingRow icon="shield" title="Profile & Verification" action={() => window.openSettingPage('sub-verify')} detail={<span id="verifyMenuBadge">Unverified</span>} />
       <SettingRow icon="wallet" title="Withdraw Rewards" action={() => window.openSettingPage('sub-withdraw')} />
-      <SettingRow icon="tasks" title="Withdrawal History" action={() => window.openSettingPage('sub-history')} />
+      <SettingRow icon="tasks" title="My Activity" action={() => window.openSettingPage('sub-history')} />
       <SettingRow icon="bell" title="Notifications" action={() => window.openNotificationsModal()} detail={<span id="notifUnreadBadge" style="display:none">0</span>} />
     </SettingsGroup>
     <SettingsGroup title="Help & Support" id="settings-support-title">

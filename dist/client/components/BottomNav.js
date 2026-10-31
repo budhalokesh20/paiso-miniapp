@@ -20,7 +20,7 @@ export function BottomNav() {
                 h("span", { className: "nav-icon" },
                     h(UiIcon, { name: "settings" })),
                 h("span", { className: "nav-label", "aria-hidden": "true" }, "Settings"))),
-        h("button", { type: "button", className: "nav-reward", "aria-label": "Claim daily reward", title: "Daily rewards", onClick: () => { window.showTab('home'); window.openDailyCheckin(); } },
+        h("button", { type: "button", className: "nav-reward", "aria-label": "Withdraw rewards", title: "Withdraw rewards", onClick: () => { window.showTab('wallet'); window.openSettingPage('sub-withdraw'); } },
             h("span", { className: "nav-icon" },
-                h(UiIcon, { name: "gift" }))));
+                h(UiIcon, { name: "wallet" }))));
 }
