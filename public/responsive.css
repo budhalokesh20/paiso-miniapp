@@ -14,40 +14,60 @@
 .app-viewport, .settings-overlay-layer { border-left: env(safe-area-inset-left, 0px) solid transparent; border-right: env(safe-area-inset-right, 0px) solid transparent; }
 .settings-subpage > .screen-content { max-width: 760px; }
 
-/* A stable five-item dock: the reward action stays inside its own touch target. */
+/* Floating capsule and independent reward action. Reserve scroll space naturally. */
 nav.bottom-nav {
-  position: relative; inset: auto; flex: 0 0 auto; width: 100%;
-  height: auto; min-height: 80px; border-radius: 22px 22px 0 0;
-  padding: 8px max(8px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px));
-  border-top: 1px solid #e1ebe9; background: #fffffffa;
-  box-shadow: 0 -6px 24px #173d4b08; backdrop-filter: blur(18px);
+  --nav-motion: 320ms cubic-bezier(.22,.68,0,1);
+  position: relative; inset: auto; display: flex; align-items: center; gap: 8px;
+  flex: 0 0 auto; width: calc(100% - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)); max-width: 440px;
+  height: 64px; min-height: 64px; margin: 10px auto calc(12px + env(safe-area-inset-bottom, 0px));
+  padding: 0; border: 0; border-radius: 999px; background: transparent;
+  box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none;
 }
-.bottom-nav-items { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; width: 100%; max-width: 680px; margin: 0 auto; }
+.bottom-nav-items {
+  position: relative; isolation: isolate; display: grid; grid-template-columns: 2fr 1fr 1fr 1fr;
+  flex: 1; min-width: 0; height: 64px; padding: 6px; border-radius: 999px;
+  background: #fff; box-shadow: 0 4px 18px #1423300b, 0 1px 3px #14233006;
+  transition: grid-template-columns var(--nav-motion);
+}
+.nav-active-pill {
+  position: absolute; z-index: -1; left: 6px; top: 6px; bottom: 6px;
+  width: calc((100% - 12px) * .4); border-radius: 999px; background: #17191c;
+  pointer-events: none; transform: translateX(0); transition: transform var(--nav-motion);
+}
+.bottom-nav-items:has([data-tab=tasks].active) { grid-template-columns: 1fr 2fr 1fr 1fr; }
+.bottom-nav-items:has([data-tab=refer].active) { grid-template-columns: 1fr 1fr 2fr 1fr; }
+.bottom-nav-items:has([data-tab=wallet].active) { grid-template-columns: 1fr 1fr 1fr 2fr; }
+.bottom-nav-items:has([data-tab=tasks].active) .nav-active-pill { transform: translateX(50%); }
+.bottom-nav-items:has([data-tab=refer].active) .nav-active-pill { transform: translateX(100%); }
+.bottom-nav-items:has([data-tab=wallet].active) .nav-active-pill { transform: translateX(150%); }
 nav.bottom-nav button, nav.bottom-nav button.nav-reward {
-  min-width: 0; min-height: 63px; padding: 3px 0; gap: 3px; border-radius: 14px;
-  color: #6a7c91; font-size: 11px; font-weight: 600; line-height: 16px;
-  transition: color 160ms var(--ui-ease), background-color 160ms var(--ui-ease);
+  display: flex; flex-direction: row; align-items: center; justify-content: center;
+  min-width: 0; min-height: 52px; height: 52px; padding: 0; gap: 0;
+  border: 0; border-radius: 999px; background: transparent; box-shadow: none;
+  color: #8a9099; font-size: 12px; font-weight: 600; line-height: 18px;
+  transition: color 180ms ease, gap var(--nav-motion);
 }
 nav.bottom-nav button .nav-icon, nav.bottom-nav .nav-reward > .nav-icon {
-  position: relative; inset: auto; display: grid; place-items: center; flex-shrink: 0;
-  width: 56px; max-width: 100%; height: 34px; border: 0; border-radius: 12px;
-  color: inherit; background: transparent; box-shadow: none;
-  transition: background-color 180ms var(--ui-ease), transform 180ms var(--ui-ease);
+  position: static; inset: auto; display: grid; place-items: center; flex: 0 0 20px;
+  width: 20px; height: 20px; border: 0; border-radius: 0; background: none; box-shadow: none; color: inherit;
+  transition: transform 180ms ease;
 }
-nav.bottom-nav button svg, nav.bottom-nav .nav-reward svg { width: 22px; height: 22px; fill: none; stroke-width: 1.8; }
+nav.bottom-nav button svg, nav.bottom-nav .nav-reward svg { width: 20px; height: 20px; fill: none; stroke-width: 1.8; }
 nav.bottom-nav button.active[data-tab=home] svg { fill: none; stroke-width: 1.8; }
-nav.bottom-nav button.active { color: #00856f; font-weight: 700; }
-nav.bottom-nav button.active .nav-icon { background: #e0f5ed; }
+nav.bottom-nav .nav-label { max-width: 0; overflow: hidden; opacity: 0; white-space: nowrap; transition: max-width var(--nav-motion), opacity 160ms ease; }
+nav.bottom-nav button.active { color: #fff; gap: 6px; font-weight: 600; }
+nav.bottom-nav button.active .nav-label { max-width: 65px; opacity: 1; }
 nav.bottom-nav button.active::after { display: none; }
-nav.bottom-nav .nav-reward > .nav-icon { width: 46px; color: white; background: linear-gradient(135deg,#00b594,#008674); box-shadow: 0 3px 8px #008e7426, inset 0 1px 0 #ffffff35; }
-nav.bottom-nav .nav-reward > .nav-label {
-  position: static; display: block; width: auto; height: auto; border: 0; border-radius: 0;
-  background: none; box-shadow: none; color: #00856f;
+nav.bottom-nav button.nav-reward {
+  flex: 0 0 52px; width: 52px; height: 52px; min-height: 52px;
+  color: #272a30; background: #fff; box-shadow: 0 4px 18px #1423300b, 0 1px 3px #14233006;
 }
-nav.bottom-nav button:active .nav-icon { transform: scale(.94); }
-nav.bottom-nav button:focus-visible { outline: 2px solid #009b7e; outline-offset: -2px; }
+nav.bottom-nav button:active .nav-icon { transform: scale(.9); }
+nav.bottom-nav button:focus-visible { outline: 2px solid #758190; outline-offset: 2px; }
+nav.bottom-nav button.active:focus-visible { outline-color: #17191c; }
 @media (hover: hover) {
-  nav.bottom-nav button:hover { color: #00856f; background: #f0f8f5; }
+  nav.bottom-nav button:not(.active):hover { color: #272a30; }
+  nav.bottom-nav button.nav-reward:hover { background: #f9fafb; }
 }
 
 @media (min-width: 600px) {
@@ -77,7 +97,6 @@ nav.bottom-nav button:focus-visible { outline: 2px solid #009b7e; outline-offset
   .screen-content.settings-content { padding: 24px var(--page-gutter) 32px; }
   #tab-games > .screen-content, #tab-offers > .screen-content, #tab-refer > .screen-content { padding: 24px var(--page-gutter) 32px; }
   .games-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  nav.bottom-nav { border-radius: 0; }
 }
 @media (min-width: 760px) {
   .home-layout, .tasks-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
@@ -111,10 +130,8 @@ nav.bottom-nav button:focus-visible { outline: 2px solid #009b7e; outline-offset
 }
 @media (max-height: 500px) and (min-width: 600px) {
   .home-header { height: calc(60px + env(safe-area-inset-top, 0px)); min-height: 60px; padding-top: calc(8px + env(safe-area-inset-top, 0px)); padding-bottom: 8px; }
-  nav.bottom-nav { min-height: 68px; padding-top: 4px; padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)); }
-  nav.bottom-nav button, nav.bottom-nav button.nav-reward { min-height: 59px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  nav.bottom-nav button, nav.bottom-nav button .nav-icon { transition: none; }
+  nav.bottom-nav button, nav.bottom-nav button .nav-icon, nav.bottom-nav .nav-label, .bottom-nav-items, .nav-active-pill { transition: none; }
   nav.bottom-nav button:active .nav-icon { transform: none; }
 }

@@ -194,22 +194,39 @@ async function run(){
     assert.ok(Math.abs(shell.width-size.width)<1 && Math.abs(shell.height-size.height)<1 && shell.x===0 && shell.y===0,'App fills available viewport '+JSON.stringify(size));
     const nav=await page.locator('.bottom-nav').boundingBox();
     const viewport=await page.locator('.app-viewport').boundingBox();
-    assert.ok(Math.abs(nav.y+nav.height-size.height)<1 && Math.abs(nav.width-size.width)<1,'Dock spans viewport and reaches bottom');
+    assert.ok(nav.y+nav.height<=size.height-12 && nav.width<=440 && nav.x>=12,'Capsule floats above the bottom with side clearance');
     assert.ok(viewport.y+viewport.height<=nav.y+1,'Dock reserves space instead of covering content');
+    const capsule=await page.locator('.bottom-nav-items').boundingBox();
+    const rewardAction=await page.locator('.bottom-nav > .nav-reward').boundingBox();
+    assert.ok(rewardAction.x>=capsule.x+capsule.width+7 && rewardAction.width===rewardAction.height,'Independent circular action sits right of capsule');
     assert.equal(await page.locator('.bottom-nav button').evaluateAll(buttons=>buttons.every(button=>{
       const r=button.getBoundingClientRect(); const icon=button.querySelector('.nav-icon').getBoundingClientRect();
       return r.width>=44 && r.height>=44 && icon.top>=r.top && icon.bottom<=r.bottom;
     })),true,'Navigation touch targets contain their icons');
     for(const tab of ['tasks','refer','wallet','home']) {
       await page.locator('.bottom-nav button[data-tab="'+tab+'"]').click();
+      await page.locator('.bottom-nav').evaluate(el=>Promise.all(el.getAnimations({subtree:true}).map(animation=>animation.finished.catch(()=>{}))));
       assert.equal(await page.locator('.bottom-nav [aria-current="page"]').getAttribute('data-tab'),tab,'Current destination '+tab);
+      const activePill=await page.locator('.nav-active-pill').boundingBox();
+      const activeButton=await page.locator('.bottom-nav button.active').boundingBox();
+      assert.ok(Math.abs(activePill.x-activeButton.x)<1 && Math.abs(activePill.width-activeButton.width)<1,'Sliding indicator aligns with active tab '+tab);
+      assert.equal(await page.locator('.bottom-nav-items').evaluate(el=>[...el.querySelectorAll('button')].every(button=>{
+        const label=button.querySelector('.nav-label');
+        if (!button.classList.contains('active')) return getComputedStyle(label).opacity==='0' && label.getBoundingClientRect().width===0;
+        return getComputedStyle(button).color==='rgb(255, 255, 255)' && label.scrollWidth<=label.clientWidth+1;
+      })),true,'Only the active label is visible, white and unclipped');
       assert.equal(await page.locator('#tab-'+tab).evaluate(el=>el.scrollWidth>el.clientWidth),false,'Responsive page overflow '+tab+' '+size.width);
+      if(size.width===390) await page.locator('.bottom-nav').screenshot({path:path.join(root,'ui/preview','navigation-'+tab+'.png')});
     }
     await page.evaluate(()=>{document.getElementById('tab-home').scrollTop=0;});
     await page.waitForFunction(()=>getComputedStyle(document.getElementById('tab-home')).opacity==='1');
     if ([320,390,768,844,1280,1920].includes(size.width)) await page.screenshot({path:path.join(root,'ui/preview',`home-${size.width}.png`)});
   }
   await page.setViewportSize({width:390,height:844});
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await page.locator('.bottom-nav button[data-tab="wallet"]').click();
+  assert.equal(await page.locator('.nav-active-pill').evaluate(el=>getComputedStyle(el).transitionDuration),'0s','Reduced-motion disables the sliding transition');
+  await page.emulateMedia({reducedMotion:'no-preference'});
   await page.locator('.bottom-nav button[data-tab="tasks"]').focus();
   await page.keyboard.press('Enter');
   assert.equal(await page.locator('.bottom-nav [aria-current="page"]').getAttribute('data-tab'),'tasks');
@@ -311,6 +328,9 @@ async function run(){
   await context.grantPermissions(['clipboard-read','clipboard-write']);
   await page.getByRole('button',{name:'Copy',exact:true}).click();
   assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),fixtures.refLink);
+  // Clipboard data can be available before its asynchronous feedback callback runs.
+  await page.waitForFunction(()=>document.getElementById('feedbackMessage').textContent==='Referral link copied.' && document.getElementById('toast').getAttribute('aria-hidden')==='false');
+  await page.locator('#toast').evaluate(el=>Promise.all(el.getAnimations().map(animation=>animation.finished.catch(()=>{}))));
   await page.getByRole('button',{name:'Dismiss notification',exact:true}).click();
   await page.evaluate(()=>{window.__clipboardWrite=navigator.clipboard.writeText; navigator.clipboard.writeText=()=>Promise.reject(new Error('Test clipboard failure'));});
   await page.getByRole('button',{name:'Copy',exact:true}).click();
@@ -342,6 +362,8 @@ async function run(){
   await page.reload({waitUntil:'networkidle'});
   await page.locator('#adBtn').click();
   await page.waitForFunction(()=>document.getElementById('toast').classList.contains('info'));
+  // Keep feedback present while the fixture confirms the reward asynchronously.
+  await page.getByRole('button',{name:'Dismiss notification',exact:true}).focus();
   assert.match(await page.locator('#feedbackMessage').innerText(),/Confirming your reward/);
   await page.locator('#toast').evaluate(el=>Promise.all(el.getAnimations().map(animation=>animation.finished.catch(()=>{}))));
   await page.screenshot({path:path.join(root,'ui/preview','feedback-info.png')});
