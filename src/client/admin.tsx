@@ -98,6 +98,8 @@ interface AdminNotificationRow {
 }
 
 interface AdminStatsResponse {
+  spinSettings?: {enabled:boolean;cooldownMs:number;rewards:number[]};
+  rewardCodes?: {code:string;points:number;maxUses:number;uses:number;enabled:boolean;expiresAt:number|null}[];
   totalUsers: number;
   verifiedUsers: number;
   qualifiedUsers: number;
@@ -981,11 +983,28 @@ function TasksTabView(props: { s: AdminStatsResponse }) {
   );
 }
 
+function RewardsAdmin({s}:{s:AdminStatsResponse}) {
+  const spin=s.spinSettings || {enabled:true,cooldownMs:86400000,rewards:[5,10,20,50]};
+  const field='block w-full rounded-xl border border-slate-200 p-3 text-sm';
+  const submit=async(event:Event,bonus:boolean)=>{
+    event.preventDefault();const form=event.currentTarget as HTMLFormElement;const button=form.querySelector('button[type=submit]') as HTMLButtonElement;if(button.disabled)return;button.disabled=true;
+    const data=new FormData(form);
+    try{const payload=bonus?{code:String(data.get('code')),points:Number(data.get('points')),maxUses:Number(data.get('maxUses')),expiresAt:data.get('expiresAt')?new Date(String(data.get('expiresAt'))).getTime():null}:{enabled:data.get('enabled')==='on',cooldownMs:Number(data.get('hours'))*3600000,rewards:String(data.get('rewards')).split(',').map(value=>Number(value.trim()))};
+      await adminApi(bonus?'/api/admin/rewards/codes':'/api/admin/rewards/spin',{method:bonus?'POST':'PUT',body:JSON.stringify(payload)});notify(bonus?'Bonus code created':'Spin settings saved');await refreshAdmin();
+    }catch(error){notify((error as Error).message,true);button.disabled=false;}
+  };
+  return <section className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4"><h2 className="text-lg font-bold">Spin & bonus rewards</h2><div className="grid gap-5 md:grid-cols-2">
+    <form className="space-y-3" onSubmit={(e:Event)=>void submit(e,false)}><h3 className="font-bold">Daily Spin</h3><label className="block"><input type="checkbox" name="enabled" checked={spin.enabled}/> Enable spins</label><label className="block">Cooldown hours<input className={field} type="number" name="hours" min="0.016667" max="720" step="any" required value={spin.cooldownMs/3600000}/></label><label className="block">Possible P points (comma separated)<input className={field} name="rewards" required value={spin.rewards.join(', ')}/></label><p className="text-xs text-slate-500">Each listed entry has the same probability. Repeat a value to increase its probability.</p><button type="submit" className="rounded-xl bg-emerald-700 px-4 py-3 text-white font-bold">Save spin settings</button></form>
+    <form className="space-y-3" onSubmit={(e:Event)=>void submit(e,true)}><h3 className="font-bold">Create bonus code</h3><label className="block">Code<input className={field} name="code" minLength={4} maxLength={40} required pattern="[A-Za-z0-9-]+"/></label><label className="block">P points<input className={field} name="points" type="number" min="1" max="1000000" defaultValue="100" required/></label><label className="block">Total redemptions<input className={field} name="maxUses" type="number" min="1" max="1000000" defaultValue="100" required/></label><label className="block">Expiry (optional)<input className={field} name="expiresAt" type="datetime-local"/></label><p className="text-xs text-slate-500">Each user can redeem a code once.</p><button type="submit" className="rounded-xl bg-emerald-700 px-4 py-3 text-white font-bold">Create code</button></form>
+  </div><div className="space-y-2">{(s.rewardCodes || []).map(code=><div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 p-3"><div><b>{code.code}</b><p className="text-sm">{code.points} P · {code.uses}/{code.maxUses} uses · {code.expiresAt?new Date(code.expiresAt).toLocaleString():'No expiry'}</p></div><button type="button" className="rounded-lg border p-2" onClick={async(event:Event)=>{const button=event.currentTarget as HTMLButtonElement;button.disabled=true;try{await adminApi('/api/admin/rewards/codes/'+encodeURIComponent(code.code),{method:'PUT',body:JSON.stringify({enabled:!code.enabled})});await refreshAdmin();}catch(error){notify((error as Error).message,true);button.disabled=false;}}}>{code.enabled?'Pause':'Enable'}</button></div>)}</div></section>;
+}
+
 function GamesTabView(props: { s: AdminStatsResponse }) {
   const games = props.s.games || [];
   const editGame = editingGameId ? games.find((game) => game.id === editingGameId) : null;
   return (
     <div className="space-y-5">
+      <RewardsAdmin s={props.s} />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <AdminStatCard label="Published games" value={games.filter((g) => g.enabled).length.toLocaleString()} detail={`${games.length} total`} />
         <AdminStatCard label="Game starts" value={(props.s.gameStarts || 0).toLocaleString()} detail="Paid and free starts" tone="blue" />

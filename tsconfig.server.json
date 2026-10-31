@@ -9,6 +9,6 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/server.ts", "src/types.ts"],
+  "include": ["src/server.ts", "src/types.ts", "src/reward-rules.ts", "src/transactional-snapshot.ts"],
   "exclude": ["node_modules", "public"]
 }

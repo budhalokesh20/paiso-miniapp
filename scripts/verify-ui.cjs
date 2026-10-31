@@ -7,6 +7,7 @@ const express = require('express');
 const app = express();
 app.use(express.static(path.join(root,'public')));
 const fixtures = {
+  spinSettings:{enabled:true,cooldownMs:86400000,rewards:[10]},nextSpinAt:0,
   user:{id:'12345',first_name:'Aarav',username:'paiso_user',coins:12500,totalEarned:12500,referrals:125,lastDaily:'',dailyStreak:3},
   tasks:[
     {id:'app',title:'Install & Open App',description:'Install new app and open',type:'app_task',reward:200,waitSeconds:1},
@@ -42,6 +43,8 @@ async function run(){
     if(url.pathname.endsWith('/play')) data={ok:true,playUrl:'about:blank',coins:12500};
     if(url.pathname==='/api/task/claim'){claims.push(route.request().postDataJSON());data=claims.length===1?{ok:false,started:true,waitSeconds:1}:{ok:true,reward:200}; if(claims.length>1) fixtures.tasks[0].done=true;}
     if(url.pathname==='/api/daily'){dailyRequests++;fixtures.canDaily=false;fixtures.dailyStreak=4;fixtures.nextDailyAt=Date.now()+86400000;data={ok:true,reward:100,coins:12600,dailyStreak:4,nextDailyAt:fixtures.nextDailyAt};}
+    if(url.pathname==='/api/rewards/spin'){fixtures.nextSpinAt=Date.now()+86400000;data={ok:true,points:10,coins:12510};}
+    if(url.pathname==='/api/rewards/redeem'){data=route.request().postDataJSON().code==='TEST-25'?{ok:true,points:25,coins:12535}:{ok:false,error:'Invalid bonus code.'};}
     await route.fulfill({json:data});
   });
   fixtures.unreadCount=12;
@@ -276,11 +279,20 @@ async function run(){
   await page.keyboard.press('Escape');
   assert.equal(await page.locator('#dailyCheckinModal').isVisible(),false);
   await page.getByRole('button',{name:'Spin Now',exact:true}).click();
-  assert.match(await page.locator('#toast').innerText(),/isn't available yet/);
-  assert.equal(await page.locator('#toast').getAttribute('aria-live'),'polite');
-  assert.equal(await page.locator('#toast').evaluate(el=>getComputedStyle(el).transitionDuration),'0s');
-  await page.screenshot({path:path.join(root,'ui/preview','feedback-warning.png')});
-  await page.getByRole('button',{name:'Dismiss notification',exact:true}).click();
+  await page.locator('#spinClaimButton').click();
+  await page.waitForFunction(()=>document.getElementById('rewardResult').textContent.includes('+10'));
+  assert.equal(await page.locator('#spinClaimButton').isDisabled(),true);
+  await page.screenshot({path:path.join(root,'ui/preview','rewards-spin.png')});
+  await page.getByRole('button',{name:'Close rewards',exact:true}).click();
+  await page.locator('#quickBonusBtn').click();
+  await page.locator('#bonusCodeInput').fill('BAD');
+  await page.locator('#bonusRedeemButton').click();
+  await page.waitForFunction(()=>document.getElementById('rewardResult').textContent==='Invalid bonus code.');
+  await page.locator('#bonusCodeInput').fill('TEST-25');
+  await page.locator('#bonusRedeemButton').click();
+  await page.waitForFunction(()=>document.getElementById('rewardResult').textContent.includes('+25'));
+  await page.screenshot({path:path.join(root,'ui/preview','rewards-code.png')});
+  await page.getByRole('button',{name:'Close rewards',exact:true}).click();
   await page.emulateMedia({reducedMotion:'no-preference'});
   await page.locator('.bottom-nav').getByRole('button',{name:'Tasks',exact:true}).click();
   await page.locator('#tab-tasks').getByRole('button',{name:'View All',exact:true}).click();
@@ -328,8 +340,7 @@ async function run(){
   assert.equal(await page.locator('#dailyBtn').evaluate(el=>el===document.activeElement),true);
   await page.emulateMedia({reducedMotion:'reduce'});
   await page.locator('#dailyBtn').click();
-  await page.waitForFunction(()=>document.getElementById('dailyBtn').disabled);
-  await page.waitForFunction(()=>document.getElementById('quickBonusText').textContent==='Claimed');
+  await page.waitForFunction(()=>document.getElementById('feedbackMessage').textContent.includes('coins added') && document.getElementById('toast').getAttribute('aria-hidden')==='false');
   assert.equal(await page.locator('.claim-particle').count(),0,'Reduced motion skips reward particles');
   assert.equal(await page.locator('#toast').getAttribute('aria-hidden'),'false');
   assert.match(await page.locator('#feedbackMessage').innerText(),/coins added/);
@@ -338,8 +349,8 @@ async function run(){
   await page.getByRole('button',{name:'Dismiss notification',exact:true}).click();
   await page.getByRole('button',{name:'Close daily check-in',exact:true}).click();
   await page.emulateMedia({reducedMotion:'no-preference'});
-  assert.equal(await page.locator('#quickBonusBtn').isDisabled(),true);
-  assert.equal(await page.locator('#tasksBonusBtn').isDisabled(),true,'Both screens share the claimed daily bonus state');
+  assert.equal(await page.locator('#quickBonusBtn').isDisabled(),false);
+  assert.equal(await page.locator('#tasksBonusBtn').isDisabled(),false,'Bonus codes are separate from daily check-in');
   await page.evaluate(()=>window.claimDaily());
   assert.equal(dailyRequests,1,'Check-in and daily bonus share one reward');
   await page.locator('#featuredGames button').first().click();

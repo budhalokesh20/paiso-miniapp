@@ -282,7 +282,7 @@ function QuickTasks({ variant = 'home' }) {
     const items = [
         { title: 'Daily Check-in', copy: 'Claim daily reward', action: () => window.openDailyCheckin(), label: 'Check In', art: 'checkin' },
         { title: 'Daily Spin', copy: 'Spin & win coins!', action: () => window.openDailySpin(), label: 'Spin Now', art: 'spin' },
-        { title: 'Daily Bonus', copy: 'Claim free rewards!', action: () => window.claimDaily(), label: 'Claim Now', art: 'bonus' },
+        { title: 'Bonus Code', copy: 'Enter code, earn points', action: () => window.openBonusCode(), label: 'Enter Code', art: 'bonus' },
     ];
     return h("section", { className: tasksVariant ? "tasks-quick home-quick" : "home-quick", "aria-labelledby": titleId },
         h("div", { className: "section-head" },
@@ -294,8 +294,8 @@ function QuickTasks({ variant = 'home' }) {
             h("span", { className: 'reference-art quick-art art-' + item.art, "aria-hidden": "true" }),
             h("h3", null, item.title),
             h("p", null, item.copy),
-            h("button", { type: "button", id: item.art === 'bonus' ? (tasksVariant ? 'tasksBonusBtn' : 'quickBonusBtn') : undefined, "data-daily-bonus": item.art === 'bonus' ? '' : undefined, onClick: item.action },
-                h("span", { id: item.art === 'bonus' ? (tasksVariant ? 'tasksBonusText' : 'quickBonusText') : undefined, "data-daily-label": item.art === 'bonus' ? '' : undefined }, item.label),
+            h("button", { type: "button", id: item.art === 'bonus' ? (tasksVariant ? 'tasksBonusBtn' : 'quickBonusBtn') : undefined, onClick: item.action },
+                h("span", { id: item.art === 'bonus' ? (tasksVariant ? 'tasksBonusText' : 'quickBonusText') : undefined }, item.label),
                 !tasksVariant ? h(UiIcon, { name: "arrow", size: 14 }) : null)))));
 }
 
@@ -341,7 +341,23 @@ function DailyCheckInModal() {
         h("div", { className: "checkin-dialog-content" },
             h("button", { className: "checkin-close", "aria-label": "Close daily check-in", onClick: () => window.closeDailyCheckin() }, "\u00D7"),
             h(DailyCheckIn, null),
-            h("p", { className: "checkin-note" }, "Your daily check-in includes today's bonus.")));
+            h("p", { className: "checkin-note" }, "Check in once every 24 hours to continue your streak.")));
+}
+function RewardsModal() {
+    return h("dialog", { id: "rewardsModal", className: "home-checkin-dialog", "aria-labelledby": "rewardDialogTitle" },
+        h("div", { className: "checkin-dialog-content reward-dialog-content" },
+            h("button", { type: "button", className: "checkin-close", "aria-label": "Close rewards", onClick: () => window.closeRewards() }, "\u00D7"),
+            h("h2", { id: "rewardDialogTitle" }, "Daily Spin"),
+            h("p", { id: "rewardDialogDescription" }),
+            h("div", { id: "spinRewardPanel" },
+                h("div", { className: "reward-wheel", "aria-hidden": "true" }, "P"),
+                h("p", { id: "spinRewardOptions" }),
+                h("button", { id: "spinClaimButton", type: "button", className: "primary-btn", onClick: () => window.claimSpin() }, "Spin now")),
+            h("form", { id: "bonusCodePanel", hidden: true, onSubmit: (event) => { event.preventDefault(); void window.redeemBonus(); } },
+                h("label", { for: "bonusCodeInput" }, "Bonus code"),
+                h("input", { id: "bonusCodeInput", required: true, maxLength: 40, autoComplete: "off", placeholder: "Enter your code" }),
+                h("button", { id: "bonusRedeemButton", className: "primary-btn", type: "submit" }, "Redeem points")),
+            h("p", { id: "rewardResult", role: "status", "aria-live": "polite" })));
 }
 
 // --- src/client/components/home/EarnShortcuts.tsx ---
@@ -1032,6 +1048,7 @@ function PaisoApp() {
         h(NotificationModal, null),
         h(GameModal, null),
         h(DailyCheckInModal, null),
+        h(RewardsModal, null),
         h(SettingsOverlays, null,
             h(TaskListPage, null)),
         h("main", { className: "app-viewport" },
@@ -2294,14 +2311,52 @@ window.openDailyCheckin = () => {
         button.focus();
 };
 window.closeDailyCheckin = () => document.getElementById('dailyCheckinModal').close();
-window.openDailySpin = () => {
-    const spin = state?.games.find(game => game.enabled && /spin|wheel/i.test(game.title));
-    if (spin) {
-        void playGame(spin.id);
+let rewardBusy = false;
+function openRewardDialog(bonus) {
+    setText('rewardDialogTitle', bonus ? 'Bonus code' : 'Daily Spin');
+    setText('rewardDialogDescription', bonus ? 'Redeem a code published by Paiso.' : 'Your reward is chosen securely when you spin.');
+    setText('rewardResult', '');
+    $('spinRewardPanel').hidden = bonus;
+    $('bonusCodePanel').hidden = !bonus;
+    setText('spinRewardOptions', (state?.spinSettings?.rewards || []).join(' · ') + ' P points');
+    const button = $('spinClaimButton');
+    const ready = Boolean(state?.spinSettings?.enabled && (state.nextSpinAt || 0) <= Date.now());
+    button.disabled = !ready;
+    button.textContent = ready ? 'Spin now' : state?.spinSettings?.enabled ? 'Next spin: ' + new Date(state.nextSpinAt || 0).toLocaleString() : 'Spin is paused';
+    const dialog = $('rewardsModal');
+    if (!dialog.open)
+        dialog.showModal();
+}
+window.openDailySpin = () => openRewardDialog(false);
+window.openBonusCode = () => openRewardDialog(true);
+window.closeRewards = () => { if (!rewardBusy)
+    $('rewardsModal')?.close(); };
+async function submitReward(bonus) {
+    if (rewardBusy)
         return;
+    rewardBusy = true;
+    const button = $(bonus ? 'bonusRedeemButton' : 'spinClaimButton');
+    button.disabled = true;
+    $('rewardsModal')?.classList.add('reward-pending');
+    setText('rewardResult', 'Processing…');
+    try {
+        const result = await api(bonus ? '/api/rewards/redeem' : '/api/rewards/spin', { method: 'POST', body: JSON.stringify(bonus ? { code: $('bonusCodeInput').value } : {}) });
+        setText('rewardResult', result.ok ? '+' + result.points + ' P points credited.' : result.error || 'Reward unavailable.');
+        if (result.ok && bonus)
+            $('bonusCodeInput').value = '';
+        await load();
     }
-    toast("Daily Spin isn't available yet. Check back soon.", 'warning');
-};
+    catch {
+        setText('rewardResult', 'Could not confirm this reward. Refresh your balance before retrying.');
+    }
+    finally {
+        rewardBusy = false;
+        $('rewardsModal')?.classList.remove('reward-pending');
+        button.disabled = bonus ? false : Boolean(!state?.spinSettings?.enabled || (state.nextSpinAt || 0) > Date.now());
+    }
+}
+window.claimSpin = () => submitReward(false);
+window.redeemBonus = () => submitReward(true);
 window.copyRef = copyRef;
 window.shareRef = shareRef;
 window.withdraw = withdraw;

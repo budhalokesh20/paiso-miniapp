@@ -1,0 +1,18 @@
+const assert = require('node:assert/strict');
+const { DEFAULT_SPIN_SETTINGS, normalizeBonusCode, validateSpinSettings, spinDecision, bonusDecision } = require('../reward-rules.js');
+assert.equal(normalizeBonusCode('  paiso-2026  '), 'PAISO-2026');
+assert.equal(normalizeBonusCode('a b!'), null);
+assert.equal(validateSpinSettings(DEFAULT_SPIN_SETTINGS), true);
+assert.equal(validateSpinSettings({...DEFAULT_SPIN_SETTINGS, rewards:[-1]}), false);
+assert.deepEqual(spinDecision(DEFAULT_SPIN_SETTINGS, 0, 1000, 1), {ok:true,points:10,nextSpinAt:86401000});
+assert.equal(spinDecision(DEFAULT_SPIN_SETTINGS, 1000, 2000, 0).reason, 'cooldown');
+assert.equal(spinDecision({...DEFAULT_SPIN_SETTINGS,enabled:false}, 0, 1000, 0).reason, 'disabled');
+assert.equal(spinDecision(DEFAULT_SPIN_SETTINGS, 0, 1000, 99).reason, 'invalid');
+const code={enabled:true,points:20,maxUses:2,uses:0,expiresAt:5000};
+assert.deepEqual(bonusDecision(code,false,1000),{ok:true,points:20});
+assert.equal(bonusDecision(code,true,1000).reason,'claimed');
+assert.equal(bonusDecision({...code,uses:2},false,1000).reason,'exhausted');
+assert.equal(bonusDecision(code,false,5000).reason,'expired');
+assert.equal(bonusDecision({...code,enabled:false},false,1000).reason,'disabled');
+assert.equal(bonusDecision({...code,points:0},false,1000).reason,'invalid');
+console.log('Reward rule checks passed; transactional integration is still required.');

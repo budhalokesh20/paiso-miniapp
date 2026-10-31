@@ -1,6 +1,6 @@
 import { h, Fragment } from './jsx';
 import { SvgSpriteDefs } from './components/Icons';
-import { DailyCheckInModal } from './components/home/DailyCheckIn';
+import { DailyCheckInModal, RewardsModal } from './components/home/DailyCheckIn';
 import { HomeView } from './components/HomeView';
 import { FeedbackToast, showFeedback, FeedbackKind } from './components/shared/FeedbackToast';
 import { EarnIcon } from './components/shared/EarnIcon';
@@ -126,6 +126,8 @@ interface ClientNotification {
 }
 
 interface ClientMeResponse {
+  spinSettings?: {enabled:boolean;cooldownMs:number;rewards:number[]};
+  nextSpinAt?: number;
   user: ClientUser;
   tasks: ClientTask[];
   games: ClientGame[];
@@ -232,6 +234,10 @@ declare global {
     claimTask: (id: string) => Promise<void>;
     playGame: (id: string) => Promise<void>;
     closeGame: () => void;
+    openBonusCode: () => void;
+    closeRewards: () => void;
+    claimSpin: () => Promise<void>;
+    redeemBonus: () => Promise<void>;
     searchGames: (query: string) => void;
     filterGames: (filter: 'all' | 'free' | 'paid') => void;
     retryGames: () => void;
@@ -330,6 +336,7 @@ function PaisoApp() {
       <NotificationModal />
       <GameModal />
       <DailyCheckInModal />
+      <RewardsModal />
       <SettingsOverlays><TaskListPage /></SettingsOverlays>
       <main className="app-viewport">
         <HomeView />
@@ -1660,11 +1667,35 @@ window.openDailyCheckin = () => {
   if (!button.disabled) button.focus();
 };
 window.closeDailyCheckin = () => (document.getElementById('dailyCheckinModal') as HTMLDialogElement).close();
-window.openDailySpin = () => {
-  const spin = state?.games.find(game => game.enabled && /spin|wheel/i.test(game.title));
-  if (spin) { void playGame(spin.id); return; }
-  toast("Daily Spin isn't available yet. Check back soon.", 'warning');
-};
+let rewardBusy=false;
+function openRewardDialog(bonus:boolean):void {
+  setText('rewardDialogTitle',bonus?'Bonus code':'Daily Spin');
+  setText('rewardDialogDescription',bonus?'Redeem a code published by Paiso.':'Your reward is chosen securely when you spin.');
+  setText('rewardResult','');
+  $('spinRewardPanel')!.hidden=bonus; $('bonusCodePanel')!.hidden=!bonus;
+  setText('spinRewardOptions',(state?.spinSettings?.rewards || []).join(' · ')+' P points');
+  const button=$<HTMLButtonElement>('spinClaimButton')!;
+  const ready=Boolean(state?.spinSettings?.enabled && (state.nextSpinAt || 0)<=Date.now());
+  button.disabled=!ready; button.textContent=ready?'Spin now':state?.spinSettings?.enabled?'Next spin: '+new Date(state.nextSpinAt || 0).toLocaleString():'Spin is paused';
+  const dialog=$<HTMLDialogElement>('rewardsModal')!;if(!dialog.open)dialog.showModal();
+}
+window.openDailySpin=()=>openRewardDialog(false);
+window.openBonusCode=()=>openRewardDialog(true);
+window.closeRewards=()=>{if(!rewardBusy)$<HTMLDialogElement>('rewardsModal')?.close();};
+async function submitReward(bonus:boolean):Promise<void> {
+  if(rewardBusy)return; rewardBusy=true;
+  const button=$<HTMLButtonElement>(bonus?'bonusRedeemButton':'spinClaimButton')!;button.disabled=true;
+  $('rewardsModal')?.classList.add('reward-pending');setText('rewardResult','Processing…');
+  try {
+    const result=await api<{ok:boolean;points?:number;error?:string}>(bonus?'/api/rewards/redeem':'/api/rewards/spin',{method:'POST',body:JSON.stringify(bonus?{code:$<HTMLInputElement>('bonusCodeInput')!.value}:{})});
+    setText('rewardResult',result.ok?'+'+result.points+' P points credited.':result.error || 'Reward unavailable.');
+    if(result.ok && bonus)$<HTMLInputElement>('bonusCodeInput')!.value='';
+    await load();
+  }catch{setText('rewardResult','Could not confirm this reward. Refresh your balance before retrying.');}
+  finally{rewardBusy=false;$('rewardsModal')?.classList.remove('reward-pending');button.disabled=bonus?false:Boolean(!state?.spinSettings?.enabled || (state.nextSpinAt || 0)>Date.now());}
+}
+window.claimSpin=()=>submitReward(false);
+window.redeemBonus=()=>submitReward(true);
 window.copyRef = copyRef;
 window.shareRef = shareRef;
 window.withdraw = withdraw;

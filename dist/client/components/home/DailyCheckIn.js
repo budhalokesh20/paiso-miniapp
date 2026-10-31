@@ -39,5 +39,21 @@ export function DailyCheckInModal() {
         h("div", { className: "checkin-dialog-content" },
             h("button", { className: "checkin-close", "aria-label": "Close daily check-in", onClick: () => window.closeDailyCheckin() }, "\u00D7"),
             h(DailyCheckIn, null),
-            h("p", { className: "checkin-note" }, "Your daily check-in includes today's bonus.")));
+            h("p", { className: "checkin-note" }, "Check in once every 24 hours to continue your streak.")));
+}
+export function RewardsModal() {
+    return h("dialog", { id: "rewardsModal", className: "home-checkin-dialog", "aria-labelledby": "rewardDialogTitle" },
+        h("div", { className: "checkin-dialog-content reward-dialog-content" },
+            h("button", { type: "button", className: "checkin-close", "aria-label": "Close rewards", onClick: () => window.closeRewards() }, "\u00D7"),
+            h("h2", { id: "rewardDialogTitle" }, "Daily Spin"),
+            h("p", { id: "rewardDialogDescription" }),
+            h("div", { id: "spinRewardPanel" },
+                h("div", { className: "reward-wheel", "aria-hidden": "true" }, "P"),
+                h("p", { id: "spinRewardOptions" }),
+                h("button", { id: "spinClaimButton", type: "button", className: "primary-btn", onClick: () => window.claimSpin() }, "Spin now")),
+            h("form", { id: "bonusCodePanel", hidden: true, onSubmit: (event) => { event.preventDefault(); void window.redeemBonus(); } },
+                h("label", { for: "bonusCodeInput" }, "Bonus code"),
+                h("input", { id: "bonusCodeInput", required: true, maxLength: 40, autoComplete: "off", placeholder: "Enter your code" }),
+                h("button", { id: "bonusRedeemButton", className: "primary-btn", type: "submit" }, "Redeem points")),
+            h("p", { id: "rewardResult", role: "status", "aria-live": "polite" })));
 }

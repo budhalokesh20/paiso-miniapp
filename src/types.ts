@@ -43,6 +43,7 @@ export interface User {
   adDay?: string;
   adCount?: number;
   lastAdAt?: number;
+  lastSpinAt?: number;
 }
 
 export interface QualificationStatus {
@@ -163,6 +164,8 @@ export interface AppNotification {
 }
 
 export interface DatabaseSchema {
+  spinSettings?: import('./reward-rules').SpinSettings;
+  rewardCodes?: Record<string, { code: string; enabled: boolean; points: number; maxUses: number; uses: number; expiresAt: number | null; usedBy: Record<string, boolean> }>;
   users: Record<string, User>;
   withdrawals: Withdrawal[];
   claims: Record<string, number>;

@@ -1,0 +1,17 @@
+# Spin and bonus codes
+
+Home and Tasks provide Daily Spin and Bonus Code dialogs. Spin defaults to one attempt per 24 hours with equally likely 5, 10, 20 and 50 P points. The server selects the outcome with `crypto.randomInt`; the client cannot choose the outcome. P points use the existing coin balance and conversion settings. Redeeming a code is separate from daily check-in.
+
+In Admin → Games → Spin & bonus rewards, change the spin enable switch, cooldown hours and reward list. Create codes with points, a global usage limit and an optional expiry, or pause/re-enable existing codes. Codes are case-insensitive and each user can claim a code once. Reusing an existing code name is rejected, so historical redemptions cannot accidentally be reset.
+
+The live API implementation uses the validated TypeScript reward rules inside a serialized state operation. Each API request refreshes PostgreSQL state, and a changed snapshot is saved with a revision comparison before its response is sent. Database failure or a conflicting revision returns HTTP 503 instead of success. Bot-created users use the same queue. Local file mode uses atomic replacement for development; production and Render require PostgreSQL. The SQL files in `database/` are test prototypes; do not run the standalone reward functions in production. The server initializes the revision column and its write guard at startup.
+
+## Deployment
+
+Deploy during a short maintenance window: stop the old app version before starting the new one. Startup stores a one-time `rewards-v1` snapshot in `paiso_release_backups` before enabling the revision guard; this does not replace your normal managed database backups. Older versions use unconditional snapshot writes, which the new database revision trigger intentionally rejects. Deploy every service instance from the same release. `/healthz` returns `release: rewards-v1` after startup succeeds. Verify `/api/me`, admin login, a low-value test code and cooldown behavior before reopening traffic. Keep `DATABASE_URL` and `BOT_TOKEN` set in Render. This repository update does not execute migrations against the live database; startup performs the revision migration when the release is deployed.
+
+The existing singleton JSON state architecture serializes API work in one process; revision conflicts across processes fail with 503 and require a fresh request. It does not automatically replay reward or withdrawal requests. Long-running third-party verification can delay other state requests. These are practical capacity limits to monitor when scaling.
+
+## Tests
+
+`npm run build` compiles backend, app and admin. `node scripts/verify-games-api.cjs` runs against a fresh sandbox with no live credentials. Set `PAISO_API_TEST_DB=pg` and `PGLITE_MODULE` to an isolated PGlite module path to exercise PostgreSQL writes and persistence after shutdown. Set `PAISO_ADMIN_UI_TEST=1`, `PAISO_PLAYWRIGHT` and `PAISO_CHROMIUM` to include admin browser tests. `scripts/verify-ui.cjs` covers the app with mock API data across nine viewport sizes. Tests cover duplicate spin/redemption attempts, usage limits, storage failure, retry, admin create/pause/configuration, offline behavior and existing page flows. PGlite is an isolated PostgreSQL-compatible test environment; the actual Render/Neon deployment is not tested by these local runs.

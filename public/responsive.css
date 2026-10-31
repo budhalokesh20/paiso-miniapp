@@ -3,6 +3,19 @@
   --reference-unit: min(1vw, 4.4px);
   --page-gutter: clamp(12px, 2.6vw, 32px);
 }
+.reward-dialog-content { padding: 52px 24px 28px; }
+.reward-dialog-content h2 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+.reward-dialog-content p { font-size: 14px; line-height: 1.6; color: var(--ui-muted); margin: 10px 0; }
+.reward-dialog-content .primary-btn { width: 100%; min-height: 48px; margin-top: 18px; background: var(--green); color: #fff; border: 0; border-radius: 14px; padding: 12px; font-weight: 700; }
+.reward-dialog-content .primary-btn:disabled { opacity: .6; }
+.reward-dialog-content label { display: block; margin: 24px 0 8px; font-weight: 600; }
+.reward-dialog-content input { width: 100%; min-height: 50px; padding: 12px 14px; border: 1px solid var(--ui-line); border-radius: 14px; font-size: 16px; text-transform: uppercase; }
+.reward-dialog-content [hidden] { display: none; }
+.reward-wheel { display: grid; place-items: center; width: 152px; height: 152px; margin: 24px auto; border-radius: 50%; border: 9px solid #e4f6ee; background: conic-gradient(#00a587 0deg 90deg,#95e3ce 90deg 180deg,#00a587 180deg 270deg,#95e3ce 270deg); box-shadow: 0 8px 24px #009b7e22; color: #fff; font-size: 48px; font-weight: 800; }
+.reward-pending .reward-wheel { animation: reward-wheel-turn 1s linear infinite; }
+@keyframes reward-wheel-turn { to { transform: rotate(360deg); } }
+#rewardResult { color: #00866e; font-weight: 600; }
+@media(prefers-reduced-motion:reduce) { .reward-pending .reward-wheel { animation: none; } }
 #root, .app-shell { width: 100%; max-width: none; height: 100vh; height: 100dvh; min-height: 0; }
 .app-shell { container-type: normal; border: 0; box-shadow: none; }
 .app-viewport { flex: 1 1 0; min-height: 0; }

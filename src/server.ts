@@ -8,6 +8,8 @@
  * - Withdrawal requires meeting the qualification condition (3 Ads, 2 Tasks, 2 Daily Check-ins)
  * - DB: Postgres (Neon) when DATABASE_URL is set, else local JSON file (data/db.json)
  */
+import { readSnapshot, commitSnapshot } from './transactional-snapshot';
+import { DEFAULT_SPIN_SETTINGS, validateSpinSettings, spinDecision, normalizeBonusCode, bonusDecision } from './reward-rules';
 import express, { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import dns from 'dns';
@@ -103,7 +105,7 @@ const DEFAULT_SETTINGS: WithdrawSettings = {
 
 // --- Storage: Postgres (Neon) when DATABASE_URL is set, else local JSON file ---
 const DATABASE_URL: string = process.env.DATABASE_URL || '';
-type NeonSql = (query: string, params?: unknown[]) => Promise<Array<{ data: DatabaseSchema }>>;
+type NeonSql = (query: string, params?: unknown[]) => Promise<Array<{ data: DatabaseSchema; revision: number | string }>>;
 let sql: { query: NeonSql } | null = null;
 let db: DatabaseSchema = {
   users: {},
@@ -133,6 +135,8 @@ function normalizeDB(d: Partial<DatabaseSchema> | null | undefined): DatabaseSch
     });
   }
   return {
+    spinSettings: d?.spinSettings || { ...DEFAULT_SPIN_SETTINGS, rewards: [...DEFAULT_SPIN_SETTINGS.rewards] },
+    rewardCodes: d?.rewardCodes || {},
     users: (d && d.users) || {},
     withdrawals: (d && d.withdrawals) || [],
     claims: (d && d.claims) || {},
@@ -263,48 +267,63 @@ function getSettings(): WithdrawSettings {
   return db.settings;
 }
 
-let saveChain: Promise<void> = Promise.resolve();
-
-function persistNow(): Promise<void> {
-  if (!sql) {
-    try {
-      fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
-    } catch {}
-    return Promise.resolve();
-  }
-  const snapshot = JSON.stringify(db);
-  return sql
-    .query(
-      'INSERT INTO paiso_state (id, data) VALUES (1, $1::jsonb) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data',
-      [snapshot]
-    )
-    .then(() => undefined)
-    .catch((e: Error) => console.error('DB save failed:', e.message));
+let stateQueue: Promise<void> = Promise.resolve();
+let stateRevision = 0;
+let inStateOperation = false;
+function acquireState(): Promise<() => void> {
+  const previous=stateQueue; let release!:()=>void;
+  stateQueue=new Promise<void>(resolve=>{release=resolve;});
+  return previous.then(()=>release);
 }
-
+async function refreshState(): Promise<string> {
+  if(sql) { const snapshot=await readSnapshot<DatabaseSchema>(sql.query.bind(sql)); db=normalizeDB(snapshot.data); stateRevision=snapshot.revision; }
+  return JSON.stringify(db);
+}
+async function persistState(): Promise<void> {
+  if(sql) { stateRevision=await commitSnapshot(sql.query.bind(sql),stateRevision,db); }
+  else { const temporary=DB_FILE+'.tmp'; fs.writeFileSync(temporary,JSON.stringify(db,null,2)); fs.renameSync(temporary,DB_FILE); }
+}
 function saveDB(): Promise<void> {
-  saveChain = saveChain.then(persistNow);
-  return saveChain;
+  // API responses are fenced until the whole state operation commits.
+  if(!inStateOperation) return Promise.reject(new Error('State write outside operation'));
+  return Promise.resolve();
+}
+async function runStateOperation<T>(work:()=>T): Promise<T> {
+  const release=await acquireState();
+  let before='';
+  try { before=await refreshState(); inStateOperation=true; const result=work(); if(JSON.stringify(db)!==before) await persistState(); return result; }
+  catch(error) { if(before) db=normalizeDB(JSON.parse(before)); throw error; }
+  finally { inStateOperation=false; release(); }
 }
 
 async function initDB(): Promise<void> {
-  if (DATABASE_URL) {
+  if ((process.env.NODE_ENV === 'production' || process.env.RENDER === 'true') && !DATABASE_URL) {
+    throw new Error('DATABASE_URL is required in production.');
+  }
+  const localTestModule=process.env.NODE_ENV==='test' ? process.env.PAISO_TEST_PGLITE_MODULE : undefined;
+  if (DATABASE_URL || localTestModule) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { neon } = require('@neondatabase/serverless');
-      sql = neon(DATABASE_URL);
+      if(localTestModule) {
+        const { PGlite }=require(localTestModule);
+        const local=new PGlite(process.env.PAISO_TEST_DB_PATH || 'memory://');
+        sql={query:async(statement:string,params?:unknown[])=>(await local.query(statement,params)).rows};
+      } else { const { neon } = require('@neondatabase/serverless'); sql = neon(DATABASE_URL); }
       if (sql) {
         await sql.query('CREATE TABLE IF NOT EXISTS paiso_state (id INT PRIMARY KEY, data JSONB NOT NULL)');
-        const rows = await sql.query('SELECT data FROM paiso_state WHERE id = 1');
-        if (rows.length) db = normalizeDB(rows[0].data);
-        else await persistNow();
+        await sql.query('ALTER TABLE paiso_state ADD COLUMN IF NOT EXISTS revision bigint NOT NULL DEFAULT 0');
+        await sql.query('CREATE TABLE IF NOT EXISTS paiso_release_backups (release text PRIMARY KEY, data jsonb NOT NULL, revision bigint NOT NULL, created_at timestamptz NOT NULL DEFAULT now())');
+        await sql.query("INSERT INTO paiso_release_backups(release,data,revision) SELECT 'rewards-v1',data,revision FROM paiso_state WHERE id=1 ON CONFLICT(release) DO NOTHING");
+        await sql.query(`CREATE OR REPLACE FUNCTION paiso_require_snapshot_revision() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.revision IS DISTINCT FROM OLD.revision + 1 THEN RAISE EXCEPTION 'snapshot revision required' USING ERRCODE = '40001'; END IF; RETURN NEW; END; $$`);
+        await sql.query('CREATE OR REPLACE TRIGGER paiso_snapshot_revision_guard BEFORE UPDATE ON paiso_state FOR EACH ROW EXECUTE FUNCTION paiso_require_snapshot_revision()');
+        const rows = await sql.query('SELECT data, revision FROM paiso_state WHERE id = 1');
+        if (rows.length) { db = normalizeDB(rows[0].data); stateRevision=Number(rows[0].revision); }
+        else await sql.query('INSERT INTO paiso_state (id, data) VALUES (1, $1::jsonb) ON CONFLICT (id) DO NOTHING', [JSON.stringify(db)]);
         console.log('🗄️  Postgres DB loaded (Neon) — data permanent chha');
         return;
       }
-    } catch (e) {
-      const err = e as Error;
-      console.error('⚠️ Postgres init failed, file DB ma fallback:', err.message);
-      sql = null;
+    } catch {
+      throw new Error('Persistent database initialization failed; refusing temporary file fallback.');
     }
   }
   try {
@@ -363,6 +382,7 @@ async function tgApi(method: string, body?: Record<string, unknown>): Promise<an
   const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(method === 'getUpdates' ? 35000 : 15000),
     body: JSON.stringify(body || {})
   });
   return r.json();
@@ -518,6 +538,19 @@ function getReferralHistory(referrerId: string): ReferralHistoryItem[] {
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
+app.get('/healthz', (_req:Request,res:Response)=>{res.setHeader('Cache-Control','no-store');res.json({ok:true,release:'rewards-v1'});});
+// Express 4 does not forward rejected async handlers automatically.
+for (const method of ['get','post','put','delete','patch'] as const) {
+  const register=(app[method] as Function).bind(app);
+  (app as any)[method]=(route:unknown,...handlers:Function[])=>{
+    if(!handlers.length)return register(route);
+    return register(route,...handlers.map((handler,index)=>(req:Request,res:Response,next:NextFunction)=>{
+      const settled=()=>{if(index===handlers.length-1)res.locals.releaseAbandoned?.();};
+      try { const result=handler(req,res,next); if(result && typeof result.catch==='function')result.catch(next).finally(settled); else settled(); }
+      catch(error){next(error);settled();}
+    }));
+  };
+}
 
 // Basic security headers (no X-Frame-Options: Telegram Web loads the Mini App in an iframe)
 app.use((_req: Request, res: Response, next: NextFunction) => {
@@ -592,6 +625,32 @@ app.get('/api/countries', async (_req: Request, res: Response) => {
   res.json({ countries: getSettings().countries });
 });
 
+// Serialize state access and commit before sending any API response.
+app.use('/api', (req:Request,res:Response,next:NextFunction)=>{
+  void (async()=>{
+    const release=await acquireState(); let before=''; let ended=false;
+    const end=res.end.bind(res);
+    try { before=await refreshState(); inStateOperation=true; }
+    catch { release(); res.status(503).json({ok:false,error:'Database unavailable. Please try again.'}); return; }
+    res.locals.releaseAbandoned=()=>{if(!ended && res.destroyed){ended=true;db=normalizeDB(JSON.parse(before));inStateOperation=false;release();}};
+    res.end=((...args:any[])=>{
+      if(ended) return res; ended=true;
+      void (async()=>{
+        try {
+          if(res.locals.stateFailed || res.statusCode>=500) throw new Error('Request failed');
+          if(JSON.stringify(db)!==before) await persistState();
+          (end as any)(...args);
+        } catch {
+          db=normalizeDB(JSON.parse(before));
+          if(!res.headersSent) { res.statusCode=503; res.removeHeader('Content-Length'); res.removeHeader('ETag'); res.setHeader('Content-Type','application/json'); end(JSON.stringify({ok:false,error:'Could not save this request. Refresh before trying again.'})); }
+          else res.destroy();
+        } finally { inStateOperation=false; release(); }
+      })(); return res;
+    }) as typeof res.end;
+    next();
+  })();
+});
+
 function auth(req: Request, res: Response, next: NextFunction): void {
   const initData = String(req.headers['x-init-data'] || '');
   const isLocalDev = !initData && isTrueLocalRequest(req);
@@ -636,6 +695,8 @@ app.get('/api/me', auth, (req: Request, res: Response) => {
   const { pendingOtp: _hiddenOtp, ...safeUser } = user;
   res.json({
     user: safeUser,
+    spinSettings: db.spinSettings || DEFAULT_SPIN_SETTINGS,
+    nextSpinAt: user.lastSpinAt ? user.lastSpinAt + (db.spinSettings || DEFAULT_SPIN_SETTINGS).cooldownMs : 0,
     tasks: getTasks().map((t) => {
       const st = getTaskClaimState(user.id, t);
       return { ...t, done: st.done, nextAvailableAt: st.nextAvailableAt };
@@ -667,6 +728,44 @@ app.get('/api/me', auth, (req: Request, res: Response) => {
   });
 });
 
+
+app.post('/api/rewards/spin', rateLimit('spin',12,60000), auth, (req:Request,res:Response)=>{
+  const config=db.spinSettings || DEFAULT_SPIN_SETTINGS;
+  if(!validateSpinSettings(config)) { res.status(503).json({ok:false,error:'Spin is temporarily unavailable.'}); return; }
+  const decision=spinDecision(config,req.user!.lastSpinAt || 0,Date.now(),crypto.randomInt(config.rewards.length));
+  if(!decision.ok) { res.status(409).json({...decision,error:decision.reason==='cooldown'?'Your next spin is not ready yet.':'Spin is paused.'}); return; }
+  req.user!.lastSpinAt=Date.now(); req.user!.coins+=decision.points; req.user!.totalEarned+=decision.points;
+  pushNotification({userId:req.user!.id,title:'Spin reward',message:'+'+decision.points+' P points credited.',type:'reward',coins:decision.points});
+  res.json({...decision,coins:req.user!.coins});
+});
+app.post('/api/rewards/redeem',rateLimit('redeem',12,60000),auth,(req:Request,res:Response)=>{
+  const normalized=typeof req.body?.code==='string'?normalizeBonusCode(req.body.code):null;
+  const code=normalized?db.rewardCodes?.[normalized]:undefined;
+  if(!code) { res.status(400).json({ok:false,error:'Invalid or unavailable bonus code.'}); return; }
+  const decision=bonusDecision(code,Boolean(code.usedBy[req.user!.id]),Date.now());
+  if(!decision.ok) { const messages={claimed:'You already redeemed this code.',expired:'This code has expired.',exhausted:'This code has reached its usage limit.',disabled:'This code is paused.',invalid:'Invalid bonus code.'}; res.status(409).json({ok:false,error:messages[decision.reason]}); return; }
+  code.usedBy[req.user!.id]=true; code.uses++; req.user!.coins+=decision.points; req.user!.totalEarned+=decision.points;
+  pushNotification({userId:req.user!.id,title:'Bonus code redeemed',message:'+'+decision.points+' P points credited.',type:'reward',coins:decision.points});
+  res.json({...decision,coins:req.user!.coins});
+});
+app.get('/api/admin/rewards',adminOnly,(_req:Request,res:Response)=>res.json({spin:db.spinSettings || DEFAULT_SPIN_SETTINGS,codes:Object.values(db.rewardCodes || {}).map(({usedBy,...code})=>code)}));
+app.put('/api/admin/rewards/spin',adminOnly,(req:Request,res:Response)=>{
+  if(!req.body || !validateSpinSettings(req.body)) {res.status(400).json({error:'Enter valid rewards and a cooldown of 1 minute to 30 days.'});return;}
+  db.spinSettings={enabled:req.body.enabled,cooldownMs:req.body.cooldownMs,rewards:[...req.body.rewards]}; res.json({ok:true});
+});
+app.post('/api/admin/rewards/codes',adminOnly,(req:Request,res:Response)=>{
+  const code=typeof req.body?.code==='string'?normalizeBonusCode(req.body.code):null;
+  const candidate={enabled:true,points:req.body?.points,maxUses:req.body?.maxUses,uses:0,expiresAt:req.body?.expiresAt ?? null};
+  if(!code || !bonusDecision(candidate,false,Date.now()).ok) {res.status(400).json({error:'Enter a valid code, points, usage limit and future expiry.'});return;}
+  if(db.rewardCodes?.[code]) {res.status(409).json({error:'This code already exists. Use a new code.'});return;}
+  if(Object.keys(db.rewardCodes || {}).length>=1000) {res.status(409).json({error:'Maximum code count reached.'});return;}
+  db.rewardCodes ||= {}; db.rewardCodes[code]={code,...candidate,usedBy:{}}; res.json({ok:true});
+});
+app.put('/api/admin/rewards/codes/:code',adminOnly,(req:Request,res:Response)=>{
+  const code=db.rewardCodes?.[String(req.params.code)];
+  if(!code || typeof req.body?.enabled!=='boolean'){res.status(400).json({error:'Invalid code or status.'});return;}
+  code.enabled=req.body.enabled;res.json({ok:true});
+});
 app.post('/api/games/:id/play', auth, async (req: Request, res: Response) => {
   const user = req.user!;
   const game = getGames().find((g) => g.id === String(req.params.id) && g.enabled);
@@ -1278,6 +1377,8 @@ app.get('/api/admin/stats', adminOnly, (_req: Request, res: Response) => {
     games: getGames().map(publicGame),
     gameStarts: gamePlays.length,
     gameCoinsCollected: gamePlays.reduce((sum, p) => sum + p.coins, 0),
+    spinSettings: db.spinSettings || DEFAULT_SPIN_SETTINGS,
+    rewardCodes: Object.values(db.rewardCodes || {}).map(({usedBy,...code})=>code),
     users: users
       .sort((a, b) => b.coins - a.coins)
       .map((u) => {
@@ -1818,7 +1919,7 @@ async function poll(): Promise<void> {
         if (!msg?.text) continue;
         if (msg.text.startsWith('/start')) {
           const param = msg.text.split(' ')[1] || '';
-          getUser(msg.from, param);
+          await runStateOperation(()=>getUser(msg.from, param));
           await tgApi('sendMessage', {
             chat_id: msg.chat.id,
             text: `👋 Paiso ma swagat chha ${msg.from.first_name}!\n\n🪙 Tasks gara, coins kamaau\n👥 Refer gara = +${REFERRAL_BONUS} coins\n💸 ${MIN_WITHDRAW_COINS} coins = NPR ${MIN_WITHDRAW_COINS / COIN_PER_NPR} withdraw (eSewa/Khalti)\n\nTala ko button dabayera Paiso app khola 👇`,
@@ -1828,7 +1929,7 @@ async function poll(): Promise<void> {
           });
         }
         if (msg.text === '/balance') {
-          const u2 = getUser(msg.from, '');
+          const u2 = await runStateOperation(()=>getUser(msg.from, ''));
           await tgApi('sendMessage', {
             chat_id: msg.chat.id,
             text: `🪙 Balance: ${u2.coins} coins (≈ NPR ${(u2.coins / COIN_PER_NPR).toFixed(2)})`
@@ -1844,4 +1945,7 @@ async function poll(): Promise<void> {
 initDB().then(() => {
   app.listen(PORT, () => console.log(`✅ Server: http://localhost:${PORT}`));
   poll();
+}).catch((error: Error) => {
+  console.error('Server startup stopped:', error.message);
+  process.exitCode = 1;
 });

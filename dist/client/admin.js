@@ -436,10 +436,85 @@ function TasksTabView(props) {
                         })) : (h("tr", null,
                             h("td", { colSpan: "6", className: "py-8 text-center text-slate-400" }, "No tasks created yet"))))))))));
 }
+function RewardsAdmin({ s }) {
+    const spin = s.spinSettings || { enabled: true, cooldownMs: 86400000, rewards: [5, 10, 20, 50] };
+    const field = 'block w-full rounded-xl border border-slate-200 p-3 text-sm';
+    const submit = async (event, bonus) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const button = form.querySelector('button[type=submit]');
+        if (button.disabled)
+            return;
+        button.disabled = true;
+        const data = new FormData(form);
+        try {
+            const payload = bonus ? { code: String(data.get('code')), points: Number(data.get('points')), maxUses: Number(data.get('maxUses')), expiresAt: data.get('expiresAt') ? new Date(String(data.get('expiresAt'))).getTime() : null } : { enabled: data.get('enabled') === 'on', cooldownMs: Number(data.get('hours')) * 3600000, rewards: String(data.get('rewards')).split(',').map(value => Number(value.trim())) };
+            await adminApi(bonus ? '/api/admin/rewards/codes' : '/api/admin/rewards/spin', { method: bonus ? 'POST' : 'PUT', body: JSON.stringify(payload) });
+            notify(bonus ? 'Bonus code created' : 'Spin settings saved');
+            await refreshAdmin();
+        }
+        catch (error) {
+            notify(error.message, true);
+            button.disabled = false;
+        }
+    };
+    return h("section", { className: "rounded-2xl border border-slate-200 bg-white p-5 space-y-4" },
+        h("h2", { className: "text-lg font-bold" }, "Spin & bonus rewards"),
+        h("div", { className: "grid gap-5 md:grid-cols-2" },
+            h("form", { className: "space-y-3", onSubmit: (e) => void submit(e, false) },
+                h("h3", { className: "font-bold" }, "Daily Spin"),
+                h("label", { className: "block" },
+                    h("input", { type: "checkbox", name: "enabled", checked: spin.enabled }),
+                    " Enable spins"),
+                h("label", { className: "block" },
+                    "Cooldown hours",
+                    h("input", { className: field, type: "number", name: "hours", min: "0.016667", max: "720", step: "any", required: true, value: spin.cooldownMs / 3600000 })),
+                h("label", { className: "block" },
+                    "Possible P points (comma separated)",
+                    h("input", { className: field, name: "rewards", required: true, value: spin.rewards.join(', ') })),
+                h("p", { className: "text-xs text-slate-500" }, "Each listed entry has the same probability. Repeat a value to increase its probability."),
+                h("button", { type: "submit", className: "rounded-xl bg-emerald-700 px-4 py-3 text-white font-bold" }, "Save spin settings")),
+            h("form", { className: "space-y-3", onSubmit: (e) => void submit(e, true) },
+                h("h3", { className: "font-bold" }, "Create bonus code"),
+                h("label", { className: "block" },
+                    "Code",
+                    h("input", { className: field, name: "code", minLength: 4, maxLength: 40, required: true, pattern: "[A-Za-z0-9-]+" })),
+                h("label", { className: "block" },
+                    "P points",
+                    h("input", { className: field, name: "points", type: "number", min: "1", max: "1000000", defaultValue: "100", required: true })),
+                h("label", { className: "block" },
+                    "Total redemptions",
+                    h("input", { className: field, name: "maxUses", type: "number", min: "1", max: "1000000", defaultValue: "100", required: true })),
+                h("label", { className: "block" },
+                    "Expiry (optional)",
+                    h("input", { className: field, name: "expiresAt", type: "datetime-local" })),
+                h("p", { className: "text-xs text-slate-500" }, "Each user can redeem a code once."),
+                h("button", { type: "submit", className: "rounded-xl bg-emerald-700 px-4 py-3 text-white font-bold" }, "Create code"))),
+        h("div", { className: "space-y-2" }, (s.rewardCodes || []).map(code => h("div", { className: "flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 p-3" },
+            h("div", null,
+                h("b", null, code.code),
+                h("p", { className: "text-sm" },
+                    code.points,
+                    " P \u00B7 ",
+                    code.uses,
+                    "/",
+                    code.maxUses,
+                    " uses \u00B7 ",
+                    code.expiresAt ? new Date(code.expiresAt).toLocaleString() : 'No expiry')),
+            h("button", { type: "button", className: "rounded-lg border p-2", onClick: async (event) => { const button = event.currentTarget; button.disabled = true; try {
+                    await adminApi('/api/admin/rewards/codes/' + encodeURIComponent(code.code), { method: 'PUT', body: JSON.stringify({ enabled: !code.enabled }) });
+                    await refreshAdmin();
+                }
+                catch (error) {
+                    notify(error.message, true);
+                    button.disabled = false;
+                } } }, code.enabled ? 'Pause' : 'Enable')))));
+}
 function GamesTabView(props) {
     const games = props.s.games || [];
     const editGame = editingGameId ? games.find((game) => game.id === editingGameId) : null;
     return (h("div", { className: "space-y-5" },
+        h(RewardsAdmin, { s: props.s }),
         h("div", { className: "grid grid-cols-1 gap-3 sm:grid-cols-3" },
             h(AdminStatCard, { label: "Published games", value: games.filter((g) => g.enabled).length.toLocaleString(), detail: `${games.length} total` }),
             h(AdminStatCard, { label: "Game starts", value: (props.s.gameStarts || 0).toLocaleString(), detail: "Paid and free starts", tone: "blue" }),

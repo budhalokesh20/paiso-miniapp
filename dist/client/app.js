@@ -1,6 +1,6 @@
 import { h } from './jsx';
 import { SvgSpriteDefs } from './components/Icons';
-import { DailyCheckInModal } from './components/home/DailyCheckIn';
+import { DailyCheckInModal, RewardsModal } from './components/home/DailyCheckIn';
 import { HomeView } from './components/HomeView';
 import { FeedbackToast, showFeedback } from './components/shared/FeedbackToast';
 import { EarnIcon } from './components/shared/EarnIcon';
@@ -59,6 +59,7 @@ function PaisoApp() {
         h(NotificationModal, null),
         h(GameModal, null),
         h(DailyCheckInModal, null),
+        h(RewardsModal, null),
         h(SettingsOverlays, null,
             h(TaskListPage, null)),
         h("main", { className: "app-viewport" },
@@ -1321,14 +1322,52 @@ window.openDailyCheckin = () => {
         button.focus();
 };
 window.closeDailyCheckin = () => document.getElementById('dailyCheckinModal').close();
-window.openDailySpin = () => {
-    const spin = state?.games.find(game => game.enabled && /spin|wheel/i.test(game.title));
-    if (spin) {
-        void playGame(spin.id);
+let rewardBusy = false;
+function openRewardDialog(bonus) {
+    setText('rewardDialogTitle', bonus ? 'Bonus code' : 'Daily Spin');
+    setText('rewardDialogDescription', bonus ? 'Redeem a code published by Paiso.' : 'Your reward is chosen securely when you spin.');
+    setText('rewardResult', '');
+    $('spinRewardPanel').hidden = bonus;
+    $('bonusCodePanel').hidden = !bonus;
+    setText('spinRewardOptions', (state?.spinSettings?.rewards || []).join(' · ') + ' P points');
+    const button = $('spinClaimButton');
+    const ready = Boolean(state?.spinSettings?.enabled && (state.nextSpinAt || 0) <= Date.now());
+    button.disabled = !ready;
+    button.textContent = ready ? 'Spin now' : state?.spinSettings?.enabled ? 'Next spin: ' + new Date(state.nextSpinAt || 0).toLocaleString() : 'Spin is paused';
+    const dialog = $('rewardsModal');
+    if (!dialog.open)
+        dialog.showModal();
+}
+window.openDailySpin = () => openRewardDialog(false);
+window.openBonusCode = () => openRewardDialog(true);
+window.closeRewards = () => { if (!rewardBusy)
+    $('rewardsModal')?.close(); };
+async function submitReward(bonus) {
+    if (rewardBusy)
         return;
+    rewardBusy = true;
+    const button = $(bonus ? 'bonusRedeemButton' : 'spinClaimButton');
+    button.disabled = true;
+    $('rewardsModal')?.classList.add('reward-pending');
+    setText('rewardResult', 'Processing…');
+    try {
+        const result = await api(bonus ? '/api/rewards/redeem' : '/api/rewards/spin', { method: 'POST', body: JSON.stringify(bonus ? { code: $('bonusCodeInput').value } : {}) });
+        setText('rewardResult', result.ok ? '+' + result.points + ' P points credited.' : result.error || 'Reward unavailable.');
+        if (result.ok && bonus)
+            $('bonusCodeInput').value = '';
+        await load();
     }
-    toast("Daily Spin isn't available yet. Check back soon.", 'warning');
-};
+    catch {
+        setText('rewardResult', 'Could not confirm this reward. Refresh your balance before retrying.');
+    }
+    finally {
+        rewardBusy = false;
+        $('rewardsModal')?.classList.remove('reward-pending');
+        button.disabled = bonus ? false : Boolean(!state?.spinSettings?.enabled || (state.nextSpinAt || 0) > Date.now());
+    }
+}
+window.claimSpin = () => submitReward(false);
+window.redeemBonus = () => submitReward(true);
 window.copyRef = copyRef;
 window.shareRef = shareRef;
 window.withdraw = withdraw;

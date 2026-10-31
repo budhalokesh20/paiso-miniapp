@@ -4,7 +4,7 @@ Reference: ui/task.png. TasksView composes TaskHero, the shared QuickTasks compo
 
 Watch Videos, Play Games and Complete Offers open actual backend tasks filtered by video, play_game and app_task. View All includes web/social/completed tasks. TaskListPage mounts in the existing app-level detail layer, fills the app from the top and uses independent scrolling. Back and Escape return to the category screen. Search is available inside View All and each category list. No fake tasks, rewards or progress are added.
 
-Daily Check-in, Daily Spin and Daily Bonus reuse the Home actions. Bonus buttons on both screens update together after a claim. Spin opens a published Spin/Wheel game when available; otherwise it shows the existing availability message. Check-in and Bonus use the same daily reward endpoint.
+Daily Check-in, Daily Spin and Bonus Code reuse the Home actions. Spin and code redemption have separate backend endpoints, with limits controlled from Admin → Games. Check-in retains its own daily reward endpoint. See ui/REWARDS.md.
 
 public/tasks.css owns the mobile reference layout and task list styling, with three quick cards at every width and stacked category banners on phones. public/responsive.css adds a two-column hero/quick-task layout and three category columns from 760px, inside the full viewport shell. The shared header is shown only on Home; search remains available in View All. Existing Home, Settings and Offers behavior is preserved.
 

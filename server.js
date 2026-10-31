@@ -13,6 +13,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
  * - Withdrawal requires meeting the qualification condition (3 Ads, 2 Tasks, 2 Daily Check-ins)
  * - DB: Postgres (Neon) when DATABASE_URL is set, else local JSON file (data/db.json)
  */
+const transactional_snapshot_1 = require("./transactional-snapshot");
+const reward_rules_1 = require("./reward-rules");
 const express_1 = __importDefault(require("express"));
 const crypto_1 = __importDefault(require("crypto"));
 const dns_1 = __importDefault(require("dns"));
@@ -107,6 +109,8 @@ function normalizeDB(d) {
         });
     }
     return {
+        spinSettings: d?.spinSettings || { ...reward_rules_1.DEFAULT_SPIN_SETTINGS, rewards: [...reward_rules_1.DEFAULT_SPIN_SETTINGS.rewards] },
+        rewardCodes: d?.rewardCodes || {},
         users: (d && d.users) || {},
         withdrawals: (d && d.withdrawals) || [],
         claims: (d && d.claims) || {},
@@ -228,46 +232,97 @@ function getSettings() {
     }
     return db.settings;
 }
-let saveChain = Promise.resolve();
-function persistNow() {
-    if (!sql) {
-        try {
-            fs_1.default.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
-        }
-        catch { }
-        return Promise.resolve();
+let stateQueue = Promise.resolve();
+let stateRevision = 0;
+let inStateOperation = false;
+function acquireState() {
+    const previous = stateQueue;
+    let release;
+    stateQueue = new Promise(resolve => { release = resolve; });
+    return previous.then(() => release);
+}
+async function refreshState() {
+    if (sql) {
+        const snapshot = await (0, transactional_snapshot_1.readSnapshot)(sql.query.bind(sql));
+        db = normalizeDB(snapshot.data);
+        stateRevision = snapshot.revision;
     }
-    const snapshot = JSON.stringify(db);
-    return sql
-        .query('INSERT INTO paiso_state (id, data) VALUES (1, $1::jsonb) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data', [snapshot])
-        .then(() => undefined)
-        .catch((e) => console.error('DB save failed:', e.message));
+    return JSON.stringify(db);
+}
+async function persistState() {
+    if (sql) {
+        stateRevision = await (0, transactional_snapshot_1.commitSnapshot)(sql.query.bind(sql), stateRevision, db);
+    }
+    else {
+        const temporary = DB_FILE + '.tmp';
+        fs_1.default.writeFileSync(temporary, JSON.stringify(db, null, 2));
+        fs_1.default.renameSync(temporary, DB_FILE);
+    }
 }
 function saveDB() {
-    saveChain = saveChain.then(persistNow);
-    return saveChain;
+    // API responses are fenced until the whole state operation commits.
+    if (!inStateOperation)
+        return Promise.reject(new Error('State write outside operation'));
+    return Promise.resolve();
+}
+async function runStateOperation(work) {
+    const release = await acquireState();
+    let before = '';
+    try {
+        before = await refreshState();
+        inStateOperation = true;
+        const result = work();
+        if (JSON.stringify(db) !== before)
+            await persistState();
+        return result;
+    }
+    catch (error) {
+        if (before)
+            db = normalizeDB(JSON.parse(before));
+        throw error;
+    }
+    finally {
+        inStateOperation = false;
+        release();
+    }
 }
 async function initDB() {
-    if (DATABASE_URL) {
+    if ((process.env.NODE_ENV === 'production' || process.env.RENDER === 'true') && !DATABASE_URL) {
+        throw new Error('DATABASE_URL is required in production.');
+    }
+    const localTestModule = process.env.NODE_ENV === 'test' ? process.env.PAISO_TEST_PGLITE_MODULE : undefined;
+    if (DATABASE_URL || localTestModule) {
         try {
             // eslint-disable-next-line @typescript-eslint/no-var-requires
-            const { neon } = require('@neondatabase/serverless');
-            sql = neon(DATABASE_URL);
+            if (localTestModule) {
+                const { PGlite } = require(localTestModule);
+                const local = new PGlite(process.env.PAISO_TEST_DB_PATH || 'memory://');
+                sql = { query: async (statement, params) => (await local.query(statement, params)).rows };
+            }
+            else {
+                const { neon } = require('@neondatabase/serverless');
+                sql = neon(DATABASE_URL);
+            }
             if (sql) {
                 await sql.query('CREATE TABLE IF NOT EXISTS paiso_state (id INT PRIMARY KEY, data JSONB NOT NULL)');
-                const rows = await sql.query('SELECT data FROM paiso_state WHERE id = 1');
-                if (rows.length)
+                await sql.query('ALTER TABLE paiso_state ADD COLUMN IF NOT EXISTS revision bigint NOT NULL DEFAULT 0');
+                await sql.query('CREATE TABLE IF NOT EXISTS paiso_release_backups (release text PRIMARY KEY, data jsonb NOT NULL, revision bigint NOT NULL, created_at timestamptz NOT NULL DEFAULT now())');
+                await sql.query("INSERT INTO paiso_release_backups(release,data,revision) SELECT 'rewards-v1',data,revision FROM paiso_state WHERE id=1 ON CONFLICT(release) DO NOTHING");
+                await sql.query(`CREATE OR REPLACE FUNCTION paiso_require_snapshot_revision() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.revision IS DISTINCT FROM OLD.revision + 1 THEN RAISE EXCEPTION 'snapshot revision required' USING ERRCODE = '40001'; END IF; RETURN NEW; END; $$`);
+                await sql.query('CREATE OR REPLACE TRIGGER paiso_snapshot_revision_guard BEFORE UPDATE ON paiso_state FOR EACH ROW EXECUTE FUNCTION paiso_require_snapshot_revision()');
+                const rows = await sql.query('SELECT data, revision FROM paiso_state WHERE id = 1');
+                if (rows.length) {
                     db = normalizeDB(rows[0].data);
+                    stateRevision = Number(rows[0].revision);
+                }
                 else
-                    await persistNow();
+                    await sql.query('INSERT INTO paiso_state (id, data) VALUES (1, $1::jsonb) ON CONFLICT (id) DO NOTHING', [JSON.stringify(db)]);
                 console.log('🗄️  Postgres DB loaded (Neon) — data permanent chha');
                 return;
             }
         }
-        catch (e) {
-            const err = e;
-            console.error('⚠️ Postgres init failed, file DB ma fallback:', err.message);
-            sql = null;
+        catch {
+            throw new Error('Persistent database initialization failed; refusing temporary file fallback.');
         }
     }
     try {
@@ -324,6 +379,7 @@ async function tgApi(method, body) {
     const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(method === 'getUpdates' ? 35000 : 15000),
         body: JSON.stringify(body || {})
     });
     return r.json();
@@ -474,6 +530,30 @@ function getReferralHistory(referrerId) {
 const app = (0, express_1.default)();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
+app.get('/healthz', (_req, res) => { res.setHeader('Cache-Control', 'no-store'); res.json({ ok: true, release: 'rewards-v1' }); });
+// Express 4 does not forward rejected async handlers automatically.
+for (const method of ['get', 'post', 'put', 'delete', 'patch']) {
+    const register = app[method].bind(app);
+    app[method] = (route, ...handlers) => {
+        if (!handlers.length)
+            return register(route);
+        return register(route, ...handlers.map((handler, index) => (req, res, next) => {
+            const settled = () => { if (index === handlers.length - 1)
+                res.locals.releaseAbandoned?.(); };
+            try {
+                const result = handler(req, res, next);
+                if (result && typeof result.catch === 'function')
+                    result.catch(next).finally(settled);
+                else
+                    settled();
+            }
+            catch (error) {
+                next(error);
+                settled();
+            }
+        }));
+    };
+}
 // Basic security headers (no X-Frame-Options: Telegram Web loads the Mini App in an iframe)
 app.use((_req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -539,6 +619,62 @@ app.get('/api/countries', async (_req, res) => {
     catch { }
     res.json({ countries: getSettings().countries });
 });
+// Serialize state access and commit before sending any API response.
+app.use('/api', (req, res, next) => {
+    void (async () => {
+        const release = await acquireState();
+        let before = '';
+        let ended = false;
+        const end = res.end.bind(res);
+        try {
+            before = await refreshState();
+            inStateOperation = true;
+        }
+        catch {
+            release();
+            res.status(503).json({ ok: false, error: 'Database unavailable. Please try again.' });
+            return;
+        }
+        res.locals.releaseAbandoned = () => { if (!ended && res.destroyed) {
+            ended = true;
+            db = normalizeDB(JSON.parse(before));
+            inStateOperation = false;
+            release();
+        } };
+        res.end = ((...args) => {
+            if (ended)
+                return res;
+            ended = true;
+            void (async () => {
+                try {
+                    if (res.locals.stateFailed || res.statusCode >= 500)
+                        throw new Error('Request failed');
+                    if (JSON.stringify(db) !== before)
+                        await persistState();
+                    end(...args);
+                }
+                catch {
+                    db = normalizeDB(JSON.parse(before));
+                    if (!res.headersSent) {
+                        res.statusCode = 503;
+                        res.removeHeader('Content-Length');
+                        res.removeHeader('ETag');
+                        res.setHeader('Content-Type', 'application/json');
+                        end(JSON.stringify({ ok: false, error: 'Could not save this request. Refresh before trying again.' }));
+                    }
+                    else
+                        res.destroy();
+                }
+                finally {
+                    inStateOperation = false;
+                    release();
+                }
+            })();
+            return res;
+        });
+        next();
+    })();
+});
 function auth(req, res, next) {
     const initData = String(req.headers['x-init-data'] || '');
     const isLocalDev = !initData && isTrueLocalRequest(req);
@@ -577,6 +713,8 @@ app.get('/api/me', auth, (req, res) => {
     const { pendingOtp: _hiddenOtp, ...safeUser } = user;
     res.json({
         user: safeUser,
+        spinSettings: db.spinSettings || reward_rules_1.DEFAULT_SPIN_SETTINGS,
+        nextSpinAt: user.lastSpinAt ? user.lastSpinAt + (db.spinSettings || reward_rules_1.DEFAULT_SPIN_SETTINGS).cooldownMs : 0,
         tasks: getTasks().map((t) => {
             const st = getTaskClaimState(user.id, t);
             return { ...t, done: st.done, nextAvailableAt: st.nextAvailableAt };
@@ -606,6 +744,80 @@ app.get('/api/me', auth, (req, res) => {
         unreadCount: notifData.unreadCount,
         refLink: `https://t.me/${process.env.BOT_USERNAME || 'YourBot'}?start=ref_${user.id}`
     });
+});
+app.post('/api/rewards/spin', rateLimit('spin', 12, 60000), auth, (req, res) => {
+    const config = db.spinSettings || reward_rules_1.DEFAULT_SPIN_SETTINGS;
+    if (!(0, reward_rules_1.validateSpinSettings)(config)) {
+        res.status(503).json({ ok: false, error: 'Spin is temporarily unavailable.' });
+        return;
+    }
+    const decision = (0, reward_rules_1.spinDecision)(config, req.user.lastSpinAt || 0, Date.now(), crypto_1.default.randomInt(config.rewards.length));
+    if (!decision.ok) {
+        res.status(409).json({ ...decision, error: decision.reason === 'cooldown' ? 'Your next spin is not ready yet.' : 'Spin is paused.' });
+        return;
+    }
+    req.user.lastSpinAt = Date.now();
+    req.user.coins += decision.points;
+    req.user.totalEarned += decision.points;
+    pushNotification({ userId: req.user.id, title: 'Spin reward', message: '+' + decision.points + ' P points credited.', type: 'reward', coins: decision.points });
+    res.json({ ...decision, coins: req.user.coins });
+});
+app.post('/api/rewards/redeem', rateLimit('redeem', 12, 60000), auth, (req, res) => {
+    const normalized = typeof req.body?.code === 'string' ? (0, reward_rules_1.normalizeBonusCode)(req.body.code) : null;
+    const code = normalized ? db.rewardCodes?.[normalized] : undefined;
+    if (!code) {
+        res.status(400).json({ ok: false, error: 'Invalid or unavailable bonus code.' });
+        return;
+    }
+    const decision = (0, reward_rules_1.bonusDecision)(code, Boolean(code.usedBy[req.user.id]), Date.now());
+    if (!decision.ok) {
+        const messages = { claimed: 'You already redeemed this code.', expired: 'This code has expired.', exhausted: 'This code has reached its usage limit.', disabled: 'This code is paused.', invalid: 'Invalid bonus code.' };
+        res.status(409).json({ ok: false, error: messages[decision.reason] });
+        return;
+    }
+    code.usedBy[req.user.id] = true;
+    code.uses++;
+    req.user.coins += decision.points;
+    req.user.totalEarned += decision.points;
+    pushNotification({ userId: req.user.id, title: 'Bonus code redeemed', message: '+' + decision.points + ' P points credited.', type: 'reward', coins: decision.points });
+    res.json({ ...decision, coins: req.user.coins });
+});
+app.get('/api/admin/rewards', adminOnly, (_req, res) => res.json({ spin: db.spinSettings || reward_rules_1.DEFAULT_SPIN_SETTINGS, codes: Object.values(db.rewardCodes || {}).map(({ usedBy, ...code }) => code) }));
+app.put('/api/admin/rewards/spin', adminOnly, (req, res) => {
+    if (!req.body || !(0, reward_rules_1.validateSpinSettings)(req.body)) {
+        res.status(400).json({ error: 'Enter valid rewards and a cooldown of 1 minute to 30 days.' });
+        return;
+    }
+    db.spinSettings = { enabled: req.body.enabled, cooldownMs: req.body.cooldownMs, rewards: [...req.body.rewards] };
+    res.json({ ok: true });
+});
+app.post('/api/admin/rewards/codes', adminOnly, (req, res) => {
+    const code = typeof req.body?.code === 'string' ? (0, reward_rules_1.normalizeBonusCode)(req.body.code) : null;
+    const candidate = { enabled: true, points: req.body?.points, maxUses: req.body?.maxUses, uses: 0, expiresAt: req.body?.expiresAt ?? null };
+    if (!code || !(0, reward_rules_1.bonusDecision)(candidate, false, Date.now()).ok) {
+        res.status(400).json({ error: 'Enter a valid code, points, usage limit and future expiry.' });
+        return;
+    }
+    if (db.rewardCodes?.[code]) {
+        res.status(409).json({ error: 'This code already exists. Use a new code.' });
+        return;
+    }
+    if (Object.keys(db.rewardCodes || {}).length >= 1000) {
+        res.status(409).json({ error: 'Maximum code count reached.' });
+        return;
+    }
+    db.rewardCodes ||= {};
+    db.rewardCodes[code] = { code, ...candidate, usedBy: {} };
+    res.json({ ok: true });
+});
+app.put('/api/admin/rewards/codes/:code', adminOnly, (req, res) => {
+    const code = db.rewardCodes?.[String(req.params.code)];
+    if (!code || typeof req.body?.enabled !== 'boolean') {
+        res.status(400).json({ error: 'Invalid code or status.' });
+        return;
+    }
+    code.enabled = req.body.enabled;
+    res.json({ ok: true });
 });
 app.post('/api/games/:id/play', auth, async (req, res) => {
     const user = req.user;
@@ -1188,6 +1400,8 @@ app.get('/api/admin/stats', adminOnly, (_req, res) => {
         games: getGames().map(publicGame),
         gameStarts: gamePlays.length,
         gameCoinsCollected: gamePlays.reduce((sum, p) => sum + p.coins, 0),
+        spinSettings: db.spinSettings || reward_rules_1.DEFAULT_SPIN_SETTINGS,
+        rewardCodes: Object.values(db.rewardCodes || {}).map(({ usedBy, ...code }) => code),
         users: users
             .sort((a, b) => b.coins - a.coins)
             .map((u) => {
@@ -1700,7 +1914,7 @@ async function poll() {
                     continue;
                 if (msg.text.startsWith('/start')) {
                     const param = msg.text.split(' ')[1] || '';
-                    getUser(msg.from, param);
+                    await runStateOperation(() => getUser(msg.from, param));
                     await tgApi('sendMessage', {
                         chat_id: msg.chat.id,
                         text: `👋 Paiso ma swagat chha ${msg.from.first_name}!\n\n🪙 Tasks gara, coins kamaau\n👥 Refer gara = +${REFERRAL_BONUS} coins\n💸 ${MIN_WITHDRAW_COINS} coins = NPR ${MIN_WITHDRAW_COINS / COIN_PER_NPR} withdraw (eSewa/Khalti)\n\nTala ko button dabayera Paiso app khola 👇`,
@@ -1710,7 +1924,7 @@ async function poll() {
                     });
                 }
                 if (msg.text === '/balance') {
-                    const u2 = getUser(msg.from, '');
+                    const u2 = await runStateOperation(() => getUser(msg.from, ''));
                     await tgApi('sendMessage', {
                         chat_id: msg.chat.id,
                         text: `🪙 Balance: ${u2.coins} coins (≈ NPR ${(u2.coins / COIN_PER_NPR).toFixed(2)})`
@@ -1726,4 +1940,7 @@ async function poll() {
 initDB().then(() => {
     app.listen(PORT, () => console.log(`✅ Server: http://localhost:${PORT}`));
     poll();
+}).catch((error) => {
+    console.error('Server startup stopped:', error.message);
+    process.exitCode = 1;
 });
