@@ -3,7 +3,6 @@ import { SvgSpriteDefs } from './components/Icons';
 import { DailyCheckInModal } from './components/home/DailyCheckIn';
 import { HomeView } from './components/HomeView';
 import { FeedbackToast, showFeedback, FeedbackKind } from './components/shared/FeedbackToast';
-import { AppHeader } from './components/shared/AppHeader';
 import { EarnIcon } from './components/shared/EarnIcon';
 import { UiIcon } from './components/shared/UiIcon';
 import { GameCard } from './components/shared/GameCard';
@@ -328,7 +327,6 @@ function PaisoApp() {
       <GameModal />
       <DailyCheckInModal />
       <SettingsOverlays><TaskListPage /></SettingsOverlays>
-      <AppHeader />
       <main className="app-viewport">
         <HomeView />
         <TasksView />
@@ -456,7 +454,7 @@ function showTab(name: TabName, taskFilter?: TaskFilter): void {
 let settingsOpener: HTMLElement | null = null;
 
 function setSettingsBackgroundInert(inert: boolean): void {
-  document.querySelectorAll<HTMLElement>('.app-shell > .app-header, .app-shell > .app-viewport, .app-shell > .bottom-nav').forEach(el => {
+  document.querySelectorAll<HTMLElement>('.app-shell > .app-viewport, .app-shell > .bottom-nav').forEach(el => {
     el.inert = inert;
   });
 }

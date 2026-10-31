@@ -4,7 +4,7 @@ export function QuickTasks({ variant = 'home' }: { variant?: 'home' | 'tasks' })
   const tasksVariant = variant === 'tasks';
   const titleId = tasksVariant ? 'tasks-quick-title' : 'quick-title';
   const items = [
-    { title: 'Daily Check-in', copy: <span>Check in daily<br />and earn rewards!</span>, action: () => window.openDailyCheckin(), label: 'Check In', art: 'checkin' },
+    { title: 'Daily Check-in', copy: 'Claim daily reward', action: () => window.openDailyCheckin(), label: 'Check In', art: 'checkin' },
     { title: 'Daily Spin', copy: 'Spin & win coins!', action: () => window.openDailySpin(), label: 'Spin Now', art: 'spin' },
     { title: 'Daily Bonus', copy: 'Claim free rewards!', action: () => window.claimDaily(), label: 'Claim Now', art: 'bonus' },
   ];

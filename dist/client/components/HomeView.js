@@ -1,10 +1,12 @@
 import { h } from '../jsx';
+import { AppHeader } from './shared/AppHeader';
 import { HomeHero } from './home/HomeHero';
 import { QuickTasks } from './home/QuickTasks';
 import { EarnShortcuts } from './home/EarnShortcuts';
 import { FeaturedGames } from './home/FeaturedGames';
 export function HomeView() {
     return (h("section", { id: "tab-home", className: "app-screen home-screen active-screen", "aria-label": "Home" },
+        h(AppHeader, null),
         h("div", { className: "screen-content home-layout" },
             h(HomeHero, null),
             h(QuickTasks, null),

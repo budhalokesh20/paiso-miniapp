@@ -33,7 +33,6 @@ button:disabled { cursor: not-allowed; }
 .header-avatar { padding: 4px; }
 .header-avatar .avatar-dot { width: 9px; height: 9px; top: 4px; right: 4px; }
 .app-header[hidden] { display: none; }
-.app-header[hidden] + .app-viewport { margin-top: env(safe-area-inset-top,0px); }
 .home-header { height: calc(68px + env(safe-area-inset-top,0px)); min-height: 68px; gap: 12px; padding-top: calc(12px + env(safe-area-inset-top,0px)); padding-bottom: 12px; }
 .home-identity { display: flex; align-items: center; gap: 11px; flex: 1; min-width: 0; min-height: 44px; padding: 0; border: 0; background: transparent; text-align: left; }
 .home-identity .home-avatar { width: 44px; height: 44px; flex-shrink: 0; border-radius: 50%; background: #eaf4ef; box-shadow: 0 0 0 3px #fff; }

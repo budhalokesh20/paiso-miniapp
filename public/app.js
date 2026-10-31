@@ -279,10 +279,7 @@ function QuickTasks({ variant = 'home' }) {
     const tasksVariant = variant === 'tasks';
     const titleId = tasksVariant ? 'tasks-quick-title' : 'quick-title';
     const items = [
-        { title: 'Daily Check-in', copy: h("span", null,
-                "Check in daily",
-                h("br", null),
-                "and earn rewards!"), action: () => window.openDailyCheckin(), label: 'Check In', art: 'checkin' },
+        { title: 'Daily Check-in', copy: 'Claim daily reward', action: () => window.openDailyCheckin(), label: 'Check In', art: 'checkin' },
         { title: 'Daily Spin', copy: 'Spin & win coins!', action: () => window.openDailySpin(), label: 'Spin Now', art: 'spin' },
         { title: 'Daily Bonus', copy: 'Claim free rewards!', action: () => window.claimDaily(), label: 'Claim Now', art: 'bonus' },
     ];
@@ -429,6 +426,7 @@ function showFeaturedGamesError() {
 // --- src/client/components/HomeView.tsx ---
 function HomeView() {
     return (h("section", { id: "tab-home", className: "app-screen home-screen active-screen", "aria-label": "Home" },
+        h(AppHeader, null),
         h("div", { className: "screen-content home-layout" },
             h(HomeHero, null),
             h(QuickTasks, null),
@@ -965,7 +963,6 @@ function BottomNav() {
 
 
 
-
 function NotificationModal() {
     return (h("div", { id: "notifModal", role: "dialog", "aria-modal": "true", "aria-labelledby": "notificationsTitle", className: "fixed inset-0 z-[9999] bg-slate-900/50 backdrop-blur-[2px] hidden items-end sm:items-center justify-center p-0 sm:p-4", onKeyDown: (event) => {
             if (event.key === 'Escape') {
@@ -1014,7 +1011,6 @@ function PaisoApp() {
         h(DailyCheckInModal, null),
         h(SettingsOverlays, null,
             h(TaskListPage, null)),
-        h(AppHeader, null),
         h("main", { className: "app-viewport" },
             h(HomeView, null),
             h(TasksView, null),
@@ -1127,7 +1123,7 @@ function showTab(name, taskFilter) {
 }
 let settingsOpener = null;
 function setSettingsBackgroundInert(inert) {
-    document.querySelectorAll('.app-shell > .app-header, .app-shell > .app-viewport, .app-shell > .bottom-nav').forEach(el => {
+    document.querySelectorAll('.app-shell > .app-viewport, .app-shell > .bottom-nav').forEach(el => {
         el.inert = inert;
     });
 }

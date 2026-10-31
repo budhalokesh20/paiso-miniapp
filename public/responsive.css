@@ -8,6 +8,9 @@
 .app-viewport { flex: 1 1 0; min-height: 0; }
 .app-screen { padding-bottom: 0; }
 .app-screen:not(.active-screen) { transition: none; }
+.app-screen:not(.home-screen) { padding-top: env(safe-area-inset-top, 0px); }
+/* Header belongs to the Home scroll flow, without a separate surface above it. */
+.home-screen > .home-header { position: static; background: transparent; border: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
 .screen-content { max-width: 1280px; }
 .home-layout, .tasks-layout { padding-left: var(--page-gutter); padding-right: var(--page-gutter); }
 .app-header { padding-left: max(var(--page-gutter), env(safe-area-inset-left, 0px)); padding-right: max(var(--page-gutter), env(safe-area-inset-right, 0px)); }
@@ -31,7 +34,7 @@ nav.bottom-nav {
 }
 .nav-active-pill {
   position: absolute; z-index: -1; left: 6px; top: 6px; bottom: 6px;
-  width: calc((100% - 12px) * .4); border-radius: 999px; background: #17191c;
+  width: calc((100% - 12px) * .4); border-radius: 999px; background: var(--green);
   pointer-events: none; transform: translateX(0); transition: transform var(--nav-motion);
 }
 .bottom-nav-items:has([data-tab=tasks].active) { grid-template-columns: 1fr 2fr 1fr 1fr; }
@@ -44,7 +47,7 @@ nav.bottom-nav button, nav.bottom-nav button.nav-reward {
   display: flex; flex-direction: row; align-items: center; justify-content: center;
   min-width: 0; min-height: 52px; height: 52px; padding: 0; gap: 0;
   border: 0; border-radius: 999px; background: transparent; box-shadow: none;
-  color: #8a9099; font-size: 12px; font-weight: 600; line-height: 18px;
+  color: var(--ui-muted); font-size: 12px; font-weight: 600; line-height: 18px;
   transition: color 180ms ease, gap var(--nav-motion);
 }
 nav.bottom-nav button .nav-icon, nav.bottom-nav .nav-reward > .nav-icon {
@@ -60,14 +63,13 @@ nav.bottom-nav button.active .nav-label { max-width: 65px; opacity: 1; }
 nav.bottom-nav button.active::after { display: none; }
 nav.bottom-nav button.nav-reward {
   flex: 0 0 52px; width: 52px; height: 52px; min-height: 52px;
-  color: #272a30; background: #fff; box-shadow: 0 4px 18px #1423300b, 0 1px 3px #14233006;
+  color: var(--ui-accent); background: #fff; box-shadow: 0 4px 18px #1423300b, 0 1px 3px #14233006;
 }
 nav.bottom-nav button:active .nav-icon { transform: scale(.9); }
-nav.bottom-nav button:focus-visible { outline: 2px solid #758190; outline-offset: 2px; }
-nav.bottom-nav button.active:focus-visible { outline-color: #17191c; }
+nav.bottom-nav button:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
 @media (hover: hover) {
-  nav.bottom-nav button:not(.active):hover { color: #272a30; }
-  nav.bottom-nav button.nav-reward:hover { background: #f9fafb; }
+  nav.bottom-nav button:not(.active):hover { color: var(--ui-accent); }
+  nav.bottom-nav button.nav-reward:hover { background: #edf9f4; }
 }
 
 @media (min-width: 600px) {

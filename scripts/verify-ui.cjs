@@ -168,6 +168,8 @@ async function run(){
     await page.waitForFunction(()=>getComputedStyle(document.getElementById('tab-home')).opacity==='1');
     const layout = await page.evaluate(()=>{
       const home=document.getElementById('tab-home');
+      const header=document.querySelector('.home-header');
+      const initialHeaderTop=header.getBoundingClientRect().top;
       home.scrollTop=home.scrollHeight;
       const cards=[...document.querySelectorAll('#featuredGames .featured-game')];
       const dock=document.querySelector('.bottom-nav').getBoundingClientRect();
@@ -175,6 +177,7 @@ async function run(){
       const childRects=[...document.querySelector('.home-layout').children].map(el=>el.getBoundingClientRect());
       return {
         overflow:home.scrollWidth>home.clientWidth,
+        headerScrollError:Math.abs(header.getBoundingClientRect().top-initialHeaderTop+home.scrollTop),
         lastCardBottom:Math.max(...cards.map(el=>el.getBoundingClientRect().bottom)),
         dockTop:dock.top,
         tapTargets:shortcuts.every(el=>el.clientWidth>=44&&el.clientHeight>=44),
@@ -185,6 +188,7 @@ async function run(){
       };
     });
     assert.equal(layout.overflow,false,'Home overflow '+JSON.stringify(size));
+    assert.ok(layout.headerScrollError<1,'Header scrolls with content instead of covering it '+JSON.stringify(size));
     assert.equal(layout.overlaps,false,'Home section overlap '+JSON.stringify(size));
     assert.equal(layout.tapTargets,true,'Home touch targets');
     assert.ok(layout.lastCardBottom<=layout.dockTop-12,'Last game clears dock '+JSON.stringify(size));
