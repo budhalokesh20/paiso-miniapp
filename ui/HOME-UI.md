@@ -2,7 +2,7 @@
 
 Reference: `ui/home.png`. The phone frame and system status bar belong to the mockup; the app implements the screen inside it.
 
-`HomeView.tsx` composes HomeHero, QuickTasks, EarnShortcuts and FeaturedGames. `public/home.css` owns the single-column layout, scaled to the app container (maximum 440px). It keeps three quick cards, two earn columns and four popular game columns. Short viewports scroll above the fixed navigation. Reduced-motion preferences and safe-area insets are supported.
+`HomeView.tsx` composes HomeHero, QuickTasks, EarnShortcuts and FeaturedGames. `public/home.css` preserves the mobile reference, with its scale capped by `--reference-unit`. `public/responsive.css` expands the shell to the full viewport and arranges sections in two columns from 760px. Mobile keeps three quick cards, two earn columns and four popular game columns; wider screens use a two-column popular games grid. Short viewports scroll above the navigation, which reserves its own space. Reduced-motion preferences and safe-area insets are supported.
 
 `public/assets/home-reference.webp` is the supplied reference optimized as a 245 KB artwork atlas. CSS background regions select its illustrations, including shared icon fallbacks after the older icon sheet was removed. Headings, descriptions, buttons and game names are real DOM elements. No generated replacement artwork is used for this revision.
 

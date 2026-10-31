@@ -1,0 +1,120 @@
+/* Full viewport shell; reference artwork and type keep their mobile scale. */
+:root {
+  --reference-unit: min(1vw, 4.4px);
+  --page-gutter: clamp(12px, 2.6vw, 32px);
+}
+#root, .app-shell { width: 100%; max-width: none; height: 100vh; height: 100dvh; min-height: 0; }
+.app-shell { container-type: normal; border: 0; box-shadow: none; }
+.app-viewport { flex: 1 1 0; min-height: 0; }
+.app-screen { padding-bottom: 0; }
+.app-screen:not(.active-screen) { transition: none; }
+.screen-content { max-width: 1280px; }
+.home-layout, .tasks-layout { padding-left: var(--page-gutter); padding-right: var(--page-gutter); }
+.app-header { padding-left: max(var(--page-gutter), env(safe-area-inset-left, 0px)); padding-right: max(var(--page-gutter), env(safe-area-inset-right, 0px)); }
+.app-viewport, .settings-overlay-layer { border-left: env(safe-area-inset-left, 0px) solid transparent; border-right: env(safe-area-inset-right, 0px) solid transparent; }
+.settings-subpage > .screen-content { max-width: 760px; }
+
+/* A stable five-item dock: the reward action stays inside its own touch target. */
+nav.bottom-nav {
+  position: relative; inset: auto; flex: 0 0 auto; width: 100%;
+  height: auto; min-height: 80px; border-radius: 22px 22px 0 0;
+  padding: 8px max(8px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px));
+  border-top: 1px solid #e1ebe9; background: #fffffffa;
+  box-shadow: 0 -6px 24px #173d4b08; backdrop-filter: blur(18px);
+}
+.bottom-nav-items { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; width: 100%; max-width: 680px; margin: 0 auto; }
+nav.bottom-nav button, nav.bottom-nav button.nav-reward {
+  min-width: 0; min-height: 63px; padding: 3px 0; gap: 3px; border-radius: 14px;
+  color: #6a7c91; font-size: 11px; font-weight: 600; line-height: 16px;
+  transition: color 160ms var(--ui-ease), background-color 160ms var(--ui-ease);
+}
+nav.bottom-nav button .nav-icon, nav.bottom-nav .nav-reward > .nav-icon {
+  position: relative; inset: auto; display: grid; place-items: center; flex-shrink: 0;
+  width: 56px; max-width: 100%; height: 34px; border: 0; border-radius: 12px;
+  color: inherit; background: transparent; box-shadow: none;
+  transition: background-color 180ms var(--ui-ease), transform 180ms var(--ui-ease);
+}
+nav.bottom-nav button svg, nav.bottom-nav .nav-reward svg { width: 22px; height: 22px; fill: none; stroke-width: 1.8; }
+nav.bottom-nav button.active[data-tab=home] svg { fill: none; stroke-width: 1.8; }
+nav.bottom-nav button.active { color: #00856f; font-weight: 700; }
+nav.bottom-nav button.active .nav-icon { background: #e0f5ed; }
+nav.bottom-nav button.active::after { display: none; }
+nav.bottom-nav .nav-reward > .nav-icon { width: 46px; color: white; background: linear-gradient(135deg,#00b594,#008674); box-shadow: 0 3px 8px #008e7426, inset 0 1px 0 #ffffff35; }
+nav.bottom-nav .nav-reward > .nav-label {
+  position: static; display: block; width: auto; height: auto; border: 0; border-radius: 0;
+  background: none; box-shadow: none; color: #00856f;
+}
+nav.bottom-nav button:active .nav-icon { transform: scale(.94); }
+nav.bottom-nav button:focus-visible { outline: 2px solid #009b7e; outline-offset: -2px; }
+@media (hover: hover) {
+  nav.bottom-nav button:hover { color: #00856f; background: #f0f8f5; }
+}
+
+@media (min-width: 600px) {
+  .home-layout, .tasks-layout { gap: 22px; padding-top: 14px; padding-bottom: 32px; }
+  .home-hero { height: 280px; padding: 28px; }
+  .home-hero .hero-title { font-size: 34px; }
+  .home-hero .hero-sub { margin: 12px 0 18px; font-size: 14px; }
+  .home-hero .hero-cta { height: 42px; }
+  .home-hero .hero-art { top: auto; bottom: 0; width: 64%; height: auto; aspect-ratio: 416 / 322; }
+  .quick-art { max-height: 140px; }
+  .quick-card { padding-bottom: 14px; }
+  .quick-card h3, .tasks-quick .quick-card h3 { margin-top: 8px; }
+  .quick-card > button, .tasks-quick .quick-card > button { min-height: 42px; }
+  .home-layout .section-head h2, .tasks-layout .section-head h2 { font-size: 19px; }
+  .home-shortcuts .earn-tile { min-height: 108px; max-height: 160px; }
+  .home-shortcuts .explore-title { font-size: 17px; }
+  .home-featured .featured-game > b { min-height: 42px; font-size: 13px; }
+  .tasks-hero { min-height: 200px; max-height: 280px; }
+  .tasks-hero h2 { font-size: 28px; }
+  .tasks-hero-art { top: auto; bottom: 0; height: auto; aspect-ratio: 348 / 270; }
+  .home-hero .hero-art, .tasks-hero-art {
+    mask-image: linear-gradient(90deg, transparent, #000 15%, #000 98%, transparent), linear-gradient(0deg, transparent, #000 2%, #000 84%, transparent);
+    mask-composite: intersect;
+  }
+  .task-category { max-height: 136px; }
+  .category-copy b { font-size: 18px; }
+  .screen-content.settings-content { padding: 24px var(--page-gutter) 32px; }
+  #tab-games > .screen-content, #tab-offers > .screen-content, #tab-refer > .screen-content { padding: 24px var(--page-gutter) 32px; }
+  .games-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  nav.bottom-nav { border-radius: 0; }
+}
+@media (min-width: 760px) {
+  .home-layout, .tasks-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .home-hero { height: 100%; min-height: 270px; padding: 24px; }
+  .home-hero .hero-title { font-size: 30px; }
+  .home-hero .hero-sub { font-size: 12px; white-space: normal; }
+  .home-shortcuts, .home-featured { align-self: start; }
+  .home-featured .featured-games { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home-featured .game-cover { aspect-ratio: 1.85; }
+  .tasks-heading, .tasks-categories { grid-column: 1 / -1; }
+  .tasks-hero { height: 100%; min-height: 270px; aspect-ratio: auto; padding: 24px; }
+  .tasks-hero-art { width: 58%; }
+  .tasks-hero h2 { font-size: 26px; }
+  .task-category-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .task-category { min-height: 190px; max-height: none; aspect-ratio: auto; align-items: flex-start; padding: 14px; }
+  .category-icon { width: 62px; height: 62px; }
+  .category-copy, .category-video .category-copy { left: 16px; bottom: 18px; width: calc(100% - 32px); }
+  .category-decoration { width: 54%; height: 60%; }
+  .settings-content { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; align-items: start; }
+  .settings-heading, .settings-content > .settings-profile { grid-column: 1 / -1; }
+  .settings-screen .settings-heading, .settings-screen .settings-profile, .settings-screen .settings-group { margin: 0; }
+  #tab-offers .task-list, #taskList { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .task-detail-page > .screen-content { max-width: 1280px; }
+  #tab-refer > .screen-content { max-width: 900px; }
+}
+@media (min-width: 1100px) {
+  .games-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .home-header { padding-left: max(var(--page-gutter), calc((100% - 1216px) / 2)); padding-right: max(var(--page-gutter), calc((100% - 1216px) / 2)); }
+  .home-hero .hero-title { font-size: 36px; }
+  .home-hero .hero-sub { font-size: 14px; }
+}
+@media (max-height: 500px) and (min-width: 600px) {
+  .home-header { height: calc(60px + env(safe-area-inset-top, 0px)); min-height: 60px; padding-top: calc(8px + env(safe-area-inset-top, 0px)); padding-bottom: 8px; }
+  nav.bottom-nav { min-height: 68px; padding-top: 4px; padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)); }
+  nav.bottom-nav button, nav.bottom-nav button.nav-reward { min-height: 59px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  nav.bottom-nav button, nav.bottom-nav button .nav-icon { transition: none; }
+  nav.bottom-nav button:active .nav-icon { transform: none; }
+}

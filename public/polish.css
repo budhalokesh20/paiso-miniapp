@@ -55,27 +55,27 @@ nav.bottom-nav button.active { color: var(--ui-accent); }
 nav.bottom-nav .nav-reward > span { width: 58px; height: 58px; bottom: 3px; box-shadow: 0 5px 18px #009b7e30; border: 3px solid var(--ui-bg); }
 nav.bottom-nav .nav-reward svg { width: 27px; height: 27px; }
 .home-layout, .tasks-layout { gap: 14px; padding-bottom: 28px; }
-.home-hero { height: calc(42.4cqw + 12px); box-shadow: 0 5px 18px #07384a12; }
+.home-hero { height: calc(calc(42.4 * var(--reference-unit)) + 12px); box-shadow: 0 5px 18px #07384a12; }
 .home-hero .hero-title, .tasks-hero h2 { font-weight: 700; }
-.home-hero .hero-sub { font-size: clamp(11px,2.9cqw,13px); line-height: 1.4; }
+.home-hero .hero-sub { font-size: clamp(11px,calc(2.9 * var(--reference-unit)),13px); line-height: 1.4; }
 .home-hero .hero-cta { height: 36px; font-size: 12px; font-weight: 700; }
 .home-layout .section-head, .tasks-layout .section-head { margin-bottom: 9px; min-height: 26px; }
-.home-layout .section-head h2, .tasks-layout .section-head h2 { font-size: clamp(16px,4.2cqw,18px); font-weight: 700; letter-spacing: -.4px; }
+.home-layout .section-head h2, .tasks-layout .section-head h2 { font-size: clamp(16px,calc(4.2 * var(--reference-unit)),18px); font-weight: 700; letter-spacing: -.4px; }
 .home-layout .view-all-btn, .tasks-layout .view-all-btn { font-size: 12px; font-weight: 600; min-height: 28px; color: #607791; }
 .quick-card { box-shadow: inset 0 0 0 1px #ffffff80, var(--ui-shadow); }
-.quick-card h3, .tasks-quick .quick-card h3 { font-size: clamp(11.5px,3.3cqw,14px); font-weight: 700; letter-spacing: -.4px; }
-.quick-card p, .tasks-quick .quick-card p { font-size: clamp(10.5px,2.8cqw,12px); line-height: 1.25; min-height: 30px; }
-.quick-card > button, .tasks-quick .quick-card > button { min-height: 36px; height: auto; padding: 7px 3px; font-size: clamp(10.5px,2.8cqw,12px); font-weight: 600; }
+.quick-card h3, .tasks-quick .quick-card h3 { font-size: clamp(11.5px,calc(3.3 * var(--reference-unit)),14px); font-weight: 700; letter-spacing: -.4px; }
+.quick-card p, .tasks-quick .quick-card p { font-size: clamp(10.5px,calc(2.8 * var(--reference-unit)),12px); line-height: 1.25; min-height: 30px; }
+.quick-card > button, .tasks-quick .quick-card > button { min-height: 36px; height: auto; padding: 7px 3px; font-size: clamp(10.5px,calc(2.8 * var(--reference-unit)),12px); font-weight: 600; }
 .home-shortcuts .earn-tile, .task-category, .tasks-hero { box-shadow: inset 0 0 0 1px #ffffff60, var(--ui-shadow); }
-.home-shortcuts .explore-title { font-size: clamp(13px,3.6cqw,16px); font-weight: 700; }
-.home-shortcuts .explore-sub { font-size: clamp(10.5px,2.8cqw,12px); line-height: 1.3; }
+.home-shortcuts .explore-title { font-size: clamp(13px,calc(3.6 * var(--reference-unit)),16px); font-weight: 700; }
+.home-shortcuts .explore-sub { font-size: clamp(10.5px,calc(2.8 * var(--reference-unit)),12px); line-height: 1.3; }
 .home-featured .featured-game { border: 1px solid #e8eef4; background: #fff; box-shadow: var(--ui-shadow); }
-.home-featured .featured-game > b { font-size: clamp(10.5px,2.8cqw,12px); font-weight: 600; padding: 7px 3px; min-height: 30px; line-height: 1.3; }
+.home-featured .featured-game > b { font-size: clamp(10.5px,calc(2.8 * var(--reference-unit)),12px); font-weight: 600; padding: 7px 3px; min-height: 30px; line-height: 1.3; }
 .tasks-heading h1 { font-weight: 700; }
-.tasks-heading p { font-size: clamp(12px,3.3cqw,14px); line-height: 1.5; }
-.tasks-hero p { font-size: clamp(11px,3cqw,13px); line-height: 1.35; }
+.tasks-heading p { font-size: clamp(12px,calc(3.3 * var(--reference-unit)),14px); line-height: 1.5; }
+.tasks-hero p { font-size: clamp(11px,calc(3 * var(--reference-unit)),13px); line-height: 1.35; }
 .category-copy b { font-weight: 700; }
-.category-copy > span { font-size: clamp(10.5px,2.9cqw,13px); line-height: 1.35; }
+.category-copy > span { font-size: clamp(10.5px,calc(2.9 * var(--reference-unit)),13px); line-height: 1.35; }
 .card, .settings-screen .settings-profile, .settings-screen .settings-group-card,
 .task-card, .game-card, .ref-link-card, .ref-hist-card, .empty-state,
 .settings-screen .withdraw-form { border: 1px solid var(--ui-line); border-radius: var(--ui-radius); background-color: var(--ui-surface); box-shadow: var(--ui-shadow); }

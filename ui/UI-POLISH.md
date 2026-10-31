@@ -15,3 +15,11 @@ Open ui/preview/polish-review.html for the visual review. Screenshots contain te
 ## Personalized Home header
 
 Home shows the current avatar and a Hey, first-name greeting from user data. The notification bell opens the existing notification dialog and shows unread counts up to 9+. The shared header is completely hidden on Tasks, Invite, Games, Offers and Settings, without reserving layout space. Back bars remain on detail pages. Search stays inside task lists; the Home withdrawal shortcut remains available. Browser checks cover greeting data, avatar navigation, unread-count clearing and header visibility across every tab.
+
+## Fullscreen layout and navigation
+
+`public/responsive.css` is the final layout layer. The shell fills the available browser viewport with dynamic viewport height; content stays readable within a 1280px maximum. At 760px, Home, Tasks and Settings reflow into columns. Games scale from two to four columns. Forms keep a narrower reading width. Reference artwork and text use a capped `--reference-unit`, avoiding oversized typography on desktop. Banner artwork keeps its original aspect ratio.
+
+The footer has five evenly spaced touch targets, consistent outline icons, a mint active pill and a labeled Rewards action. Its controls stay within the dock, which reserves space above the bottom safe area. Keyboard focus and reduced motion are supported. Inactive pages hide immediately to avoid showing two pages during a transition; incoming pages retain their gentle fade.
+
+Regression coverage now includes nine viewport sizes from 320px to 1920px, portrait and landscape, full viewport bounds, footer touch targets, keyboard navigation, selected destinations, Rewards opening, content clearance and horizontal overflow. `node scripts/verify-ui.cjs --layout-only` runs the layout/navigation portion; omit the flag for all existing interaction checks. Preview images use fixture data, not live transactions.

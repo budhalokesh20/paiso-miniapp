@@ -72,7 +72,8 @@ async function run(){
 
 
   // Reference Tasks landing and real category lists.
-  const taskSizes=[{width:320,height:568},{width:390,height:844},{width:768,height:1024},{width:844,height:390}];
+  console.log('Checking Tasks layouts and category actions');
+  const taskSizes=[{width:320,height:568},{width:390,height:844},{width:768,height:1024},{width:844,height:390},{width:1280,height:800}];
   for(const size of taskSizes) {
     await page.setViewportSize(size);
     await page.evaluate(()=>window.showTab('tasks'));
@@ -159,7 +160,8 @@ async function run(){
   await page.evaluate(()=>{window.showTab('tasks');document.getElementById('tab-tasks').scrollTop=200;window.showTab('home');window.showTab('tasks');});
   assert.equal(await page.locator('#tab-tasks').evaluate(el=>el.scrollTop),0,'Tab navigation starts at the top');
 
-  const homeSizes = [{width:320,height:568},{width:360,height:640},{width:390,height:844},{width:480,height:800},{width:768,height:1024},{width:844,height:390},{width:1280,height:800}];
+  const homeSizes = [{width:320,height:568},{width:360,height:640},{width:390,height:844},{width:480,height:800},{width:600,height:900},{width:768,height:1024},{width:844,height:390},{width:1280,height:800},{width:1920,height:1080}];
+  console.log('Checking fullscreen layouts and footer navigation');
   for (const size of homeSizes) {
     await page.setViewportSize(size);
     await page.evaluate(()=>window.showTab('home'));
@@ -188,10 +190,38 @@ async function run(){
     assert.ok(layout.lastCardBottom<=layout.dockTop-12,'Last game clears dock '+JSON.stringify(size));
     assert.equal(layout.quickColumns,3,'Three quick tasks');
     assert.equal(layout.earnColumns,2,'Two earn columns');
+    const shell=await page.locator('.app-shell').boundingBox();
+    assert.ok(Math.abs(shell.width-size.width)<1 && Math.abs(shell.height-size.height)<1 && shell.x===0 && shell.y===0,'App fills available viewport '+JSON.stringify(size));
+    const nav=await page.locator('.bottom-nav').boundingBox();
+    const viewport=await page.locator('.app-viewport').boundingBox();
+    assert.ok(Math.abs(nav.y+nav.height-size.height)<1 && Math.abs(nav.width-size.width)<1,'Dock spans viewport and reaches bottom');
+    assert.ok(viewport.y+viewport.height<=nav.y+1,'Dock reserves space instead of covering content');
+    assert.equal(await page.locator('.bottom-nav button').evaluateAll(buttons=>buttons.every(button=>{
+      const r=button.getBoundingClientRect(); const icon=button.querySelector('.nav-icon').getBoundingClientRect();
+      return r.width>=44 && r.height>=44 && icon.top>=r.top && icon.bottom<=r.bottom;
+    })),true,'Navigation touch targets contain their icons');
+    for(const tab of ['tasks','refer','wallet','home']) {
+      await page.locator('.bottom-nav button[data-tab="'+tab+'"]').click();
+      assert.equal(await page.locator('.bottom-nav [aria-current="page"]').getAttribute('data-tab'),tab,'Current destination '+tab);
+      assert.equal(await page.locator('#tab-'+tab).evaluate(el=>el.scrollWidth>el.clientWidth),false,'Responsive page overflow '+tab+' '+size.width);
+    }
     await page.evaluate(()=>{document.getElementById('tab-home').scrollTop=0;});
-    if ([320,390,768,844].includes(size.width)) await page.screenshot({path:path.join(root,'ui/preview',`home-${size.width}.png`)});
+    await page.waitForFunction(()=>getComputedStyle(document.getElementById('tab-home')).opacity==='1');
+    if ([320,390,768,844,1280,1920].includes(size.width)) await page.screenshot({path:path.join(root,'ui/preview',`home-${size.width}.png`)});
   }
   await page.setViewportSize({width:390,height:844});
+  await page.locator('.bottom-nav button[data-tab="tasks"]').focus();
+  await page.keyboard.press('Enter');
+  assert.equal(await page.locator('.bottom-nav [aria-current="page"]').getAttribute('data-tab'),'tasks');
+  await page.getByRole('button',{name:'Claim daily reward',exact:true}).click();
+  assert.equal(await page.locator('.home-checkin-dialog').isVisible(),true,'Footer reward action opens daily rewards');
+  await page.locator('.checkin-close').click();
+  if(process.argv.includes('--layout-only')) {
+    assert.deepEqual(errors,[]);
+    console.log(JSON.stringify({passed:true,fullscreen:true,footerNavigation:true,homeSizes,taskSizes,errors},null,2));
+    await browser.close();server.close();return;
+  }
+  console.log('Checking polling, rewards and feedback');
   await page.locator('#featuredGames button').first().focus();
   await page.evaluate(()=>{window.__featuredNode=document.querySelector('#featuredGames button');window.__homeScroll=document.getElementById('tab-home').scrollTop;});
   await page.clock.install();

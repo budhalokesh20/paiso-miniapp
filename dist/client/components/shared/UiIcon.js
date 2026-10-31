@@ -1,6 +1,7 @@
 import { h } from '../../jsx';
 export function UiIcon({ name, size = 20 }) {
     const paths = {
+        gift: 'M3 8h18v4H3V8M5 12v9h14v-9M12 8v13M12 8H8a3 3 0 1 1 3-3l1 3Zm0 0h4a3 3 0 1 0-3-3l-1 3Z',
         game: 'M6 8h12c2 0 3 2 3 4l1 5c0 2-2 3-3 1l-3-3H8l-3 3c-1 2-3 1-3-1l1-5c0-2 1-4 3-4M7 10v4M5 12h4M16 11h.01M18 13h.01',
         search: 'M21 21l-5-5M19 10.5a8.5 8.5 0 1 1-17 0 8.5 8.5 0 0 1 17 0',
         crown: 'M3 6l4 4 5-7 5 7 4-4-2 13H5L3 6M6 15h12',
